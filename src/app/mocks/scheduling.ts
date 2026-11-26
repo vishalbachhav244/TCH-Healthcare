@@ -1,13 +1,8 @@
 import { dayInIndia, shiftDay, type Appointment, type Facility } from '../domain/operations';
+import { appointmentSlots, type ScheduleException } from '../domain/scheduling';
 import { ApiError } from './access';
 import { db } from './database';
 import { checkedDay } from './queries';
-
-const slots = Array.from({ length: 32 }, (_, slot) => {
-  const hour = String(9 + Math.floor(slot / 4)).padStart(2, '0');
-  const minute = String((slot % 4) * 15).padStart(2, '0');
-  return hour + ':' + minute;
-});
 
 export function bookingDay(value: string) {
   const day = checkedDay(value);
@@ -24,6 +19,26 @@ export async function facilityPractitioner(facility: Facility, practitionerId: s
   return practitioner;
 }
 
+function exceptionsFor(facility: Facility, practitionerId: string, day: string) {
+  return db.scheduleExceptions
+    .where('[facilityId+practitionerId+day]')
+    .equals([facility.id, practitionerId, day])
+    .filter((item) => item.releasedAt === undefined);
+}
+
+export function includesTime(block: Pick<ScheduleException, 'start' | 'end'>, time: string) {
+  return time >= block.start && time < block.end;
+}
+
+export function availableSlots(appointments: Appointment[], blocks: ScheduleException[]) {
+  const occupied = new Set(
+    appointments.filter((row) => row.status !== 'Cancelled').map((row) => row.time),
+  );
+  return appointmentSlots.filter(
+    (time) => !occupied.has(time) && !blocks.some((block) => includesTime(block, time)),
+  );
+}
+
 export async function assertAvailable(
   facility: Facility,
   patientId: string,
@@ -32,13 +47,18 @@ export async function assertAvailable(
   time: string,
   except?: string,
 ) {
-  if (!slots.includes(time)) throw new ApiError(422, 'Choose a listed 15-minute appointment slot.');
-  const [patient] = await Promise.all([
+  if (!appointmentSlots.includes(time))
+    throw new ApiError(422, 'Choose a listed 15-minute appointment slot.');
+  const [patient, , block] = await Promise.all([
     db.patients.get(patientId),
     facilityPractitioner(facility, practitionerId),
+    exceptionsFor(facility, practitionerId, day)
+      .and((row) => includesTime(row, time))
+      .first(),
   ]);
   if (patient?.tenantId !== facility.tenantId)
     throw new ApiError(404, 'Patient is unavailable at this facility.');
+  if (block) throw new ApiError(409, 'The clinician’s schedule is blocked at this time.');
   const scheduled = (item: Appointment) => item.id !== except && item.status !== 'Cancelled';
   const [occupied, overlapping] = await Promise.all([
     db.appointments
@@ -56,22 +76,43 @@ export async function assertAvailable(
   if (overlapping) throw new ApiError(409, 'This patient already has an appointment at this time.');
 }
 
+export async function bookAppointment(
+  facility: Facility,
+  fields: Pick<Appointment, 'patientId' | 'practitionerId' | 'day' | 'time' | 'channel'>,
+) {
+  const { patientId, practitionerId, day, time } = fields;
+  await assertAvailable(facility, patientId, practitionerId, day, time);
+  const appointment = {
+    ...fields,
+    id: crypto.randomUUID(),
+    facilityId: facility.id,
+    status: 'Booked' as const,
+    pass: crypto.randomUUID(),
+  };
+  await db.appointments.add(appointment);
+  return appointment;
+}
+
 export async function availability(
   facility: Facility,
   practitionerId: string,
   value: string,
   excluding?: string,
+  patientId?: string,
 ) {
   const day = bookingDay(value);
   await facilityPractitioner(facility, practitionerId);
-  const taken = await db.appointments
-    .where('[facilityId+day]')
-    .equals([facility.id, day])
-    .filter(
-      (row) =>
-        row.practitionerId === practitionerId && row.status !== 'Cancelled' && row.id !== excluding,
-    )
-    .toArray();
-  const occupied = new Set(taken.map((row) => row.time));
-  return slots.filter((time) => !occupied.has(time));
+  const [appointments, blocks] = await Promise.all([
+    db.appointments
+      .where('[facilityId+day]')
+      .equals([facility.id, day])
+      .filter(
+        (row) =>
+          (row.practitionerId === practitionerId || row.patientId === patientId) &&
+          row.id !== excluding,
+      )
+      .toArray(),
+    exceptionsFor(facility, practitionerId, day).toArray(),
+  ]);
+  return availableSlots(appointments, blocks);
 }

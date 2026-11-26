@@ -29,6 +29,7 @@ import type {
   SharedReport,
 } from '../domain/interoperability';
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
+import type { ScheduleException, SchedulingDay, WaitlistEntry } from '../domain/scheduling';
 
 interface CommandResult {
   id: string;
@@ -55,6 +56,12 @@ function objectShape<T>(value: unknown, keys: readonly (keyof T)[]): T {
 function collection<T>(value: unknown, keys: readonly (keyof T)[]): T[] {
   if (!Array.isArray(value)) throw new Error('Invalid API response');
   return value.map((row: unknown) => objectShape<T>(row, keys));
+}
+
+function timeSlots(value: unknown) {
+  if (!Array.isArray(value) || value.some((time) => typeof time !== 'string'))
+    throw new Error('The workspace returned invalid appointment times.');
+  return value as string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -179,13 +186,62 @@ export class Api {
       day,
       practitionerId,
       appointmentId,
-    }).pipe(
-      map((value) => {
-        if (!Array.isArray(value) || value.some((time) => typeof time !== 'string'))
-          throw new Error('The workspace returned invalid appointment times.');
-        return value as string[];
-      }),
+    }).pipe(map(timeSlots));
+  }
+
+  portalAvailableTimes(token: string, facility: string, day: string, practitionerId: string) {
+    return this.get('portal/availability', token, facility, { day, practitionerId }).pipe(
+      map(timeSlots),
     );
+  }
+
+  schedulingDay(token: string, facility: string, day: string) {
+    return this.get('scheduling', token, facility, { day }).pipe(
+      map((value) =>
+        objectShape<SchedulingDay>(value, ['practitioners', 'waitlist', 'exceptions']),
+      ),
+    );
+  }
+
+  schedulingPatients(token: string, facility: string, q: string) {
+    return this.patients('appointments/options', token, facility, q).pipe(
+      map((data) => data.patients),
+    );
+  }
+
+  joinWaitlist(
+    token: string,
+    facility: string,
+    fields: Pick<WaitlistEntry, 'patientId' | 'practitionerId' | 'day'>,
+  ) {
+    return this.execute('scheduling/waitlist', token, facility, fields);
+  }
+
+  changeWaitlist(
+    token: string,
+    facility: string,
+    entry: Pick<WaitlistEntry, 'id' | 'version'>,
+    action: { action: 'withdraw' } | { action: 'book'; time: string },
+  ) {
+    return this.execute(
+      'scheduling/waitlist/status',
+      token,
+      facility,
+      { entryId: entry.id, version: String(entry.version), ...action },
+      'PATCH',
+    );
+  }
+
+  createScheduleException(
+    token: string,
+    facility: string,
+    fields: Pick<ScheduleException, 'practitionerId' | 'day' | 'start' | 'end' | 'reason'>,
+  ) {
+    return this.execute('scheduling/exceptions', token, facility, fields);
+  }
+
+  releaseScheduleException(token: string, facility: string, exceptionId: string) {
+    return this.execute('scheduling/exceptions/release', token, facility, { exceptionId }, 'PATCH');
   }
 
   appointments(

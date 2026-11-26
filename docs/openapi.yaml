@@ -2428,6 +2428,270 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /scheduling:
+    get:
+      operationId: getSchedulingDay
+      summary: Read facility waitlist requests and schedule blocks for a date.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: day
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulingDay"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /scheduling/waitlist:
+    post:
+      operationId: joinAppointmentWaitlist
+      summary: Add one waitlist request for a patient, clinician and date.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - practitionerId
+                - day
+              properties:
+                patientId:
+                  type: string
+                practitionerId:
+                  type: string
+                day:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /scheduling/waitlist/status:
+    patch:
+      operationId: changeAppointmentWaitlist
+      summary: Book an available appointment or withdraw an active request at its
+        expected version.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required:
+                    - entryId
+                    - version
+                    - action
+                    - time
+                  properties:
+                    entryId:
+                      type: string
+                    version:
+                      type: string
+                    action:
+                      type: string
+                      enum:
+                        - book
+                    time:
+                      type: string
+                      pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+                - type: object
+                  required:
+                    - entryId
+                    - version
+                    - action
+                  properties:
+                    entryId:
+                      type: string
+                    version:
+                      type: string
+                    action:
+                      type: string
+                      enum:
+                        - withdraw
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /scheduling/exceptions:
+    post:
+      operationId: blockClinicianSchedule
+      summary: Block a clinician time range that has no appointments or active
+        schedule blocks.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - practitionerId
+                - day
+                - start
+                - end
+                - reason
+              properties:
+                practitionerId:
+                  type: string
+                day:
+                  type: string
+                  format: date
+                start:
+                  type: string
+                  pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+                end:
+                  type: string
+                  pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+                reason:
+                  type: string
+                  enum:
+                    - Clinician leave
+                    - Team meeting
+                    - Service interruption
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /scheduling/exceptions/release:
+    patch:
+      operationId: releaseClinicianSchedule
+      summary: Release an active clinician time block and preserve its history.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - exceptionId
+              properties:
+                exceptionId:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/availability:
+    get:
+      operationId: getPatientAvailableTimes
+      summary: Read clinically available times without exposing other patients or
+        appointments.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: day
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: practitionerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -3645,6 +3909,115 @@ components:
         - createdAt
         - timeline
         - ownedByCurrentUser
+    WaitlistRow:
+      type: object
+      required:
+        - id
+        - patient
+        - patientId
+        - practitioner
+        - practitionerId
+        - requestedAt
+        - status
+        - version
+        - availableTimes
+      properties:
+        id:
+          type: string
+        patient:
+          type: string
+        patientId:
+          type: string
+        practitioner:
+          type: string
+        practitionerId:
+          type: string
+        requestedAt:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - Waiting
+            - Booked
+            - Withdrawn
+            - Expired
+        version:
+          type: integer
+          minimum: 0
+        availableTimes:
+          type: array
+          items:
+            type: string
+            pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        bookedTime:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        bookedDay:
+          type: string
+          format: date
+        appointmentStatus:
+          type: string
+          enum:
+            - Booked
+            - Checked in
+            - In consultation
+            - Completed
+            - Cancelled
+    ScheduleException:
+      type: object
+      required:
+        - id
+        - practitioner
+        - practitionerId
+        - day
+        - start
+        - end
+        - reason
+      properties:
+        id:
+          type: string
+        practitioner:
+          type: string
+        practitionerId:
+          type: string
+        day:
+          type: string
+          format: date
+        start:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        end:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        reason:
+          type: string
+          enum:
+            - Clinician leave
+            - Team meeting
+            - Service interruption
+        releasedAt:
+          type: integer
+          minimum: 0
+    SchedulingDay:
+      type: object
+      required:
+        - practitioners
+        - waitlist
+        - exceptions
+      properties:
+        practitioners:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practitioner"
+        waitlist:
+          type: array
+          items:
+            $ref: "#/components/schemas/WaitlistRow"
+        exceptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleException"
   responses:
     Error401:
       description: 'Missing or expired session.'

@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
-import { dayInIndia } from '../domain/operations';
+import { dayInIndia, shiftDay } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
 import { PatientSharing } from './patient-sharing';
 
@@ -19,6 +20,7 @@ export class Portal {
   private readonly api = inject(Api);
   protected readonly store = inject(SessionStore);
   protected readonly today = dayInIndia();
+  protected readonly latest = shiftDay(this.today, 90);
   protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing'>('visits');
   protected readonly report = signal<LabOrder | undefined>(undefined);
   protected readonly busy = signal(false);
@@ -31,7 +33,13 @@ export class Portal {
   protected readonly form = inject(NonNullableFormBuilder).group({
     practitionerId: ['', Validators.required],
     day: [this.today, Validators.required],
-    time: ['14:00', Validators.required],
+    time: ['', Validators.required],
+  });
+  private readonly practitionerId = toSignal(this.form.controls.practitionerId.valueChanges, {
+    initialValue: '',
+  });
+  private readonly bookingDay = toSignal(this.form.controls.day.valueChanges, {
+    initialValue: this.today,
   });
   private readonly scope = computed(() => ({
     token: this.store.session()?.token ?? '',
@@ -40,6 +48,18 @@ export class Portal {
   }));
   protected readonly data = facilityQuery(this.scope, ({ token, facility }) =>
     this.api.portal(token, facility),
+  );
+  private readonly slotParams = computed(() => ({
+    ...this.scope(),
+    facility:
+      this.booking() && this.practitionerId() && this.bookingDay() ? this.scope().facility : '',
+    day: this.bookingDay(),
+    practitionerId: this.practitionerId(),
+  }));
+  protected readonly slots = facilityQuery(
+    this.slotParams,
+    ({ token, facility, day, practitionerId }) =>
+      this.api.portalAvailableTimes(token, facility, day, practitionerId),
   );
   protected readonly next = computed(() => {
     const data = this.data();
@@ -56,7 +76,7 @@ export class Portal {
 
   protected open(dialog: HTMLDialogElement, id?: string) {
     this.booking.set(!id);
-    this.form.reset({ day: this.today, time: '14:00' });
+    this.form.reset();
     this.error.set('');
     this.pass.set('');
     this.qr.set('');
@@ -65,7 +85,12 @@ export class Portal {
   }
 
   protected async book() {
-    if (this.form.invalid) {
+    const slots = this.slots();
+    if (
+      this.form.invalid ||
+      slots.state !== 'ready' ||
+      !slots.data.includes(this.form.controls.time.value)
+    ) {
       this.error.set('Choose a clinician, date and time.');
       return;
     }

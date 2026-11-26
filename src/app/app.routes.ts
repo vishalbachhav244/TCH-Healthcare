@@ -125,6 +125,13 @@ export const routes: Routes = [
         title: 'Appointments · TrueCare',
       },
       {
+        path: 'scheduling',
+        data: { resource: 'scheduling' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/scheduling').then((m) => m.Scheduling),
+        title: 'Scheduling · TrueCare',
+      },
+      {
         path: 'queue',
         data: { resource: 'queue' },
         canActivate: [workspaceAccess],

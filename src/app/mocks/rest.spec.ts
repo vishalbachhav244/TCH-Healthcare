@@ -2,7 +2,14 @@ import '@angular/compiler';
 import 'fake-indexeddb/auto';
 import { HttpHeaders, HttpRequest } from '@angular/common/http';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { dayInIndia, invoiceTotal, type AppointmentPage, type Session } from '../domain/operations';
+import {
+  dayInIndia,
+  invoiceTotal,
+  shiftDay,
+  type AppointmentPage,
+  type Session,
+} from '../domain/operations';
+import type { SchedulingDay } from '../domain/scheduling';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -623,6 +630,168 @@ describe('platform authorization and entitlements', () => {
 });
 
 describe('scheduling and queue transitions', () => {
+  it('enforces schedule blocks on staff, portal and waitlist booking with scoped release', async () => {
+    const [reception, executive, patient, clinician] = await Promise.all([
+      login('reception'),
+      login('executive'),
+      login('patient'),
+      login('clinician'),
+    ]);
+    const facility = 'mer-central';
+    const day = shiftDay(dayInIndia(), 2);
+    const entryFields = { patientId: 'TC-MERIDIAN-01001', practitionerId: 'mer-central-DR-1', day };
+    const blockFields = {
+      practitionerId: entryFields.practitionerId,
+      day,
+      start: '09:00',
+      end: '09:15',
+      reason: 'Clinician leave',
+    };
+    const appointmentFields = { ...entryFields, time: '09:00' };
+    const view = (session: Session, selectedFacility = facility) =>
+      get('scheduling?day=' + day, session, selectedFacility) as Promise<SchedulingDay>;
+    const query = `?day=${day}&practitionerId=${entryFields.practitionerId}`;
+    await expect(view(clinician)).rejects.toMatchObject({ status: 403 });
+    await expect(view(reception, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('scheduling/exceptions', blockFields, reception, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('scheduling/waitlist', entryFields, executive, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    const { id: entryId } = (await post(
+      'scheduling/waitlist',
+      entryFields,
+      reception,
+      facility,
+    )) as { id: string };
+    await expect(
+      post('scheduling/waitlist', entryFields, reception, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      post('scheduling/exceptions', { ...blockFields, end: '09:07' }, executive, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const { id: exceptionId } = (await post(
+      'scheduling/exceptions',
+      blockFields,
+      executive,
+      facility,
+    )) as { id: string };
+    await expect(
+      post('scheduling/exceptions', { ...blockFields, end: '09:30' }, executive, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      get('appointments/availability' + query, reception, facility),
+    ).resolves.not.toContain('09:00');
+    await expect(get('portal/availability' + query, patient, facility)).resolves.not.toContain(
+      '09:00',
+    );
+    await expect(get('portal/availability' + query, reception, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      post('appointments', appointmentFields, reception, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      post('portal/appointments', appointmentFields, patient, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const confirmed = (await post(
+      'appointments',
+      { ...entryFields, patientId: 'TC-MERIDIAN-01002', time: '09:15' },
+      reception,
+      facility,
+    )) as { id: string };
+    await expect(
+      patch(
+        'appointments/reschedule',
+        { ...appointmentFields, appointmentId: confirmed.id, version: '0' },
+        reception,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    const booking = { entryId, version: '1', action: 'book', time: '09:00' };
+    await expect(
+      patch('scheduling/waitlist/status', booking, reception, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      patch('scheduling/exceptions/release', { exceptionId }, executive, 'mer-north'),
+    ).rejects.toMatchObject({ status: 404 });
+    await patch('scheduling/exceptions/release', { exceptionId }, executive, facility);
+    await expect(
+      patch('scheduling/exceptions/release', { exceptionId }, executive, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const active = (await view(reception)).waitlist.find((row) => row.id === entryId)!;
+    expect(active.availableTimes).toContain('09:00');
+    expect(active.availableTimes).not.toContain('09:15');
+    const commands = await Promise.allSettled([
+      patch('scheduling/waitlist/status', booking, reception, facility),
+      patch('scheduling/waitlist/status', booking, reception, facility),
+    ]);
+    expect(commands.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(commands).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    const appointment = await db.appointments
+      .where('[facilityId+practitionerId+day+time]')
+      .equals([facility, entryFields.practitionerId, day, '09:00'])
+      .toArray();
+    expect(appointment).toHaveLength(1);
+    expect(appointment[0]).toMatchObject({
+      patientId: entryFields.patientId,
+      status: 'Booked',
+      pass: expect.any(String),
+    });
+    await expect(
+      post('scheduling/exceptions', blockFields, executive, facility),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('existing appointment'),
+    });
+    expect((await view(executive)).waitlist.find((row) => row.id === entryId)).toMatchObject({
+      status: 'Booked',
+      version: 2,
+      bookedTime: '09:00',
+    });
+  });
+
+  it('retains waitlist withdrawal history, denies expired requests and permits another request', async () => {
+    const user = await login('reception');
+    const facility = 'mer-central';
+    const day = shiftDay(dayInIndia(), 3);
+    const fields = { patientId: 'TC-MERIDIAN-01002', practitionerId: 'mer-central-DR-2', day };
+    const { id } = (await post('scheduling/waitlist', fields, user, facility)) as { id: string };
+    await patch(
+      'scheduling/waitlist/status',
+      { entryId: id, version: '1', action: 'withdraw' },
+      user,
+      facility,
+    );
+    const { id: nextId } = (await post('scheduling/waitlist', fields, user, facility)) as {
+      id: string;
+    };
+    expect(nextId).not.toBe(id);
+    const view = (await get('scheduling?day=' + day, user, facility)) as SchedulingDay;
+    expect(view.waitlist.find((row) => row.id === id)?.status).toBe('Withdrawn');
+    const yesterday = shiftDay(dayInIndia(), -1);
+    await db.waitlist.update(nextId, { day: yesterday });
+    const prior = (await get('scheduling?day=' + yesterday, user, facility)) as SchedulingDay;
+    expect(prior.waitlist.find((row) => row.id === nextId)).toMatchObject({
+      status: 'Expired',
+      availableTimes: [],
+    });
+    await expect(
+      patch(
+        'scheduling/waitlist/status',
+        { entryId: nextId, version: '1', action: 'book', time: '10:00' },
+        user,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it('rotates appointment passes, rejects stale changes, and releases cancelled slots', async () => {
     const user = await login('reception');
     const facility = 'mer-central';

@@ -2,14 +2,14 @@ import {
   dayInIndia,
   invoiceTotal,
   observations,
-  type Appointment,
   type DomainEvent,
   type Facility,
   type Observation,
 } from '../domain/operations';
 import { ApiError, patientSubject, requireSession, scope } from './access';
 import { db } from './database';
-import { assertAvailable, bookingDay, facilityPractitioner } from './scheduling';
+import { assertAvailable, bookAppointment, bookingDay, facilityPractitioner } from './scheduling';
+import { updateException, updateWaitlist } from './scheduling-workspace';
 import { createPatient } from './seed';
 import { inpatientCommand } from './inpatient';
 import { laboratoryCommand } from './laboratory';
@@ -74,6 +74,8 @@ export async function command(
       db.stockMovements,
       db.clinicalReviews,
       db.qualityCases,
+      db.waitlist,
+      db.scheduleExceptions,
     ],
     async () => {
       const session = await requireSession(token);
@@ -104,21 +106,30 @@ export async function command(
           const practitionerId = field(payload, 'practitionerId');
           const day = bookingDay(field(payload, 'day'));
           const time = field(payload, 'time');
-          await assertAvailable(facility, patientId, practitionerId, day, time);
-          pass = crypto.randomUUID();
-          const appointment: Appointment = {
-            id: crypto.randomUUID(),
-            facilityId: facility.id,
+          const appointment = await bookAppointment(facility, {
             day,
             time,
             patientId,
             practitionerId,
             channel: !selfService && payload['channel'] === 'Walk-in' ? 'Walk-in' : 'Scheduled',
-            status: 'Booked',
-            pass,
-          };
-          await db.appointments.add(appointment);
+          });
+          pass = appointment.pass;
           changed = event(facility, 'AppointmentBooked', appointment.id);
+          break;
+        }
+        case 'scheduling/waitlist':
+        case 'scheduling/waitlist/status': {
+          const facility = scope(session, facilityRecord, 'D10', 'appointments');
+          const result = await updateWaitlist(facility, path, payload);
+          changed = { ...event(facility, result.type, result.id), actor: session.account };
+          pass = result.pass;
+          break;
+        }
+        case 'scheduling/exceptions':
+        case 'scheduling/exceptions/release': {
+          const facility = scope(session, facilityRecord, 'D10', 'schedule-exceptions');
+          const result = await updateException(facility, path, payload);
+          changed = { ...event(facility, result.type, result.id), actor: session.account };
           break;
         }
         case 'appointments/reschedule':

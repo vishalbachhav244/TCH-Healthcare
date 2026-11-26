@@ -8,4 +8,6 @@ A connector binds one facility to one recipient identity. A matching code refere
 
 A clinical review references a flagged published report. A referral links that review to a facility quality case. The quality register exposes a process title, category and priority. Case events preserve the actor, timestamp and status, with a structured disposition for resolution.
 
+A waitlist request links one patient, clinician and facility date. It has its own lifecycle and version, and links to an appointment only after successful conversion. An unreleased schedule block excludes a clinician's slots over a half-open time range. Releasing a block preserves its record. Booking, rescheduling and waitlist conversion check the same appointment and block stores in their write transaction. [Scheduling contracts](../src/app/domain/scheduling.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

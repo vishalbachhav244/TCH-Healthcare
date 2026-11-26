@@ -9,6 +9,7 @@ export type Resource =
   | 'network'
   | 'overview'
   | 'appointments'
+  | 'scheduling'
   | 'patients'
   | 'queue'
   | 'clinical'
@@ -196,6 +197,7 @@ export const navigation = [
   },
   { title: 'Quality & compliance', resource: 'quality', icon: 'shield', workspace: 'D08' },
   { title: 'Appointments', resource: 'appointments', icon: 'calendar', workspace: 'D10' },
+  { title: 'Scheduling', resource: 'scheduling', icon: 'clock', workspace: 'D10' },
   { title: 'Patients', resource: 'patients', icon: 'users', workspace: 'D09' },
   { title: 'Consultation queue', resource: 'queue', icon: 'list', workspace: 'D11' },
   { title: 'Clinical workspace', resource: 'clinical', icon: 'stethoscope', workspace: 'D13' },

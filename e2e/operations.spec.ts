@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { dayInIndia, shiftDay } from '../src/app/domain/operations';
 
 async function signIn(page: Page, account: string) {
   await page.goto('/');
@@ -23,6 +24,123 @@ async function checkReflow(page: Page) {
     ).toBeLessThanOrEqual(width);
   }
 }
+
+test('shares clinician availability across waitlist, scheduling and patient booking', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(125_000);
+  const day = shiftDay(dayInIndia(), 1);
+  const practitioner = 'mer-central-DR-1';
+  await signIn(page, 'reception');
+  await page.getByRole('main').getByRole('link', { name: 'Scheduling' }).click();
+  await page.getByLabel('Schedule date').fill(day);
+  await expect(page.getByText('No waitlist requests match this date and filter.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Block time' })).toHaveCount(0);
+  const add = page.getByRole('button', { name: 'Add to waitlist' });
+  await add.focus();
+  await page.keyboard.press('Enter');
+  const intake = page.getByRole('dialog', { name: 'Add to appointment waitlist' });
+  await expect(intake).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(add).toBeFocused();
+  await add.click();
+  const patientId = 'TC-MERIDIAN-01001';
+  await intake.getByLabel('Find patient').fill(patientId);
+  await intake.getByLabel('Patient', { exact: true }).selectOption(patientId);
+  await intake.getByLabel('Clinician', { exact: true }).selectOption(practitioner);
+  await intake.getByRole('button', { name: 'Save waitlist request' }).click();
+  const waiting = page
+    .getByRole('region', { name: 'Appointment waitlist' })
+    .getByRole('row', { name: new RegExp(patientId) });
+  await expect(waiting.getByRole('button', { name: 'Book slot' })).toBeEnabled();
+  await expect(page.getByLabel('Waitlist status')).toHaveValue('Waiting');
+  await expect(page.getByRole('combobox', { name: 'Clinician', exact: true })).toHaveValue(
+    practitioner,
+  );
+
+  const manager = await page.context().newPage();
+  await signIn(manager, 'executive');
+  await manager
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Scheduling', exact: true })
+    .click();
+  await manager.getByLabel('Schedule date').fill(day);
+  await expect(manager.getByRole('button', { name: 'Add to waitlist' })).toHaveCount(0);
+  const openBlock = async () => {
+    await manager.getByRole('button', { name: 'Block time' }).click();
+    const editor = manager.getByRole('dialog', { name: 'Block clinician time' });
+    await editor.getByLabel('Clinician', { exact: true }).selectOption(practitioner);
+    await editor.getByLabel('Starts at').selectOption('09:00');
+    await editor.getByLabel('Ends at').selectOption('17:00');
+    await editor.getByLabel('Reason', { exact: true }).selectOption('Clinician leave');
+    await editor.getByRole('button', { name: 'Save schedule block' }).click();
+    return editor;
+  };
+  await openBlock();
+  await expect(manager.getByText('Clinician time blocked.')).toBeVisible();
+  await expect(waiting).toContainText('No times available');
+  await expect(page.getByRole('combobox', { name: 'Clinician', exact: true })).toHaveValue(
+    practitioner,
+  );
+  await expect(waiting.getByRole('button', { name: 'Book slot' })).toBeDisabled();
+
+  const patient = await page.context().newPage();
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Book a visit' }).click();
+  const booking = patient.getByRole('dialog', { name: 'Book a visit' });
+  await booking.getByLabel('Find a clinician').selectOption(practitioner);
+  await booking.getByLabel('Date', { exact: true }).fill(day);
+  await expect(booking.getByText('No visits are available', { exact: false })).toBeVisible();
+  await expect(booking.getByRole('button', { name: 'Book appointment' })).toBeDisabled();
+
+  await checkReflow(page);
+  await checkReflow(manager);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('scheduling-1440.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  await manager.getByRole('button', { name: 'Release block' }).click();
+  await manager
+    .getByRole('dialog', { name: 'Release schedule block' })
+    .getByRole('button', { name: 'Confirm release' })
+    .click();
+  await expect(booking.locator('option[value="09:00"]')).toHaveCount(1);
+  await waiting.getByRole('button', { name: 'Book slot' }).click();
+  const conversion = page.getByRole('dialog', { name: 'Book from waitlist' });
+  await conversion.getByLabel('Available time').selectOption('09:00');
+  await conversion.getByRole('button', { name: 'Book appointment' }).click();
+  await expect(waiting).toContainText('Booked');
+  await expect(booking.locator('option[value="09:00"]')).toHaveCount(0);
+  await booking.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(patient.getByText('09:00 IST', { exact: false })).not.toHaveCount(0);
+
+  const conflict = await openBlock();
+  await expect(conflict.getByRole('alert')).toContainText(
+    'This range contains an existing appointment.',
+  );
+  await conflict.getByRole('button', { name: 'Close block editor' }).click();
+  await expect(
+    manager
+      .getByRole('region', { name: 'Clinician schedule blocks' })
+      .getByRole('row', { name: /Clinician leave/ }),
+  ).toContainText('Released');
+  await page.reload();
+  await page.getByLabel('Schedule date').fill(day);
+  await expect(waiting).toContainText('Booked');
+  await page.getByRole('link', { name: 'View appointments' }).click();
+  const scheduled = page.getByRole('row', { name: new RegExp(patientId) });
+  await expect(scheduled).toContainText('09:00');
+  await expect(scheduled).toContainText('Booked');
+  await patient.goto('/work/scheduling');
+  await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await manager.close();
+  await patient.close();
+});
 
 test('matches a record request, grants one report, and withdraws access live', async ({
   page,

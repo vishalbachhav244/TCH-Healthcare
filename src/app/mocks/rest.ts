@@ -1,7 +1,7 @@
 import type { HttpRequest } from '@angular/common/http';
 import type { Facility } from '../domain/operations';
 import { notifyFacility } from '../core/events';
-import { ApiError, requireSession, scope, startSession } from './access';
+import { ApiError, patientSubject, requireSession, scope, startSession } from './access';
 import { command, services } from './commands';
 import { db, initialize } from './database';
 import { appointments, checkedDay, dashboard, invoiceRows, queueDisplay } from './queries';
@@ -11,6 +11,7 @@ import { listLaboratory } from './laboratory';
 import { portal } from './portal';
 import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
+import { schedulingDay } from './scheduling-workspace';
 import { clinicalPrescriptions, pharmacyData } from './pharmacy';
 import { platformOperations, updateIncident } from './platform-operations';
 import {
@@ -66,6 +67,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'subscriptions',
     'appointments/reschedule',
     'appointments/cancel',
+    'scheduling/waitlist/status',
+    'scheduling/exceptions/release',
     'quality/cases/status',
   ].includes(path);
   const incidentWrite =
@@ -140,6 +143,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         params,
         'all',
       );
+    case 'scheduling':
+      return schedulingDay(scope(session, facilityRecord, 'D10'), params);
     case 'queue':
       return appointments(
         scope(session, facilityRecord, 'D11'),
@@ -189,13 +194,18 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
           : [];
       return { patients, practitioners };
     }
-    case 'appointments/availability': {
-      const facility = scope(session, facilityRecord, 'D10', 'appointments');
+    case 'appointments/availability':
+    case 'portal/availability': {
+      const selfService = path === 'portal/availability';
+      const facility = selfService
+        ? scope(session, facilityRecord, 'D12', 'portal')
+        : scope(session, facilityRecord, 'D10', 'appointments');
       return availability(
         facility,
         params.get('practitionerId') ?? '',
         params.get('day') ?? '',
-        params.get('appointmentId') ?? undefined,
+        selfService ? undefined : (params.get('appointmentId') ?? undefined),
+        selfService ? patientSubject(session) : undefined,
       );
     }
     case 'queue/options': {

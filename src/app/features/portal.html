@@ -160,7 +160,7 @@
 @if (active() === 'sharing') {
   <tc-patient-sharing />
 }
-<dialog #visitDialog aria-labelledby="portal-booking">
+<dialog #visitDialog aria-labelledby="portal-booking" (close)="booking.set(false)">
   <div class="dialog-head">
     <h2 id="portal-booking">{{ booking() && !pass() ? 'Book a visit' : 'Appointment pass' }}</h2>
     <button class="icon-button" type="button" aria-label="Close" (click)="visitDialog.close()">
@@ -178,22 +178,48 @@
           }
         }
       </select>
+      @let availability = slots();
       <div class="field-pair">
-        <label>Date<input type="date" formControlName="day" [min]="today" required /></label
-        ><label
-          >Time<input
-            type="time"
-            formControlName="time"
-            min="09:00"
-            max="16:45"
-            step="900"
-            required
+        <label
+          >Date<input type="date" formControlName="day" [min]="today" [max]="latest" required
         /></label>
+        <label
+          >Time
+          <select formControlName="time" required>
+            <option value="">Choose an available time</option>
+            @if (availability.state === 'ready') {
+              @for (time of availability.data; track time) {
+                <option [value]="time">{{ time }} IST</option>
+              }
+            }
+          </select>
+        </label>
       </div>
+      @if (availability.state === 'error') {
+        <p class="field-error" role="alert">{{ availability.message }}</p>
+      } @else if (availability.state === 'ready' && !availability.data.length) {
+        <p class="subtle">No visits are available for this clinician on the selected day.</p>
+      } @else if (
+        availability.state === 'loading' &&
+        form.controls.practitionerId.value &&
+        form.controls.day.value
+      ) {
+        <p class="subtle" role="status">Checking available times…</p>
+      }
       @if (error()) {
         <p class="field-error" role="alert">{{ error() }}</p>
       }
-      <button class="button primary" type="submit" [disabled]="busy()">Book appointment</button>
+      <button
+        class="button primary"
+        type="submit"
+        [disabled]="
+          busy() ||
+          availability.state !== 'ready' ||
+          !availability.data.includes(form.controls.time.value)
+        "
+      >
+        Book appointment
+      </button>
     </form>
   } @else {
     <div class="dialog-body pass-body">

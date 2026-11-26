@@ -26,3 +26,4 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-20 | D12 | `/work/portal` → Record sharing | One-time matching code, consent review, revocation and access history |
 | TC-LOCAL-21 | D07 | `/work/clinical-governance` | Seven-day indicators, flagged report worklist, review and referral |
 | TC-LOCAL-22 | D08 | `/work/quality` | Case intake, status filter, ownership, resolution and case history |
+| TC-LOCAL-23 | D10 | `/work/scheduling` | Date and clinician filters, appointment waitlist, slot conversion, withdrawals and schedule blocks |

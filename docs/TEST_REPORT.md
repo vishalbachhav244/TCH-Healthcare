@@ -6,17 +6,19 @@ Verification ran locally on 26 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 19 contract and domain tests passed across 2 files |
-| `npm run e2e` | 11 Chromium journeys passed, including the three-role consent and two-role clinical quality flows. |
-| `npm run build` | Passed. Initial assets approximately 356 kB raw and 94 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 359 kB raw and 95 kB estimated transfer. |
+| `npm test` | 21 contract and domain tests passed across 2 files |
+| `npm run e2e` | 12 Chromium journeys passed, including scheduling across reception, executive and patient tabs. |
+| `npm run build` | Passed. Initial assets approximately 357 kB raw and 94 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 360 kB raw and 95 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
 | Browser-local migration | Verified version 11 to 12 against the loopback app in a fresh browser context. Active and revoked grants moved intact, and pending requests remained available. |
-| OpenAPI | 73 operations, unique IDs and checked internal references. |
+| OpenAPI | 79 operations, unique IDs and checked internal references. |
+| Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
 
+- Add a patient to a clinician’s waitlist. From an executive tab, block the day and verify both reception and the patient portal lose the available times. Release the block, book an open time from the waitlist, and confirm the appointment persists after reload. Reject an overlapping block and patient access to the staff route.
 - Match a recipient with a patient-issued code, grant one report version, preview it, pause and resume the connector, then revoke access. Check that access disappears on the recipient’s open screen and the patient’s decision survives reload.
 - Refer a flagged laboratory result using the keyboard, claim the redacted case, require a resolution and close it. Verify that status updates in the original worklist, the case history survives reload, and the Medical Director cannot open the quality register. Create and filter a facility case.
 - Create an organization and a facility, stage a staff role, activate the facility, revoke the scoped role in an open staff tab, then revoke inpatient access.
@@ -40,3 +42,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Subscriptions](screenshots/subscriptions-desktop.png) · [Network performance](screenshots/network-desktop.png) · [Platform operations](screenshots/platform-operations-desktop.png) · [Pharmacy](screenshots/pharmacy-desktop.png)
 
 [Integrations](screenshots/integrations-desktop.png) · [Patient record sharing](screenshots/record-sharing-390.png) · [Clinical governance](screenshots/clinical-governance-desktop.png) · [Quality & Compliance](screenshots/quality-register-desktop.png)
+
+[Desktop scheduling](screenshots/scheduling-1440.png) · [Mobile scheduling](screenshots/scheduling-390.png)

@@ -22,6 +22,11 @@
         <ng-icon name="scan" /> Verify arrival
       </button>
     }
+    @if (kind === 'appointments') {
+      <a class="button secondary" routerLink="/work/scheduling" [queryParams]="{ day: day() }"
+        ><ng-icon name="clock" /> Scheduling</a
+      >
+    }
   </div>
 </section>
 <p class="sr-only" role="status">{{ message() }}</p>
@@ -328,6 +333,14 @@
       }
       @if (availability.state === 'ready' && !availability.data.length) {
         <p class="subtle">No times are available for this clinician on the selected date.</p>
+        @if (!bookingTarget()) {
+          <a
+            class="button secondary"
+            routerLink="/work/scheduling"
+            [queryParams]="{ day: booking.controls.day.value }"
+            >Open appointment waitlist</a
+          >
+        }
       }
       @if (!bookingTarget()) {
         <label for="channel">Booking type</label

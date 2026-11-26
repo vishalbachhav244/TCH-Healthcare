@@ -13,12 +13,12 @@
 | Medical director | Reviews eligible published reports at assigned facilities and sees linked case status. |
 | Quality coordinator | Creates and claims quality cases within assigned facilities. Resolution requires ownership. Clinical referrals expose a process description and status. |
 | Pharmacist | Views signed facility prescriptions and stock. Dispensing writes a stock movement and a medicine invoice. |
-| Executive | Meridian facilities. Overview and alert acknowledgement. Read-only appointment, queue and bed views. Bed responses omit admissions. |
-| Reception | Default Meridian facility. Patient search and registration, appointments and queue commands. |
+| Executive | Meridian facilities. Overview, alert acknowledgement and clinician schedule blocks. Read-only appointments, waitlist, queue and bed views. Bed responses omit admissions. |
+| Reception | Default Meridian facility. Patient search and registration, appointment and waitlist commands, and queue operations. Schedule blocks are read-only. |
 | Clinician | Assigned appointments and encounters only. Starts or signs consultations and orders laboratory tests. |
 | Admissions | Default Meridian facility. Bed and admission lifecycle. |
 | Laboratory technician | Collection, processing and result entry. |
 | Laboratory reviewer | Authorisation and publication. |
 | Cashier | Signed-encounter invoices and local settlements. |
-| Patient | Own bookings, passes, queue state, published lab reports and bill balances. |
-| Sunrise | Clinic overview and reception. No inpatient access. |
+| Patient | Own bookings, available appointment times, passes, queue state, published lab reports and bill balances. |
+| Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

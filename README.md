@@ -21,10 +21,10 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `integration` | Connector setup and redacted exchange audit |
 | `partnercare`, `partnerlab` | Separate recipient accounts for requesting a patient-authorized report |
 | `network` | Comparison and department drill-down across assigned Meridian facilities |
-| `executive` | Hospital overview, appointments, queue and beds, with two facilities |
+| `executive` | Hospital overview, clinician schedule blocks and read-only appointment, queue and bed views for two facilities |
 | `medicaldirector` | Clinical documentation indicators, flagged laboratory report reviews and referrals |
 | `quality` | Case intake, investigation ownership, resolution and history |
-| `reception` | Patient registration, scheduling, arrival verification and queue |
+| `reception` | Patient registration, appointments, waitlist, arrival verification and queue |
 | `clinician` | Assigned consultations, laboratory orders, and prescription drafting and signing |
 | `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
 | `admissions` | Admission requests, bed allocation, transfer and release |
@@ -39,6 +39,8 @@ Registration accepts evaluation codes such as `REG-1001` that generate a fiction
 To exercise records exchange, use separate tabs on the same browser profile. In the `patient` tab, generate a code for CityCare in **Record sharing**. Use `partnercare` to submit the code, then return to the patient tab to authorize a published report such as `LAB-SHARE-0147`. The `integration` account can pause the connector and review exchange activity.
 
 To exercise clinical governance, refer a flagged report as `medicaldirector`. Open the resulting case as `quality`, take ownership and choose a resolution. The Medical Director’s worklist reflects the new case status.
+
+In **Scheduling**, `reception` can add a patient to a clinician’s waitlist and book an available time. At the same facility, `executive` can block and release clinician time. A separate `patient` tab shows how those changes affect available times in **Book a visit**.
 
 ## Verify
 

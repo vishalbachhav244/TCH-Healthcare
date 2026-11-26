@@ -1,0 +1,487 @@
+<section class="page-intro">
+  <div>
+    <h1>Scheduling</h1>
+    <p>Fill open appointments from the waitlist and manage clinician availability.</p>
+  </div>
+  <a class="button secondary" routerLink="/work/appointments" [queryParams]="{ day: day() }"
+    >View appointments <ng-icon name="arrow"
+  /></a>
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@let state = response();
+<div class="filter-bar">
+  <label class="date-filter">
+    <ng-icon name="calendar" /><span>Schedule date</span>
+    <input
+      type="date"
+      #scheduleDate
+      [value]="day()"
+      [max]="latest"
+      (change)="selectDay(scheduleDate.value)"
+    />
+  </label>
+  <label class="select-control"
+    >Clinician
+    <select [formControl]="clinicianFilter" (change)="offset.set(0)">
+      <option value="">All clinicians</option>
+      @if (state.state === 'ready') {
+        @for (item of state.data.practitioners; track item.id) {
+          <option [value]="item.id">{{ item.name }}</option>
+        }
+      }
+    </select>
+  </label>
+</div>
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading the schedule…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="list" /></span>
+      </div>
+      <p>Patients waiting</p>
+      <strong>{{ waitingCount() }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="calendar" /></span>
+      </div>
+      <p>Waitlist requests with available times</p>
+      <strong>{{ bookableCount() }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="clock" /></span>
+      </div>
+      <p>Schedule blocks</p>
+      <strong>{{ blockedCount() }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-labelledby="waitlist-heading">
+    <div class="panel-heading">
+      <div>
+        <h2 id="waitlist-heading">Appointment waitlist</h2>
+        <p>Requests are listed oldest first. A request does not reserve a time.</p>
+      </div>
+      @if (store.canPerform('appointments') && editableDay() && state.data.practitioners.length) {
+        <button type="button" class="button primary" (click)="openWaitlist(waitlistEditor)">
+          <ng-icon name="plus" /> Add to waitlist
+        </button>
+      }
+    </div>
+    <div class="filter-bar">
+      <label class="select-control"
+        >Waitlist status
+        <select [formControl]="statusFilter" (change)="offset.set(0)">
+          <option value="">All statuses</option>
+          @for (item of statuses; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    @if (filtered().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Appointment waitlist">
+        <table>
+          <caption class="sr-only">
+            Appointment waitlist
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Patient</th>
+              <th scope="col">Clinician</th>
+              <th scope="col">Requested</th>
+              <th scope="col">Status</th>
+              <th scope="col">Availability</th>
+              @if (store.canPerform('appointments')) {
+                <th scope="col">Actions</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of filtered() | slice: offset() : offset() + 12; track row.id) {
+              <tr>
+                <td>
+                  <strong>{{ row.patient }}</strong
+                  ><small>{{ row.patientId }}</small>
+                </td>
+                <td>{{ row.practitioner }}</td>
+                <td>{{ row.requestedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+                <td>
+                  <span [class]="row.status | statusTone">{{ row.status }}</span>
+                </td>
+                <td>
+                  @if (row.status === 'Waiting') {
+                    @switch (row.availableTimes.length) {
+                      @case (0) {
+                        No times available
+                      }
+                      @case (1) {
+                        1 time available
+                      }
+                      @default {
+                        {{ row.availableTimes.length }} times available
+                      }
+                    }
+                  } @else if (row.appointmentStatus === 'Cancelled') {
+                    Appointment cancelled
+                  } @else if (row.bookedTime && row.bookedDay) {
+                    <a
+                      class="text-button"
+                      routerLink="/work/appointments"
+                      [queryParams]="{ day: row.bookedDay }"
+                      >{{ row.bookedDay | date: 'd MMM' }}, {{ row.bookedTime }} IST</a
+                    >
+                  } @else {
+                    —
+                  }
+                </td>
+                @if (store.canPerform('appointments')) {
+                  <td>
+                    @if (row.status === 'Waiting') {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="!row.availableTimes.length"
+                        (click)="openAction(waitlistAction, row, 'book')"
+                      >
+                        Book slot
+                      </button>
+                      <button
+                        type="button"
+                        class="text-button"
+                        (click)="openAction(waitlistAction, row, 'withdraw')"
+                      >
+                        Withdraw
+                      </button>
+                    } @else {
+                      —
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (filtered().length > 12) {
+        <div class="panel-heading">
+          <button
+            type="button"
+            class="button secondary"
+            [disabled]="offset() === 0"
+            (click)="offset.set(offset() - 12)"
+          >
+            Previous page
+          </button>
+          <button
+            type="button"
+            class="button secondary"
+            [disabled]="offset() + 12 >= filtered().length"
+            (click)="offset.set(offset() + 12)"
+          >
+            Next page
+          </button>
+        </div>
+      }
+    } @else {
+      <p class="state-panel">No waitlist requests match this date and filter.</p>
+    }
+  </section>
+  <section
+    class="panel table-panel"
+    aria-labelledby="schedule-blocks-heading"
+    style="margin-block-start: 1rem"
+  >
+    <div class="panel-heading">
+      <div>
+        <h2 id="schedule-blocks-heading">Clinician schedule blocks</h2>
+        <p>
+          Block new bookings for a time range. Existing appointments must be moved or cancelled
+          first.
+        </p>
+      </div>
+      @if (
+        store.canPerform('schedule-exceptions') && editableDay() && state.data.practitioners.length
+      ) {
+        <button type="button" class="button secondary" (click)="openBlock(blockEditor)">
+          <ng-icon name="plus" /> Block time
+        </button>
+      }
+    </div>
+    @if (blocks().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Clinician schedule blocks">
+        <table>
+          <caption class="sr-only">
+            Clinician schedule blocks
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Clinician</th>
+              <th scope="col">Time range</th>
+              <th scope="col">Reason</th>
+              <th scope="col">Status</th>
+              @if (store.canPerform('schedule-exceptions')) {
+                <th scope="col">Action</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of blocks(); track item.id) {
+              <tr>
+                <td>
+                  <strong>{{ item.practitioner }}</strong>
+                </td>
+                <td>{{ item.start }}–{{ item.end }} IST</td>
+                <td>{{ item.reason }}</td>
+                <td>
+                  <span [class]="'status ' + (item.releasedAt ? 'positive' : 'attention')">{{
+                    item.releasedAt ? 'Released' : 'Blocked'
+                  }}</span>
+                </td>
+                @if (store.canPerform('schedule-exceptions')) {
+                  <td>
+                    @if (!item.releasedAt && editableDay()) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        (click)="openRelease(releaseDialog, item.id)"
+                      >
+                        Release block
+                      </button>
+                    } @else {
+                      —
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">There are no schedule blocks for this date and clinician.</p>
+    }
+  </section>
+}
+
+<dialog #waitlistEditor aria-labelledby="waitlist-editor-heading" (close)="joining.set(false)">
+  <div class="dialog-head">
+    <h2 id="waitlist-editor-heading">Add to appointment waitlist</h2>
+    <button
+      class="icon-button"
+      aria-label="Close waitlist editor"
+      type="button"
+      (click)="waitlistEditor.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form
+    class="dialog-body fields"
+    [formGroup]="waitlistForm"
+    (ngSubmit)="addRequest(waitlistEditor)"
+  >
+    @let choices = patients();
+    <label for="waitlist-search">Find patient</label>
+    <input
+      id="waitlist-search"
+      type="search"
+      [formControl]="search"
+      (input)="searchPatients()"
+      placeholder="Search by name or patient ID"
+    />
+    <label for="waitlist-patient">Patient</label>
+    <select id="waitlist-patient" formControlName="patientId" required>
+      <option value="">Select a patient</option>
+      @if (choices.state === 'ready') {
+        @for (item of choices.data; track item.id) {
+          <option [value]="item.id">{{ item.name }} · {{ item.id }}</option>
+        }
+      }
+    </select>
+    @if (choices.state === 'loading') {
+      <p class="subtle" role="status">Finding patients…</p>
+    } @else if (choices.state === 'error') {
+      <p class="field-error" role="alert">{{ choices.message }}</p>
+    } @else if (!choices.data.length) {
+      <p class="subtle">No matching patients.</p>
+    }
+    <label for="waitlist-clinician">Clinician</label>
+    <select id="waitlist-clinician" formControlName="practitionerId" required>
+      <option value="">Select a clinician</option>
+      @if (state.state === 'ready') {
+        @for (item of state.data.practitioners; track item.id) {
+          <option [value]="item.id">{{ item.name }} · {{ item.specialty }}</option>
+        }
+      }
+    </select>
+    <label for="waitlist-day">Requested date</label>
+    <input
+      id="waitlist-day"
+      type="date"
+      formControlName="day"
+      [min]="today"
+      [max]="latest"
+      required
+    />
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="waitlistForm.invalid || busy()">
+      Save waitlist request
+    </button>
+  </form>
+</dialog>
+
+<dialog #waitlistAction aria-labelledby="waitlist-action-heading">
+  <div class="dialog-head">
+    <h2 id="waitlist-action-heading">
+      {{ target()?.action === 'book' ? 'Book from waitlist' : 'Withdraw waitlist request' }}
+    </h2>
+    <button
+      class="icon-button"
+      aria-label="Close waitlist action"
+      type="button"
+      (click)="waitlistAction.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (target(); as item) {
+    <form
+      class="dialog-body fields"
+      (submit)="$event.preventDefault(); changeRequest(waitlistAction)"
+    >
+      <p>
+        <strong>{{ item.row.patient }}</strong> · {{ item.row.practitioner }}
+      </p>
+      @if (item.action === 'book') {
+        <p>Confirm the time with the patient before booking.</p>
+        <label for="waitlist-time">Available time</label>
+        <select id="waitlist-time" [formControl]="time" required>
+          <option value="">Choose an available time</option>
+          @for (item of currentTimes(); track item) {
+            <option [value]="item">{{ item }} IST</option>
+          }
+        </select>
+        @if (!currentTimes().length) {
+          <p class="subtle">No times are currently available.</p>
+        }
+      } @else {
+        <p>This request will be removed from the active waitlist.</p>
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button
+        type="submit"
+        class="button primary"
+        [disabled]="busy() || (item.action === 'book' && !currentTimes().includes(time.value))"
+      >
+        {{ item.action === 'book' ? 'Book appointment' : 'Confirm withdrawal' }}
+      </button>
+    </form>
+  }
+</dialog>
+
+<dialog #blockEditor aria-labelledby="block-editor-heading">
+  <div class="dialog-head">
+    <h2 id="block-editor-heading">Block clinician time</h2>
+    <button
+      class="icon-button"
+      aria-label="Close block editor"
+      type="button"
+      (click)="blockEditor.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" [formGroup]="blockForm" (ngSubmit)="createBlock(blockEditor)">
+    <label for="block-clinician">Clinician</label>
+    <select id="block-clinician" formControlName="practitionerId" required>
+      <option value="">Select a clinician</option>
+      @if (state.state === 'ready') {
+        @for (item of state.data.practitioners; track item.id) {
+          <option [value]="item.id">{{ item.name }} · {{ item.specialty }}</option>
+        }
+      }
+    </select>
+    <label for="block-day">Date</label
+    ><input
+      id="block-day"
+      type="date"
+      formControlName="day"
+      [min]="today"
+      [max]="latest"
+      required
+    />
+    <div class="field-pair">
+      <label
+        >Starts at<select formControlName="start" required>
+          <option value="">Choose a start</option>
+          @for (time of boundaries | slice: 0 : -1; track time) {
+            <option [value]="time">{{ time }} IST</option>
+          }
+        </select></label
+      >
+      <label
+        >Ends at<select formControlName="end" required>
+          <option value="">Choose an end</option>
+          @for (time of boundaries | slice: 1; track time) {
+            <option [value]="time">{{ time }} IST</option>
+          }
+        </select></label
+      >
+    </div>
+    <label for="block-reason">Reason</label>
+    <select id="block-reason" formControlName="reason" required>
+      <option value="">Select a reason</option>
+      @for (item of reasons; track item) {
+        <option [value]="item">{{ item }}</option>
+      }
+    </select>
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="blockForm.invalid || busy()">
+      Save schedule block
+    </button>
+  </form>
+</dialog>
+
+<dialog #releaseDialog aria-labelledby="release-block-heading">
+  <div class="dialog-head">
+    <h2 id="release-block-heading">Release schedule block</h2>
+    <button
+      class="icon-button"
+      aria-label="Close release confirmation"
+      type="button"
+      (click)="releaseDialog.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <div class="dialog-body fields">
+    <p>Unoccupied times in this range will become available for booking.</p>
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+    <button
+      type="button"
+      class="button primary"
+      [disabled]="busy()"
+      (click)="release(releaseDialog)"
+    >
+      Confirm release
+    </button>
+  </div>
+</dialog>

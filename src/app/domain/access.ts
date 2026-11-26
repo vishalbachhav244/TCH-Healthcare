@@ -10,7 +10,7 @@ export const staffRoles = {
   executive: {
     label: 'Facility executive',
     workspaces: ['D06', 'D10', 'D11', 'D19'],
-    writes: ['overview'],
+    writes: ['overview', 'schedule-exceptions'],
   },
   reception: {
     label: 'Reception',
@@ -25,7 +25,7 @@ export const staffRoles = {
   clinicOperator: {
     label: 'Clinic operator',
     workspaces: ['D06', 'D09', 'D10', 'D11', 'D19'],
-    writes: ['overview', 'patients', 'appointments', 'queue'],
+    writes: ['overview', 'patients', 'appointments', 'queue', 'schedule-exceptions'],
   },
 } as const;
 
