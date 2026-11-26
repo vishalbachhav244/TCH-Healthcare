@@ -146,6 +146,9 @@
                     <span [class]="row.admission.status | statusTone">{{
                       row.admission.status
                     }}</span>
+                    @if (row.stepDownRequestedAt !== undefined) {
+                      <small>ICU step-down requested</small>
+                    }
                   </td>
                   <td>
                     @if (row.admission.status !== 'Discharged') {

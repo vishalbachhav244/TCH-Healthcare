@@ -2,22 +2,41 @@ import type { Admission, DomainEvent, Facility, InpatientBoard } from '../domain
 import { ApiError } from './access';
 import { db } from './database';
 import { openTask } from './ward-care';
+import { criticalCareWard, openTheatreCase } from '../domain/acute-care';
+import { requestAdmission } from './admission-records';
+
+function pendingStepDown(facility: Facility, admissionId: string) {
+  return db.icuStepDowns
+    .where('admissionId')
+    .equals(admissionId)
+    .filter((row) => row.facilityId === facility.id && row.status === 'Requested');
+}
 
 export async function board(
   facility: Facility,
   includeAdmissions: boolean,
 ): Promise<InpatientBoard> {
-  const [beds, admissions] = await Promise.all([
+  const [beds, admissions, stepDowns] = await Promise.all([
     db.beds.where('facilityId').equals(facility.id).toArray(),
     includeAdmissions ? db.admissions.where('facilityId').equals(facility.id).toArray() : [],
+    includeAdmissions
+      ? db.icuStepDowns
+          .where('facilityId')
+          .equals(facility.id)
+          .filter((row) => row.status === 'Requested')
+          .toArray()
+      : [],
   ]);
   const patients = await db.patients.bulkGet(admissions.map((row) => row.patientId));
+  const handoffs = new Map(stepDowns.map((row) => [row.admissionId, row.requestedAt]));
   return {
     beds,
     admissions: admissions
       .flatMap((admission, index) => {
         const patient = patients[index];
-        return patient?.tenantId === facility.tenantId ? [{ admission, patient }] : [];
+        return patient?.tenantId === facility.tenantId
+          ? [{ admission, patient, stepDownRequestedAt: handoffs.get(admission.id) }]
+          : [];
       })
       .sort((a, b) => b.admission.requestedAt - a.admission.requestedAt),
   };
@@ -45,27 +64,8 @@ export async function inpatientCommand(
     return event('BedReleased', bed.id);
   }
   if (path === 'admissions') {
-    const patient =
-      typeof payload['patientId'] === 'string'
-        ? await db.patients.get(payload['patientId'])
-        : undefined;
-    if (patient?.tenantId !== facility.tenantId) throw new ApiError(404, 'Patient not found.');
-    const existing = await db.admissions
-      .where('[facilityId+patientId]')
-      .equals([facility.id, patient.id])
-      .filter((row) => row.status !== 'Discharged')
-      .first();
-    if (existing)
-      throw new ApiError(409, 'This patient already has an active admission at this facility.');
-    const id = crypto.randomUUID();
-    await db.admissions.add({
-      id,
-      facilityId: facility.id,
-      patientId: patient.id,
-      requestedAt: time,
-      status: 'Requested',
-      version: 1,
-    });
+    if (typeof payload['patientId'] !== 'string') throw new ApiError(404, 'Patient not found.');
+    const id = await requestAdmission(facility, payload['patientId'], time);
     return event('AdmissionRequested', id);
   }
   const admission =
@@ -94,7 +94,17 @@ export async function inpatientCommand(
         'Complete or cancel open nursing tasks before discharging this patient.',
       );
     }
+    if (
+      await db.theatreCases
+        .where('admissionId')
+        .equals(admission.id)
+        .filter((record) => record.facilityId === facility.id && openTheatreCase(record))
+        .first()
+    ) {
+      throw new ApiError(409, 'Complete or cancel open theatre cases before discharge.');
+    }
     await db.beds.update(admission.bedId, { status: 'Cleaning' });
+    await pendingStepDown(facility, admission.id).modify({ status: 'Closed', resolvedAt: time });
     await db.admissions.update(admission.id, { ...next, status: 'Discharged', dischargedAt: time });
     return event('PatientDischarged', admission.id);
   }
@@ -104,7 +114,18 @@ export async function inpatientCommand(
   if (!bed || bed.facilityId !== facility.id) throw new ApiError(404, 'Bed not found.');
   if (bed.status !== 'Available')
     throw new ApiError(409, 'The selected bed is no longer available.');
-  if (admission.bedId) await db.beds.update(admission.bedId, { status: 'Cleaning' });
+  if (admission.bedId) {
+    const previous = await db.beds.get(admission.bedId);
+    if (previous?.facilityId !== facility.id || previous.status !== 'Occupied')
+      throw new ApiError(409, 'The assigned bed could not be verified.');
+    await db.beds.update(previous.id, { status: 'Cleaning' });
+    if (previous.ward === criticalCareWard && bed.ward !== criticalCareWard) {
+      await pendingStepDown(facility, admission.id).modify({
+        status: 'Transferred',
+        resolvedAt: time,
+      });
+    }
+  }
   await db.beds.update(bed.id, { status: 'Occupied' });
   await db.admissions.update(admission.id, {
     ...next,

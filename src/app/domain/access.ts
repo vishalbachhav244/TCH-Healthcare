@@ -24,6 +24,17 @@ export const staffRoles = {
     writes: ['inpatient-physician'],
   },
   wardNurse: { label: 'Ward nurse', workspaces: ['D15'], writes: ['nursing-station'] },
+  emergencyClinician: { label: 'Emergency clinician', workspaces: ['D16'], writes: ['emergency'] },
+  criticalCare: {
+    label: 'Critical care clinician',
+    workspaces: ['D17'],
+    writes: ['critical-care'],
+  },
+  theatreCoordinator: {
+    label: 'Theatre coordinator',
+    workspaces: ['D18'],
+    writes: ['operation-theatre'],
+  },
   cashier: { label: 'Cashier', workspaces: ['D24'], writes: ['billing'] },
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },

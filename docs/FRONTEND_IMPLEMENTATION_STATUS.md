@@ -1,6 +1,6 @@
 # Frontend implementation status
 
-The frontend is an independent project built from the supplied brief. 19 of 36 dashboard IDs have working routes with partial workflow coverage. The other 17 remain open. No dashboard has passed every acceptance criterion in the brief.
+The frontend is an independent project built from the supplied brief. 22 of 36 dashboard IDs have working routes with partial workflow coverage. The other 14 remain open. No dashboard has passed every acceptance criterion in the brief.
 
 The 137 canonical screen rows and 171 canonical requirement rows are referenced by count in the attachment. Their IDs and individual definitions were not supplied. The register uses local screen IDs and the brief's section numbers while they are unavailable. [Screen inventory](SCREEN_INVENTORY.md)
 
@@ -20,7 +20,10 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §§9,16.1 Consultation | D13 | TC-LOCAL-08 and 24 `/work/clinical` | Partial | Assigned worklist, signed history by specialty, follow-up requests, lab orders and independent prescription signature | Assigned context and completed-visit gates, cross-role follow-up booking and cancellation | Structured clinical chart, referrals and comprehensive longitudinal records |
 | §§9,16.5 Inpatient physician | D14 | TC-LOCAL-26 `/work/inpatient-physician` | Partial | Assigned admissions, structured rounds, ward orders and cancellation | Role and assignment checks, linked nursing status and observation evidence | Expanded rounds documentation, inpatient prescribing and discharge planning |
 | §§9,16.5 Nursing | D15 | TC-LOCAL-27 `/work/nursing-station` | Partial | Assigned patients, task transitions and separate or task-linked observations | Live handoff, reassignment, duplicate completion and reload checks | Medication administration, shift roster and detailed vitals |
-| §§9,16.5 Admissions | D19 | TC-LOCAL-09 and 28 `/work/beds` | Partial | Board, request, allocate, assign team, discharge gate and bed release | Concurrent allocation, care-team handoff and unfinished task checks | Daily charges, discharge documentation and inpatient billing |
+| §§9,16.5 Emergency | D16 | TC-LOCAL-29 `/work/emergency` | Partial | Arrival, clinician-assigned priority, visit closure and linked admission request | Manual assessment, duplicate and scope checks, live bed allocation status | Ambulance dispatch, richer observation chart and external handoff |
+| §§9,16.5 Critical care | D17 | TC-LOCAL-30 `/work/critical-care` | Partial | ICU beds and active census, structured reviews and step-down request | Census driven by bed movements, review history and resolved transfers | Device monitoring, critical-care medication and escalation tracking |
+| §§9,16.5 Theatre | D18 | TC-LOCAL-31 `/work/operation-theatre` | Partial | Room and patient booking, cancellation and readiness through recovery | Overlap, version, lifecycle, daily schedule and discharge checks | Team scheduling, theatre checklists and procedural charting |
+| §§9,16.5 Admissions | D19 | TC-LOCAL-09 and 28 `/work/beds` | Partial | Board, request, allocate, assign team, ICU step-down, discharge gate and bed release | Concurrent allocation, task and theatre gates, transfer handoff | Daily charges, discharge documentation and inpatient billing |
 | §§9,16.6 Laboratory | D20 | TC-LOCAL-10 `/work/laboratory` | Partial | Worklist, order and stage transitions | Technician interaction and reviewer restrictions | Panel authoring, numerical results, files and corrections |
 | §§9,16.7 Pharmacy | D22 | TC-LOCAL-17 `/work/pharmacy` | Partial | Signed worklist, eligible stock and atomic dispensing and invoice | Expiry, authorization, duplicate dispensing and billing checked | Receiving, returns, partial fills and stock reconciliation |
 | §§9,16.8 Billing | D24 | TC-LOCAL-11 `/work/billing` | Partial | Invoice list, signed encounter selection, issue and settlement | Browser invoice to paid and duplicate-settlement contract test | Deposits, tax rules, receipts, refunds and reconciliation |
@@ -29,7 +32,7 @@ Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBIL
 
 ## Continuation checkpoint
 
-1. Continue M4 with D16 Emergency, D17 ICU and D18 Operation Theatre. Extend discharge coordination and inpatient billing around the current admission, care team and bed records.
+1. Extend M4 discharge coordination, discharge documents and inpatient charges around the current admission, care team and bed records.
 2. Continue M5–M8 with radiology D21, blood bank D23, finance and insurance D25–D26, operational domains D27–D32 and engagement and analytics D33–D36. Extend pharmacy receiving and returns around its existing stock ledger.
 3. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
 4. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.

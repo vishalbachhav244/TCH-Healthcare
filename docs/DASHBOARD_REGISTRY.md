@@ -19,9 +19,9 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D13 | Doctor / OPD Workspace | `/work/clinical` | Partial | Clinical history and vitals, prescriptions, referrals and follow-up |
 | D14 | IPD Physician Workspace | `/work/inpatient-physician` | Partial | Inpatient prescribing, expanded charting and discharge planning |
 | D15 | Nursing Station | `/work/nursing-station` | Partial | Medication administration, detailed vitals and shift roster |
-| D16 | Emergency / Casualty | — | Open | Clinician-managed priority, observations and admission handoff |
-| D17 | ICU & Critical Care | — | Open | Monitoring, observations and escalation |
-| D18 | Operation Theatre | — | Open | Theatre, team, checklist and recovery |
+| D16 | Emergency / Casualty | `/work/emergency` | Partial | Emergency observations, ambulance coordination and external transfers |
+| D17 | ICU & Critical Care | `/work/critical-care` | Partial | Detailed monitoring, medication and escalation tracking |
+| D18 | Operation Theatre | `/work/operation-theatre` | Partial | Team scheduling, theatre checklists and procedural documentation |
 | D19 | Admission, Bed & Discharge | `/work/beds` | Partial | Inpatient charges, discharge documents and financial linkage |
 | D20 | Laboratory / LIMS | `/work/laboratory` | Partial | Numeric panels, reporting files, corrections and richer audit |
 | D21 | Radiology & Imaging | — | Open | Imaging orders, modality schedule and release |

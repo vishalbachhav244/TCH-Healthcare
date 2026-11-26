@@ -14,6 +14,7 @@ import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
+import { criticalCareWard, type AcuteView } from '../domain/acute-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
 import { seed } from './seed';
@@ -54,6 +55,227 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('emergency, ICU and theatre', () => {
+  const facility = 'mer-central';
+
+  it('records a clinician assessment, hands off one admission and resolves the ICU transfer', async () => {
+    const [emergency, admissions, icu, theatre] = await Promise.all([
+      login('emergency'),
+      login('admissions'),
+      login('icu'),
+      login('theatre'),
+    ]);
+    const patientId = 'TC-MERIDIAN-01001';
+    await expect(get('emergency', icu, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      get('emergency/patients?q=' + patientId, admissions, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    await db.facilities.update(facility, { inpatient: false });
+    try {
+      for (const [path, user] of [
+        ['emergency', emergency],
+        ['critical-care', icu],
+        ['operation-theatre', theatre],
+      ] as const) {
+        await expect(get(path, user, facility)).rejects.toMatchObject({ status: 403 });
+      }
+    } finally {
+      await db.facilities.update(facility, { inpatient: true });
+    }
+
+    const arrival = { patientId, arrival: 'Facility referral' };
+    const { id: caseId } = (await post('emergency/arrivals', arrival, emergency, facility)) as {
+      id: string;
+    };
+    await expect(post('emergency/arrivals', arrival, emergency, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    const waiting = (await get('emergency', emergency, facility)) as Extract<
+      AcuteView,
+      { kind: 'emergency' }
+    >;
+    const pending = waiting.cases.find((row) => row.id === caseId)!;
+    expect(pending.status).toBe('Awaiting assessment');
+    expect(pending).not.toHaveProperty('priority');
+    const identity = { caseId, version: '1' };
+    await expect(
+      patch('emergency/visits/status', { ...identity, action: 'admit' }, emergency, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      patch('emergency/visits/status', { ...identity, action: 'assess' }, emergency, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      patch(
+        'emergency/visits/status',
+        { ...identity, action: 'assess', priority: 'Urgent' },
+        emergency,
+        'mer-north',
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+    await patch(
+      'emergency/visits/status',
+      { ...identity, action: 'assess', priority: 'Urgent' },
+      emergency,
+      facility,
+    );
+    const handoff = { caseId, version: '2', action: 'admit' };
+    const results = await Promise.allSettled([
+      patch('emergency/visits/status', handoff, emergency, facility),
+      patch('emergency/visits/status', handoff, emergency, facility),
+    ]);
+    expect(results.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+    const admissionId = (await db.emergencyCases.get(caseId))!.admissionId!;
+    expect(await db.admissions.get(admissionId)).toMatchObject({ patientId, status: 'Requested' });
+    const beds = await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .toArray();
+    const critical = beds.find((row) => row.ward === criticalCareWard)!;
+    const regular = beds.find((row) => row.ward !== criticalCareWard)!;
+    await post(
+      'admissions/allocate',
+      { admissionId, bedId: critical.id, version: '1' },
+      admissions,
+      facility,
+    );
+    const criticalContext = { admissionId, version: '2' };
+    await expect(
+      post(
+        'critical-care/reviews',
+        { ...criticalContext, focus: 'Bedside review', outcome: 'Review documented' },
+        emergency,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+    await post(
+      'critical-care/reviews',
+      { ...criticalContext, focus: 'Team handoff', outcome: 'Handoff ready' },
+      icu,
+      facility,
+    );
+    await post('critical-care/step-downs', criticalContext, icu, facility);
+    await expect(
+      post('critical-care/step-downs', criticalContext, icu, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const census = (await get('critical-care', icu, facility)) as Extract<
+      AcuteView,
+      { kind: 'critical-care' }
+    >;
+    expect(census.patients.find((row) => row.admissionId === admissionId)).toMatchObject({
+      bed: critical.label,
+      stepDownRequestedAt: expect.any(Number),
+      reviews: [{ focus: 'Team handoff' }],
+    });
+    await post(
+      'admissions/allocate',
+      { admissionId, bedId: regular.id, version: '2' },
+      admissions,
+      facility,
+    );
+    expect(await db.icuStepDowns.where('admissionId').equals(admissionId).first()).toMatchObject({
+      status: 'Transferred',
+    });
+    expect(await db.beds.get(critical.id)).toMatchObject({ status: 'Cleaning' });
+    await expect(
+      post('critical-care/step-downs', { admissionId, version: '3' }, icu, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    await post('admissions/discharge', { admissionId, version: '3' }, admissions, facility);
+    const terminal = (await get('emergency', emergency, facility)) as Extract<
+      AcuteView,
+      { kind: 'emergency' }
+    >;
+    expect(terminal.cases.find((row) => row.id === caseId)).toMatchObject({
+      priority: 'Urgent',
+      assessedBy: 'Dr. Kabir Mehta',
+      admissionStatus: 'Discharged',
+    });
+    await post('beds/release', { bedId: critical.id }, admissions, facility);
+    await post('beds/release', { bedId: regular.id }, admissions, facility);
+  }, 60_000);
+
+  it('rejects theatre conflicts and invalid transitions and releases discharge after recovery', async () => {
+    const [theatre, admissions] = await Promise.all([login('theatre'), login('admissions')]);
+    const { id: admissionId } = (await post(
+      'admissions',
+      { patientId: 'TC-MERIDIAN-01002' },
+      admissions,
+      facility,
+    )) as { id: string };
+    const bed = (await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .first())!;
+    const day = dayInIndia();
+    const booking = {
+      admissionId,
+      day,
+      room: 'Theatre 1',
+      category: 'Day procedure',
+      startsAt: '08:00',
+      endsAt: '09:00',
+    };
+    await expect(post('operation-theatre/cases', booking, theatre, facility)).rejects.toMatchObject(
+      { status: 409 },
+    );
+    await post(
+      'admissions/allocate',
+      { admissionId, bedId: bed.id, version: '1' },
+      admissions,
+      facility,
+    );
+    const { id: caseId } = (await post('operation-theatre/cases', booking, theatre, facility)) as {
+      id: string;
+    };
+    await expect(post('operation-theatre/cases', booking, theatre, facility)).rejects.toMatchObject(
+      { status: 409 },
+    );
+    await expect(
+      post('operation-theatre/cases', { ...booking, room: 'Theatre 2' }, theatre, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const { id: second } = (await post(
+      'operation-theatre/cases',
+      { ...booking, room: 'Theatre 2', startsAt: '09:00', endsAt: '10:00' },
+      theatre,
+      facility,
+    )) as { id: string };
+    const update = (id: string, version: string, action: string) =>
+      patch('operation-theatre/cases/status', { caseId: id, version, action }, theatre, facility);
+    await expect(update(caseId, '1', 'start')).rejects.toMatchObject({ status: 409 });
+    await update(caseId, '1', 'ready');
+    await expect(update(caseId, '1', 'start')).rejects.toMatchObject({ status: 409 });
+    await update(caseId, '2', 'start');
+    await update(caseId, '3', 'recovery');
+    await update(second, '1', 'ready');
+    await expect(update(second, '2', 'start')).rejects.toMatchObject({ status: 409 });
+    const discharge = { admissionId, version: '2' };
+    await expect(
+      post('admissions/discharge', discharge, admissions, facility),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('open theatre cases'),
+    });
+    expect(await db.beds.get(bed.id)).toMatchObject({ status: 'Occupied' });
+    await update(caseId, '4', 'complete');
+    await update(second, '2', 'cancel');
+    await post('admissions/discharge', discharge, admissions, facility);
+    const theatreView = (await get('operation-theatre?day=' + day, theatre, facility)) as Extract<
+      AcuteView,
+      { kind: 'operation-theatre' }
+    >;
+    expect(theatreView.cases.find((row) => row.id === caseId)).toMatchObject({
+      status: 'Completed',
+      version: 5,
+    });
+    expect(theatreView.cases.find((row) => row.id === second)).toMatchObject({
+      status: 'Cancelled',
+    });
+    expect(theatreView.admissions).not.toContainEqual(expect.objectContaining({ id: admissionId }));
+    await post('beds/release', { bedId: bed.id }, admissions, facility);
+  }, 60_000);
+});
 
 describe('assigned inpatient care', () => {
   const facility = 'mer-central';

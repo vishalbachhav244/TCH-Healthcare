@@ -15,6 +15,9 @@ export type Resource =
   | 'clinical'
   | 'inpatient-physician'
   | 'nursing-station'
+  | 'emergency'
+  | 'critical-care'
+  | 'operation-theatre'
   | 'beds'
   | 'billing'
   | 'laboratory'
@@ -144,9 +147,24 @@ export const workspaces: readonly Workspace[] = [
     group: 'Clinical',
     icon: 'activity',
     inpatient: true,
+    resource: 'emergency',
   },
-  { id: 'D17', title: 'ICU & Critical Care', group: 'Clinical', icon: 'monitor', inpatient: true },
-  { id: 'D18', title: 'Operation Theatre', group: 'Clinical', icon: 'clipboard', inpatient: true },
+  {
+    id: 'D17',
+    title: 'ICU & Critical Care',
+    group: 'Clinical',
+    icon: 'activity',
+    inpatient: true,
+    resource: 'critical-care',
+  },
+  {
+    id: 'D18',
+    title: 'Operation Theatre',
+    group: 'Clinical',
+    icon: 'calendar',
+    inpatient: true,
+    resource: 'operation-theatre',
+  },
   {
     id: 'D19',
     title: 'Admission, Bed & Discharge',
@@ -222,6 +240,9 @@ export const navigation = [
     workspace: 'D14',
   },
   { title: 'Nursing station', resource: 'nursing-station', icon: 'heart', workspace: 'D15' },
+  { title: 'Emergency', resource: 'emergency', icon: 'activity', workspace: 'D16' },
+  { title: 'ICU & critical care', resource: 'critical-care', icon: 'activity', workspace: 'D17' },
+  { title: 'Operation theatre', resource: 'operation-theatre', icon: 'calendar', workspace: 'D18' },
   { title: 'Bed management', resource: 'beds', icon: 'bed', workspace: 'D19' },
   { title: 'Laboratory', resource: 'laboratory', icon: 'flask', workspace: 'D20' },
   { title: 'Pharmacy', resource: 'pharmacy', icon: 'cross', workspace: 'D22' },

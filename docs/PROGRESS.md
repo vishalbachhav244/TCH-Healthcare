@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Emergency, ICU and Operation Theatre, 26 November 2026
+
+- Added D16 `/work/emergency`, D17 `/work/critical-care` and D18 `/work/operation-theatre`. Emergency records clinician-assigned priorities and requests admission. ICU uses occupied critical-care beds for its census and persists reviews and step-down requests. Theatre supports room booking and readiness through recovery.
+- Reused existing admission creation and bed allocation. Bed Management surfaces ICU step-down requests and resolves them when an admission leaves the critical-care ward. Open theatre cases block discharge until completed or cancelled.
+- Updated the acute care contracts and adapter, shared workspace and Bed Management surfaces, schema version 16, role scopes and the OpenAPI contract. Verified the version 15 upgrade against an occupied bed and a persisted care team.
+- Coverage is 22 dashboard IDs with partial routes and 14 open. Discharge documentation and inpatient charges remain in the current milestone. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Emergency](screenshots/emergency-390.png) · [ICU](screenshots/critical-care-1440.png) · [Theatre](screenshots/operation-theatre-1440.png)
+
 ## Inpatient physician and nursing workspaces, 26 November 2026
 
 - Added D14 `/work/inpatient-physician` and D15 `/work/nursing-station` with assigned admissions, ward filters, care team context, rounds, orders, task transitions and observations.

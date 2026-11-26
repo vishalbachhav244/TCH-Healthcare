@@ -761,7 +761,7 @@ paths:
   '/admissions/allocate':
     post:
       operationId: 'allocateBed'
-      summary: 'Place or transfer to an available bed.'
+      summary: 'Place or transfer to an available bed. Transfers out of ICU resolve the active step-down request.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -793,7 +793,7 @@ paths:
   '/admissions/discharge':
     post:
       operationId: 'dischargePatient'
-      summary: 'Discharge after all linked nursing tasks are closed, then mark the bed for cleaning.'
+      summary: 'Discharge after linked nursing tasks and theatre cases are closed, then mark the bed for cleaning.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -3450,6 +3450,429 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /emergency:
+    get:
+      operationId: getEmergencyWorklist
+      summary: Read facility emergency visits with linked admission status.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyView"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /emergency/patients:
+    get:
+      operationId: findEmergencyPatients
+      summary: Search registered synthetic patients in the active facility tenant.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AcutePatient"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /emergency/arrivals:
+    post:
+      operationId: recordEmergencyArrival
+      summary: Record an unassessed emergency arrival for a registered patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - arrival
+              properties:
+                patientId:
+                  type: string
+                arrival:
+                  type: string
+                  enum:
+                    - Walk-in
+                    - Ambulance
+                    - Facility referral
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /emergency/visits/status:
+    patch:
+      operationId: updateEmergencyVisit
+      summary: Record clinician-assigned priority, request an inpatient admission or
+        close a visit.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required:
+                    - caseId
+                    - version
+                    - action
+                    - priority
+                  properties:
+                    caseId:
+                      type: string
+                    version:
+                      type: string
+                    action:
+                      type: string
+                      enum:
+                        - assess
+                    priority:
+                      type: string
+                      enum:
+                        - Immediate
+                        - Urgent
+                        - Standard
+                - type: object
+                  required:
+                    - caseId
+                    - version
+                    - action
+                  properties:
+                    caseId:
+                      type: string
+                    version:
+                      type: string
+                    action:
+                      type: string
+                      enum:
+                        - admit
+                        - close
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /critical-care:
+    get:
+      operationId: getCriticalCareCensus
+      summary: Read the active census and capacity of the facility’s critical care ward.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IcuCensus"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /critical-care/reviews:
+    post:
+      operationId: recordIcuReview
+      summary: Record a structured review for an active critical care admission.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - version
+                - focus
+                - outcome
+              properties:
+                admissionId:
+                  type: string
+                version:
+                  type: string
+                focus:
+                  type: string
+                  enum:
+                    - Bedside review
+                    - Team handoff
+                    - Transfer coordination
+                outcome:
+                  type: string
+                  enum:
+                    - Review documented
+                    - Handoff ready
+                    - Follow-up needed
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /critical-care/step-downs:
+    post:
+      operationId: requestIcuStepDown
+      summary: Request a transfer without reassigning or releasing the ICU bed.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - version
+              properties:
+                admissionId:
+                  type: string
+                version:
+                  type: string
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /operation-theatre:
+    get:
+      operationId: getTheatreSchedule
+      summary: Read room schedules for the selected day and eligible admitted patients.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - in: query
+          name: day
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TheatreSchedule"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /operation-theatre/cases:
+    post:
+      operationId: scheduleTheatreCase
+      summary: Schedule an admitted patient without room or patient overlap.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - day
+                - room
+                - category
+                - startsAt
+                - endsAt
+              properties:
+                admissionId:
+                  type: string
+                day:
+                  type: string
+                  format: date
+                room:
+                  type: string
+                  enum:
+                    - Theatre 1
+                    - Theatre 2
+                category:
+                  type: string
+                  enum:
+                    - General surgery
+                    - Orthopaedic procedure
+                    - Day procedure
+                startsAt:
+                  type: string
+                  pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+                endsAt:
+                  type: string
+                  pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /operation-theatre/cases/status:
+    patch:
+      operationId: updateTheatreStage
+      summary: Advance or cancel a versioned theatre booking.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - caseId
+                - version
+                - action
+              properties:
+                caseId:
+                  type: string
+                version:
+                  type: string
+                action:
+                  type: string
+                  enum:
+                    - ready
+                    - start
+                    - recovery
+                    - complete
+                    - cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -3798,6 +4221,8 @@ components:
             properties:
               admission: { '$ref': '#/components/schemas/Admission' }
               patient: { '$ref': '#/components/schemas/Patient' }
+              stepDownRequestedAt:
+                type: integer
     LabOrder:
       type: 'object'
       required:
@@ -5215,6 +5640,238 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WardOrderEntry"
+    AcutePatient:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    EmergencyVisit:
+      type: object
+      required:
+        - id
+        - patient
+        - arrival
+        - arrivedAt
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        patient:
+          $ref: "#/components/schemas/AcutePatient"
+        arrival:
+          type: string
+          enum:
+            - Walk-in
+            - Ambulance
+            - Facility referral
+        arrivedAt:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - Awaiting assessment
+            - Under care
+            - Admission requested
+            - Closed
+        version:
+          type: integer
+          minimum: 0
+        priority:
+          type: string
+          enum:
+            - Immediate
+            - Urgent
+            - Standard
+        assessedBy:
+          type: string
+        admissionStatus:
+          type: string
+          enum:
+            - Requested
+            - Admitted
+            - Discharged
+    EmergencyView:
+      type: object
+      required:
+        - kind
+        - cases
+      properties:
+        kind:
+          type: string
+          enum:
+            - emergency
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmergencyVisit"
+    IcuReview:
+      type: object
+      required:
+        - id
+        - createdAt
+        - actor
+        - focus
+        - outcome
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+        focus:
+          type: string
+          enum:
+            - Bedside review
+            - Team handoff
+            - Transfer coordination
+        outcome:
+          type: string
+          enum:
+            - Review documented
+            - Handoff ready
+            - Follow-up needed
+    IcuAdmission:
+      type: object
+      required:
+        - admissionId
+        - version
+        - patient
+        - bed
+        - reviews
+      properties:
+        admissionId:
+          type: string
+        version:
+          type: integer
+          minimum: 0
+        patient:
+          $ref: "#/components/schemas/AcutePatient"
+        bed:
+          type: string
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/IcuReview"
+        stepDownRequestedAt:
+          type: integer
+          minimum: 0
+    IcuCensus:
+      type: object
+      required:
+        - kind
+        - occupied
+        - available
+        - patients
+      properties:
+        kind:
+          type: string
+          enum:
+            - critical-care
+        occupied:
+          type: integer
+          minimum: 0
+        available:
+          type: integer
+          minimum: 0
+        patients:
+          type: array
+          items:
+            $ref: "#/components/schemas/IcuAdmission"
+    TheatreCase:
+      type: object
+      required:
+        - id
+        - patient
+        - room
+        - category
+        - day
+        - startsAt
+        - endsAt
+        - status
+        - version
+        - changedAt
+        - changedBy
+      properties:
+        id:
+          type: string
+        patient:
+          $ref: "#/components/schemas/AcutePatient"
+        room:
+          type: string
+          enum:
+            - Theatre 1
+            - Theatre 2
+        category:
+          type: string
+          enum:
+            - General surgery
+            - Orthopaedic procedure
+            - Day procedure
+        day:
+          type: string
+          format: date
+        startsAt:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        endsAt:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+        status:
+          type: string
+          enum:
+            - Scheduled
+            - Ready
+            - In theatre
+            - Recovery
+            - Completed
+            - Cancelled
+        version:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+    TheatreSchedule:
+      type: object
+      required:
+        - kind
+        - cases
+        - admissions
+      properties:
+        kind:
+          type: string
+          enum:
+            - operation-theatre
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TheatreCase"
+        admissions:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - patient
+              - bed
+            properties:
+              id:
+                type: string
+              patient:
+                $ref: "#/components/schemas/AcutePatient"
+              bed:
+                type: string
   responses:
     Error401:
       description: 'Missing or expired session.'

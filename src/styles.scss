@@ -1079,6 +1079,12 @@ tbody tr:nth-child(3n) .table-initials {
 .ward-mobile-context {
   display: none;
 }
+.acute-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 0.35rem;
+}
 @media (max-width: 620px) {
   .ward-record-list th,
   .ward-record-list td {

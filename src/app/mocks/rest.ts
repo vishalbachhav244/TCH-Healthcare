@@ -23,6 +23,7 @@ import {
 } from './interoperability';
 import { clinicalGovernance, qualityRegister } from './governance';
 import { wardAssignmentOptions, wardDetail, wardWorklist } from './ward-care';
+import { criticalCareView, emergencyPatients, emergencyView, theatreView } from './acute-care';
 
 export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   const url = new URL(request.urlWithParams, location.origin);
@@ -77,6 +78,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'inpatient-physician/orders/cancel',
     'nursing-station/tasks/start',
     'nursing-station/tasks/complete',
+    'emergency/visits/status',
+    'operation-theatre/cases/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -242,6 +245,31 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         scope(session, facilityRecord, 'D19', 'beds'),
         params.get('admissionId') ?? '',
       );
+    case 'emergency/patients':
+      return emergencyPatients(
+        scope(session, facilityRecord, 'D16', 'emergency'),
+        params.get('q') ?? '',
+      );
+    case 'emergency': {
+      const facility = scope(session, facilityRecord, 'D16');
+      return db.transaction('r', [db.emergencyCases, db.patients, db.admissions], () =>
+        emergencyView(facility),
+      );
+    }
+    case 'critical-care': {
+      const facility = scope(session, facilityRecord, 'D17');
+      return db.transaction(
+        'r',
+        [db.icuReviews, db.icuStepDowns, db.admissions, db.patients, db.beds],
+        () => criticalCareView(facility),
+      );
+    }
+    case 'operation-theatre': {
+      const facility = scope(session, facilityRecord, 'D18');
+      return db.transaction('r', [db.theatreCases, db.admissions, db.patients, db.beds], () =>
+        theatreView(facility, params.get('day')),
+      );
+    }
     case 'inpatient-physician':
     case 'nursing-station':
     case 'inpatient-physician/detail':

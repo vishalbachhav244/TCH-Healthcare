@@ -31,6 +31,17 @@ export const staff = {
   wardcover: { name: 'Dr. Arvind Shah', role: 'wardPhysician', facilities: ['mer-central'] },
   wardnurse: { name: 'Neha Pillai', role: 'wardNurse', facilities: ['mer-central', 'mer-north'] },
   wardrelief: { name: 'Ishani Joshi', role: 'wardNurse', facilities: ['mer-central'] },
+  emergency: {
+    name: 'Dr. Kabir Mehta',
+    role: 'emergencyClinician',
+    facilities: ['mer-central', 'mer-north'],
+  },
+  icu: { name: 'Dr. Leena Reddy', role: 'criticalCare', facilities: ['mer-central', 'mer-north'] },
+  theatre: {
+    name: 'Riya Bose',
+    role: 'theatreCoordinator',
+    facilities: ['mer-central', 'mer-north'],
+  },
   cashier: { name: 'Rohan Nair', role: 'cashier', facilities: ['mer-central'] },
   admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
   lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },

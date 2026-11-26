@@ -43,6 +43,7 @@ import type {
 } from '../domain/ward-care';
 import { initialQualityCases } from './governance-seed';
 import { initialWardAssignments } from './ward-seed';
+import type { EmergencyCase, IcuReview, IcuStepDown, TheatreCase } from '../domain/acute-care';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -74,6 +75,10 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   wardOrders: EntityTable<WardOrder, 'id'>;
   nursingTasks: EntityTable<NursingTask, 'id'>;
   wardObservations: EntityTable<WardObservation, 'id'>;
+  emergencyCases: EntityTable<EmergencyCase, 'id'>;
+  icuReviews: EntityTable<IcuReview, 'id'>;
+  icuStepDowns: EntityTable<IcuStepDown, 'id'>;
+  theatreCases: EntityTable<TheatreCase, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -312,6 +317,22 @@ db.version(15)
     const memberships = transaction.table<StaffMembership, string>('memberships');
     for (const grant of initialStaff.filter(
       (row) => row.role === 'wardPhysician' || row.role === 'wardNurse',
+    )) {
+      if (!(await memberships.get(grant.id))) await memberships.add(grant);
+    }
+  });
+
+db.version(16)
+  .stores({
+    emergencyCases: 'id, facilityId, [facilityId+patientId]',
+    icuReviews: 'id, admissionId',
+    icuStepDowns: 'id, facilityId, admissionId',
+    theatreCases: 'id, facilityId, [facilityId+day], admissionId',
+  })
+  .upgrade(async (transaction) => {
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    for (const grant of initialStaff.filter((row) =>
+      ['emergencyClinician', 'criticalCare', 'theatreCoordinator'].includes(row.role),
     )) {
       if (!(await memberships.get(grant.id))) await memberships.add(grant);
     }

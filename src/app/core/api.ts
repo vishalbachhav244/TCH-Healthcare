@@ -31,6 +31,17 @@ import type {
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
 import type { ScheduleException, SchedulingDay, WaitlistEntry } from '../domain/scheduling';
 import type {
+  AcuteView,
+  AcuteWorkspace,
+  EmergencyCase,
+  EmergencyRow,
+  IcuReviewFields,
+  IcuRow,
+  TheatreAction,
+  TheatreBooking,
+  TheatreRow,
+} from '../domain/acute-care';
+import type {
   NursingTask,
   ObservationFields,
   ObservationResult,
@@ -349,6 +360,101 @@ export class Api {
   beds(token: string, facility: string) {
     return this.get('beds', token, facility).pipe(
       map((value) => objectShape<InpatientBoard>(value, ['beds', 'admissions'])),
+    );
+  }
+
+  acuteView(token: string, facility: string, role: AcuteWorkspace, day: string) {
+    return this.get(role, token, facility, { day }).pipe(
+      map((value): AcuteView => {
+        if (role === 'emergency')
+          return objectShape<Extract<AcuteView, { kind: 'emergency' }>>(value, ['kind', 'cases']);
+        if (role === 'critical-care')
+          return objectShape<Extract<AcuteView, { kind: 'critical-care' }>>(value, [
+            'kind',
+            'patients',
+            'occupied',
+            'available',
+          ]);
+        return objectShape<Extract<AcuteView, { kind: 'operation-theatre' }>>(value, [
+          'kind',
+          'cases',
+          'admissions',
+        ]);
+      }),
+    );
+  }
+
+  emergencyPatients(token: string, facility: string, q: string) {
+    return this.get('emergency/patients', token, facility, { q }).pipe(
+      map((value) => collection<EmergencyRow['patient']>(value, ['id', 'name'])),
+    );
+  }
+
+  recordEmergencyArrival(
+    token: string,
+    facility: string,
+    fields: Pick<EmergencyCase, 'patientId' | 'arrival'>,
+  ) {
+    return this.execute('emergency/arrivals', token, facility, fields);
+  }
+
+  updateEmergencyVisit(
+    token: string,
+    facility: string,
+    visit: Pick<EmergencyRow, 'id' | 'version'>,
+    change:
+      | { action: 'admit' | 'close' }
+      | { action: 'assess'; priority: NonNullable<EmergencyCase['priority']> },
+  ) {
+    return this.execute(
+      'emergency/visits/status',
+      token,
+      facility,
+      { caseId: visit.id, version: String(visit.version), ...change },
+      'PATCH',
+    );
+  }
+
+  recordIcuReview(
+    token: string,
+    facility: string,
+    record: Pick<IcuRow, 'admissionId' | 'version'>,
+    fields: IcuReviewFields,
+  ) {
+    return this.execute('critical-care/reviews', token, facility, {
+      admissionId: record.admissionId,
+      version: String(record.version),
+      ...fields,
+    });
+  }
+
+  requestIcuStepDown(
+    token: string,
+    facility: string,
+    record: Pick<IcuRow, 'admissionId' | 'version'>,
+  ) {
+    return this.execute('critical-care/step-downs', token, facility, {
+      admissionId: record.admissionId,
+      version: String(record.version),
+    });
+  }
+
+  bookTheatreCase(token: string, facility: string, fields: TheatreBooking) {
+    return this.execute('operation-theatre/cases', token, facility, fields);
+  }
+
+  updateTheatreCase(
+    token: string,
+    facility: string,
+    record: Pick<TheatreRow, 'id' | 'version'>,
+    action: TheatreAction,
+  ) {
+    return this.execute(
+      'operation-theatre/cases/status',
+      token,
+      facility,
+      { caseId: record.id, version: String(record.version), action },
+      'PATCH',
     );
   }
 

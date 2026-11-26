@@ -32,3 +32,6 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-26 | D14 | `/work/inpatient-physician` | Assigned ward worklist, care plan, rounds, ward order placement and status |
 | TC-LOCAL-27 | D15 | `/work/nursing-station` | Assigned ward worklist, nursing tasks, observations and completion evidence |
 | TC-LOCAL-28 | D19 | `/work/beds` → Admissions → Assign care team | Facility staff directory and versioned physician and nurse assignment |
+| TC-LOCAL-29 | D16 | `/work/emergency` | Arrival, manual clinical assessment priority, admission request and live disposition |
+| TC-LOCAL-30 | D17 | `/work/critical-care` | Critical-care census, review history, step-down requests and transfer status |
+| TC-LOCAL-31 | D18 | `/work/operation-theatre` | Date-based theatre schedule, room booking, stage transitions, recovery and cancellation |

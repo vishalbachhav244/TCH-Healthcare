@@ -30,6 +30,9 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `admissions` | Admission requests, bed allocation and transfer, care-team assignment and discharge |
 | `wardphysician`, `wardcover` | Assigned inpatient care plans, rounds and ward orders |
 | `wardnurse`, `wardrelief` | Assigned nursing tasks, task completion and ward observations |
+| `emergency` | Emergency arrivals, clinician-assigned priority and admission requests |
+| `icu` | Critical care census, reviews and step-down requests |
+| `theatre` | Theatre room schedule, readiness and recovery stages |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |
 | `cashier` | Consultation invoices and local settlement |
@@ -47,6 +50,8 @@ In **Scheduling**, `reception` can add a patient to a clinician’s waitlist and
 In **Appointments**, `reception` can select an existing patient and use their previous clinician at the current facility. After signing a consultation, `clinician` can open **View note** and request a follow-up with a date window. For the demonstration patient, the `patient` tab can book that request under **Follow-up requests**. Reception can also book the request from the patient’s appointment form.
 
 In **Bed Management**, `admissions` can allocate a bed and assign an inpatient physician and ward nurse from the active facility roster. The `wardphysician` and `wardnurse` accounts have sample assignments at both Meridian facilities. A physician’s ward order appears as a nursing task. Its observation and status appear in both workspaces when the assigned nurse completes it. Admissions can discharge after the linked tasks are closed.
+
+Use `emergency` to record a registered patient’s arrival, enter the clinician-assigned priority and request admission. Allocate a Critical care bed as `admissions` to show that patient in `icu`. Request step-down there and transfer the admission to a regular ward in Bed Management. Use `theatre` to book an active admission and record its readiness, in-theatre status, recovery and completion.
 
 ## Verify
 

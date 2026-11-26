@@ -124,7 +124,7 @@ export interface Admission {
 
 export interface InpatientBoard {
   beds: Bed[];
-  admissions: { admission: Admission; patient: Patient }[];
+  admissions: { admission: Admission; patient: Patient; stepDownRequestedAt?: number }[];
 }
 
 export interface Alert {
@@ -230,6 +230,14 @@ export type EventType =
   | 'NursingTaskStarted'
   | 'NursingTaskCompleted'
   | 'WardObservationRecorded'
+  | 'EmergencyArrivalRecorded'
+  | 'EmergencyAssessmentRecorded'
+  | 'EmergencyAdmissionRequested'
+  | 'EmergencyVisitClosed'
+  | 'IcuReviewRecorded'
+  | 'IcuStepDownRequested'
+  | 'TheatreCaseBooked'
+  | 'TheatreCaseStatusChanged'
   | 'PatientDischarged'
   | 'BedReleased'
   | 'ClinicalOrderCreated'

@@ -22,6 +22,7 @@ import { laboratoryCommand } from './laboratory';
 import { pharmacyCommand } from './pharmacy';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
+import { criticalCareCommand, emergencyCommand, theatreCommand } from './acute-care';
 
 export const services = [
   { description: 'Outpatient consultation', unitMinor: 75000 },
@@ -89,6 +90,10 @@ export async function command(
       db.wardOrders,
       db.nursingTasks,
       db.wardObservations,
+      db.emergencyCases,
+      db.icuReviews,
+      db.icuStepDowns,
+      db.theatreCases,
     ],
     async () => {
       const session = await requireSession(token);
@@ -445,6 +450,33 @@ export async function command(
           changed = { ...event(facility, 'WardTeamAssigned', id), actor: session.account };
           break;
         }
+        case 'emergency/arrivals':
+        case 'emergency/visits/status':
+          changed = await emergencyCommand(
+            path,
+            scope(session, facilityRecord, 'D16', 'emergency'),
+            session,
+            payload,
+          );
+          break;
+        case 'critical-care/reviews':
+        case 'critical-care/step-downs':
+          changed = await criticalCareCommand(
+            path,
+            scope(session, facilityRecord, 'D17', 'critical-care'),
+            session,
+            payload,
+          );
+          break;
+        case 'operation-theatre/cases':
+        case 'operation-theatre/cases/status':
+          changed = await theatreCommand(
+            path,
+            scope(session, facilityRecord, 'D18', 'operation-theatre'),
+            session,
+            payload,
+          );
+          break;
         case 'inpatient-physician/rounds':
         case 'inpatient-physician/orders':
         case 'inpatient-physician/orders/cancel':

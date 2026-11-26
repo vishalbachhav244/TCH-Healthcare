@@ -18,7 +18,10 @@
 | Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, requests or withdraws follow-up and orders laboratory tests. |
 | Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, places ward orders and cancels pending orders. Reads related nursing tasks and observations. |
 | Ward nurse | Active assigned admissions at inpatient-enabled facilities. Starts and completes linked tasks and records observations. Reads rounds and orders for the assigned admission. |
-| Admissions | Default Meridian facility. Bed and admission lifecycle, including assignment of active facility physicians and nurses. Discharge requires all linked nursing tasks to be closed. |
+| Emergency clinician | Emergency arrivals, clinician-entered priority and disposition for registered patients within the selected facility tenant. May request admission. |
+| Critical care clinician | Current critical care beds and admissions at inpatient-enabled facilities. Records reviews and requests step-down. |
+| Theatre coordinator | Eligible active admissions and theatre schedules at inpatient-enabled facilities. Books rooms and records or cancels stages within the applicable lifecycle. |
+| Admissions | Default Meridian facility. Bed and admission lifecycle, including care teams and ICU step-down transfers. Discharge requires linked nursing tasks and theatre cases to be closed. |
 | Laboratory technician | Collection, processing and result entry. |
 | Laboratory reviewer | Authorisation and publication. |
 | Cashier | Signed-encounter invoices and local settlements. |

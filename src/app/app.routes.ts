@@ -167,6 +167,27 @@ export const routes: Routes = [
         title: 'Nursing Station · TrueCare',
       },
       {
+        path: 'emergency',
+        data: { resource: 'emergency' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/acute-workspace').then((m) => m.AcuteWorkspacePage),
+        title: 'Emergency · TrueCare',
+      },
+      {
+        path: 'critical-care',
+        data: { resource: 'critical-care' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/acute-workspace').then((m) => m.AcuteWorkspacePage),
+        title: 'ICU & Critical Care · TrueCare',
+      },
+      {
+        path: 'operation-theatre',
+        data: { resource: 'operation-theatre' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/acute-workspace').then((m) => m.AcuteWorkspacePage),
+        title: 'Operation Theatre · TrueCare',
+      },
+      {
         path: 'beds',
         data: { resource: 'beds' },
         canActivate: [workspaceAccess],

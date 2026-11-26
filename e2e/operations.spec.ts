@@ -25,6 +25,180 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('hands an emergency patient through ICU step-down and theatre recovery', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(170_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  await signIn(page, 'emergency');
+  await page.getByRole('button', { name: 'Record arrival' }).click();
+  const arrival = page.getByRole('dialog', { name: 'Record emergency arrival' });
+  await arrival.getByLabel('Find registered patient').fill(patientId);
+  await arrival.getByLabel('Patient', { exact: true }).selectOption(patientId);
+  await arrival.getByLabel('Arrival mode').selectOption('Facility referral');
+  await arrival.getByRole('button', { name: 'Save arrival' }).click();
+  const emergency = page.getByRole('row', { name: new RegExp(patientId) });
+  await expect(emergency).toContainText('Awaiting assessment');
+  await expect(emergency).toContainText('Unassigned');
+  await expect(emergency.getByRole('button', { name: 'Request admission' })).toHaveCount(0);
+  const assess = emergency.getByRole('button', { name: 'Record assessment' });
+  await assess.focus();
+  await page.keyboard.press('Enter');
+  const assessment = page.getByRole('dialog', { name: 'Record clinical assessment' });
+  await expect(assessment).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(assess).toBeFocused();
+  await assess.click();
+  await assessment.getByLabel('Clinician-assigned priority').selectOption('Urgent');
+  await assessment.getByRole('button', { name: 'Save assessment' }).click();
+  await expect(emergency).toContainText('Under care');
+  await emergency.getByRole('button', { name: 'Request admission' }).click();
+  await page
+    .getByRole('dialog', { name: 'Request inpatient admission' })
+    .getByRole('button', { name: 'Confirm admission request' })
+    .click();
+  await expect(emergency).toContainText('Admission requested');
+
+  const admissions = await page.context().newPage();
+  await signIn(admissions, 'admissions');
+  await admissions.getByRole('button', { name: 'Admissions', exact: true }).click();
+  await admissions.getByLabel('Find admission').fill(patientId);
+  const admission = admissions.getByRole('row', { name: new RegExp(patientId) });
+  await expect(admission).toContainText('Requested');
+  const icu = await page.context().newPage();
+  await signIn(icu, 'icu');
+  await icu.getByRole('searchbox', { name: 'Search worklist' }).fill(patientId);
+  const inIcu = icu.getByRole('row', { name: new RegExp(patientId) });
+  await expect(inIcu).toHaveCount(0);
+  await admission.getByRole('button', { name: 'Allocate bed' }).click();
+  const allocate = admissions.getByRole('dialog', { name: 'Assign bed' });
+  const beds = allocate.getByLabel('Available bed');
+  const icuBed = await beds
+    .locator('option', { hasText: 'Critical care' })
+    .first()
+    .getAttribute('value');
+  await beds.selectOption(icuBed!);
+  await allocate.getByRole('button', { name: 'Confirm bed allocation' }).click();
+  await expect(emergency).toContainText('Admitted');
+  await inIcu.getByRole('button', { name: 'Record review' }).click();
+  const review = icu.getByRole('dialog', { name: 'Record ICU review' });
+  await review.getByLabel('Review focus').selectOption('Team handoff');
+  await review.getByLabel('Review outcome').selectOption('Handoff ready');
+  await review.getByRole('button', { name: 'Save review' }).click();
+  await expect(inIcu).toContainText('Handoff ready');
+  await icu.reload();
+  await icu.getByRole('searchbox', { name: 'Search worklist' }).fill(patientId);
+  await inIcu.getByRole('button', { name: 'Review history' }).click();
+  const history = icu.getByRole('dialog', { name: 'ICU review history' });
+  await expect(history.getByText('Handoff ready')).toBeVisible();
+  await history.getByRole('button', { name: 'Close', exact: true }).click();
+  await inIcu.getByRole('button', { name: 'Request step-down' }).click();
+  await icu
+    .getByRole('dialog', { name: 'Request ICU step-down' })
+    .getByRole('button', { name: 'Confirm step-down' })
+    .click();
+  await expect(admission).toContainText('ICU step-down requested');
+
+  await checkReflow(page);
+  await checkReflow(icu);
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const [workspace, name] of [
+    [page, 'emergency-390'],
+    [icu, 'critical-care-1440'],
+  ] as const) {
+    expect(
+      (
+        await new AxeBuilder({ page: workspace })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+          .analyze()
+      ).violations,
+    ).toEqual([]);
+    await workspace.screenshot({
+      path: testInfo.outputPath(name + '.png'),
+      animations: 'disabled',
+      fullPage: true,
+    });
+  }
+  await admission.getByRole('button', { name: 'Transfer bed' }).click();
+  const wardBed = await beds
+    .locator('option')
+    .filter({ hasText: /General ward/ })
+    .first()
+    .getAttribute('value');
+  await beds.selectOption(wardBed!);
+  await allocate.getByRole('button', { name: 'Confirm bed allocation' }).click();
+  await expect(inIcu).toHaveCount(0);
+  await expect(admission).not.toContainText('ICU step-down requested');
+
+  const theatre = await page.context().newPage();
+  await signIn(theatre, 'theatre');
+  const booking = theatre.getByRole('dialog', { name: 'Schedule theatre case' });
+  async function schedule() {
+    await theatre.getByRole('button', { name: 'Schedule case' }).click();
+    await booking.getByLabel('Find active admission').fill(patientId);
+    const pick = booking.getByLabel('Admission', { exact: true });
+    const id = await pick.locator('option', { hasText: patientId }).getAttribute('value');
+    await pick.selectOption(id!);
+    await booking.getByLabel('Procedure category').selectOption('Day procedure');
+    await booking.getByLabel('Theatre', { exact: true }).selectOption('Theatre 1');
+    await booking.getByLabel('Starts at').selectOption('08:00');
+    await booking.getByLabel('Ends at').selectOption('09:00');
+    await booking.getByRole('button', { name: 'Save booking' }).click();
+  }
+  await schedule();
+  const theatreRow = theatre.getByRole('row', { name: new RegExp(patientId) });
+  await expect(theatreRow).toContainText('Scheduled');
+  await schedule();
+  await expect(booking.getByRole('alert')).toContainText('already booked during that interval');
+  await booking.getByRole('button', { name: 'Close', exact: true }).click();
+  await admission.getByRole('button', { name: 'Discharge', exact: true }).click();
+  const discharge = admissions.getByRole('dialog', { name: 'Discharge patient' });
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(discharge.getByRole('alert')).toContainText('Complete or cancel open theatre cases');
+  await discharge.getByRole('button', { name: 'Close', exact: true }).click();
+  for (const [action, status] of [
+    ['Mark ready', 'Ready'],
+    ['Start case', 'In theatre'],
+    ['Move to recovery', 'Recovery'],
+    ['Complete case', 'Completed'],
+  ]) {
+    await theatreRow.getByRole('button', { name: action, exact: true }).click();
+    await theatre
+      .getByRole('dialog', { name: action })
+      .getByRole('button', { name: 'Confirm change' })
+      .click();
+    await expect(theatreRow).toContainText(status);
+  }
+  await theatre.reload();
+  await expect(theatreRow).toContainText('Completed');
+  await checkReflow(theatre);
+  expect(
+    (await new AxeBuilder({ page: theatre }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await theatre.screenshot({
+    path: testInfo.outputPath('operation-theatre-1440.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  const tomorrow = shiftDay(dayInIndia(), 1);
+  await theatre.getByLabel('Theatre date', { exact: true }).fill(tomorrow);
+  await expect(theatre).toHaveURL(new RegExp('day=' + tomorrow));
+  await theatre.reload();
+  await expect(theatre.getByLabel('Theatre date', { exact: true })).toHaveValue(tomorrow);
+  await expect(
+    theatre.getByText('No theatre cases match the selected date and filters.'),
+  ).toBeVisible();
+  await admission.getByRole('button', { name: 'Discharge', exact: true }).click();
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(emergency).toContainText('Closed');
+  await theatre.goto('/work/emergency');
+  await expect(theatre.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await theatre.close();
+  await icu.close();
+  await admissions.close();
+});
+
 test('hands an admitted patient from physician rounds to nursing evidence and discharge', async ({
   page,
 }, testInfo) => {
@@ -635,10 +809,13 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   });
   const ward = await page.context().newPage();
   const nursing = await page.context().newPage();
+  const theatre = await page.context().newPage();
   await signIn(ward, 'wardphysician');
   await signIn(nursing, 'wardnurse');
+  await signIn(theatre, 'theatre');
   await expect(ward.getByRole('heading', { name: 'Inpatient Physician' })).toBeVisible();
   await expect(nursing.getByRole('heading', { name: 'Nursing Station' })).toBeVisible();
+  await expect(theatre.getByRole('heading', { name: 'Operation Theatre' })).toBeVisible();
   await page
     .getByRole('row', { name: /Meridian Medical Centre/ })
     .getByRole('button', { name: 'Edit entitlement' })
@@ -650,8 +827,10 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(staff.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(ward.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(nursing.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(theatre.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await ward.close();
   await nursing.close();
+  await theatre.close();
   await staff.close();
 });
 

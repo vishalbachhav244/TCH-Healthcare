@@ -95,7 +95,7 @@ export async function wardWorklist(
     .sort((a, b) => a.bed.ward.localeCompare(b.bed.ward) || a.bed.label.localeCompare(b.bed.label));
 }
 
-async function currentlyAdmitted(facility: Facility, id: string) {
+export async function currentlyAdmitted(facility: Facility, id: string) {
   const admission = await db.admissions.get(id);
   if (admission?.facilityId !== facility.id)
     throw new ApiError(404, 'Admission not found at this facility.');

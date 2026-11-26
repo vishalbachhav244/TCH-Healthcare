@@ -10,4 +10,6 @@ The consultation history and follow-up dialog and the patient’s follow-up view
 
 The physician care plan at 1440 px and the nursing plan at 390 px passed automated axe checks. Both views were checked at 390, 768, 1024 and 1440 px. The order dialog opens with Enter and restores focus after Escape. The nursing task action remains visible at 390 px with its last update shown under the task. [Physician workspace](screenshots/inpatient-physician-1440.png) · [Mobile nursing station](screenshots/nursing-station-390.png)
 
+Emergency, critical care and Theatre passed reflow checks at 390, 768, 1024 and 1440 px. The emergency view at 390 px and the two desktop views passed the selected axe rules. The emergency assessment dialog opens with Enter and restores focus after Escape. [Mobile emergency](screenshots/emergency-390.png) · [Critical care](screenshots/critical-care-1440.png) · [Operation Theatre](screenshots/operation-theatre-1440.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.
