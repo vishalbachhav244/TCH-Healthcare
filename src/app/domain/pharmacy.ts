@@ -1,4 +1,5 @@
 import type { Patient } from './operations';
+import type { CountFields } from './procurement';
 
 export const products = [
   { id: 'hydration', name: 'Oral hydration sachets', unit: 'sachet', unitMinor: 3200 },
@@ -26,6 +27,7 @@ export const stockMovementKinds = [
   'Dispensed',
   'Supplier return',
   'Patient return',
+  'Count adjustment',
 ] as const;
 
 export interface StockReceipt {
@@ -88,7 +90,14 @@ interface StockMovementBase {
 export type StockMovement = StockMovementBase &
   (
     | { kind: 'Opening balance'; prescriptionId?: never; reference?: never; invoiceId?: never }
-    | { kind: 'Received'; reference: string; prescriptionId?: never; invoiceId?: never }
+    | {
+        kind: 'Received';
+        reference: string;
+        purchaseOrderId?: string;
+        purchaseOrderReference?: string;
+        prescriptionId?: never;
+        invoiceId?: never;
+      }
     | { kind: 'Dispensed'; prescriptionId: string; reference?: never; invoiceId?: never }
     | {
         kind: 'Supplier return';
@@ -105,6 +114,14 @@ export type StockMovement = StockMovementBase &
         invoiceId: string;
         creditMinor: number;
         reviewMinor: number;
+      }
+    | {
+        kind: 'Count adjustment';
+        reference: string;
+        reason: CountFields['reason'];
+        countedOnHand: number;
+        prescriptionId?: never;
+        invoiceId?: never;
       }
   );
 

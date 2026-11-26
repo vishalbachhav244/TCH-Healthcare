@@ -10,7 +10,7 @@ import {
 import { ApiError } from './access';
 import { accountNames } from './accounts';
 import { db } from './database';
-import { movementsForLot } from './pharmacy-stock';
+import { movementsForLot, stockLedger } from './pharmacy-stock';
 
 function returnedQuantities(movements: readonly StockMovement[]) {
   const quantities = new Map<string, number>();
@@ -23,24 +23,17 @@ function returnedQuantities(movements: readonly StockMovement[]) {
 }
 
 export async function pharmacyData(facility: Facility): Promise<PharmacyData> {
-  const [visible, lots, movements] = await Promise.all([
+  const [visible, { lots, movements }] = await Promise.all([
     db.prescriptions
       .where('facilityId')
       .equals(facility.id)
       .filter((row) => row.status !== 'Draft')
       .toArray(),
-    db.stockLots.where('facilityId').equals(facility.id).toArray(),
-    db.stockMovements.where('facilityId').equals(facility.id).toArray(),
+    stockLedger(facility.id),
   ]);
   const patients = await db.patients.bulkGet(visible.map((row) => row.patientId));
   const returned = returnedQuantities(movements);
   const lotsById = new Map(lots.map((lot) => [lot.id, lot]));
-  const byLot = new Map<string, StockMovement[]>();
-  for (const move of movements) {
-    const entries = byLot.get(move.lotId);
-    if (entries) entries.push(move);
-    else byLot.set(move.lotId, [move]);
-  }
   return {
     prescriptions: visible
       .flatMap((prescription, index) => {
@@ -60,9 +53,7 @@ export async function pharmacyData(facility: Facility): Promise<PharmacyData> {
           (b.prescription.dispensedAt ?? b.prescription.createdAt) -
           (a.prescription.dispensedAt ?? a.prescription.createdAt),
       ),
-    lots: lots
-      .map((lot) => ({ ...lot, ...stockBalance(byLot.get(lot.id) ?? []) }))
-      .sort((a, b) => a.expiresOn.localeCompare(b.expiresOn)),
+    lots,
     activity: movements
       .flatMap((movement) => {
         const lot = lotsById.get(movement.lotId);

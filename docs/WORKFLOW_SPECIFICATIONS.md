@@ -11,7 +11,7 @@
 | 7 Pharmacy | Receive stock → record batch ledger → dispense signed prescription → issue medication invoice and update patient history → process supplier or patient returns | Purchase order receipts, quarantine disposition, customer instructions and partial fills |
 | 8 Billing | Signed encounter, medication dispense or finalized bed ledger → invoice → credits and local settlement → refund review → daily collection close | Deposits, receipts, taxes, tender-level reconciliation and closed-day corrections |
 | 9 Insurance | Eligible invoice → patient coverage → preauthorisation → prepare and submit → record payer settlement or denial → collect patient remainder → reconcile | Payer rules, appeals, attachments, batch remittances and external clearing |
-| 10 Procurement | Open | Requisition, purchase order, goods receipt and ledger |
+| 10 Procurement | Request replenishment → approve → choose supplier → issue order → receive all or part into the lot ledger → verify stock and order balance | Supplier onboarding, multiple order lines, non-pharmacy stock and payables matching |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
 | 12 Integration | Configure connector → redeem patient code → request report → grant one published version → verify provenance and consent → audit access | Real external transport, verified partner identities and additional record formats |
 | 13 Patient application | Clinician selection → booking → pass → queue status → released reports, discharge summaries and dispensed medication history → consent or patient-owned follow-up booking | Public discovery, family access and reminders |
@@ -37,3 +37,5 @@ Pharmacy receives a catalogue item against an in-date batch and unique stock ref
 Finance records a local refund or closes the review without one. Finance reconciles the selected posting day against patient and payer collections less refunds. A successful close preserves the counted amount and ledger snapshot.
 
 Insurance uses an existing consultation or inpatient invoice as its synthetic claim anchor. The policy period covers the invoice date. An active claim temporarily holds patient settlement. Approval can cover part of the balance. Posted payer settlement, denial, rejection or cancellation releases the hold. The cashier can then record the remaining patient balance.
+
+Stores requests a pharmacy catalogue item for its facility. Procurement approves the requisition and records the selected supplier and unit cost on the order. Stores receives an in-date batch against the open quantity. The order receipt and Pharmacy ledger entry share the same reference. Partial receipts keep the remaining quantity open. A stock count can then reconcile the on-hand quantity for that lot while preserving any quarantine balance.

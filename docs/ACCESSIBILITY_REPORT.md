@@ -20,4 +20,6 @@ The stock activity ledger and patient medication history passed reflow checks at
 
 The insurance worklist and collections view passed reflow checks at 390, 768, 1024 and 1440 px. The insurance view at 1440 px and the collection close at 390 px passed the selected axe rules. Keyboard checks verified that Enter opens the coverage and reconciliation forms and Escape returns focus to their trigger buttons. [Insurance settlement](screenshots/insurance-1440.png) · [Mobile finance reconciliation](screenshots/finance-390.png)
 
+The receiving worklist and purchase order register passed reflow checks at 390, 768, 1024 and 1440 px. The desktop order register and mobile receipt history passed the selected axe rules. Enter opens the requisition form and Escape returns focus to the request button. [Purchase order register](screenshots/procurement-1440.png) · [Mobile receiving history](screenshots/receiving-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

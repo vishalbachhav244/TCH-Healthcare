@@ -27,6 +27,8 @@ import { stockCommand } from './pharmacy-stock';
 import { invoiceBalances } from './invoice-balances';
 import { closeCollections, decideRefund, requireOpenCollectionDay } from './finance';
 import { claimCommand, recordCoverage } from './insurance';
+import { postGoodsReceipt, recordStockCount } from './inventory';
+import { purchaseOrderCommand, requisitionCommand } from './procurement';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -92,6 +94,10 @@ export async function command(
       db.collectionCloses,
       db.insuranceCoverages,
       db.insuranceClaims,
+      db.suppliers,
+      db.supplyRequisitions,
+      db.purchaseOrders,
+      db.goodsReceipts,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -487,6 +493,46 @@ export async function command(
             session,
             payload,
             path === 'insurance/claims',
+          );
+          break;
+        case 'inventory/requisitions':
+        case 'inventory/requisitions/withdraw':
+          changed = await requisitionCommand(
+            scope(session, facilityRecord, 'D27', 'inventory'),
+            session,
+            payload,
+            path.endsWith('/withdraw') ? 'withdraw' : 'create',
+          );
+          break;
+        case 'inventory/goods-receipts':
+          changed = await postGoodsReceipt(
+            scope(session, facilityRecord, 'D27', 'inventory'),
+            session,
+            payload,
+          );
+          break;
+        case 'inventory/counts':
+          changed = await recordStockCount(
+            scope(session, facilityRecord, 'D27', 'inventory'),
+            session,
+            payload,
+          );
+          break;
+        case 'procurement/requisitions/status':
+          changed = await requisitionCommand(
+            scope(session, facilityRecord, 'D28', 'procurement'),
+            session,
+            payload,
+            'decision',
+          );
+          break;
+        case 'procurement/orders':
+        case 'procurement/orders/cancel':
+          changed = await purchaseOrderCommand(
+            scope(session, facilityRecord, 'D28', 'procurement'),
+            session,
+            payload,
+            path.endsWith('/cancel'),
           );
           break;
         case 'alerts/acknowledge': {

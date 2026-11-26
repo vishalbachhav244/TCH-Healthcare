@@ -286,7 +286,14 @@
                   @if (move.reference) {
                     <small>{{ move.reference }}</small>
                   }
-                  @if (move.kind === 'Supplier return' || move.kind === 'Patient return') {
+                  @if (move.kind === 'Received' && move.purchaseOrderReference) {
+                    <small>{{ move.purchaseOrderReference }}</small>
+                  }
+                  @if (
+                    move.kind === 'Supplier return' ||
+                    move.kind === 'Patient return' ||
+                    move.kind === 'Count adjustment'
+                  ) {
                     <small>{{ move.reason }}</small>
                   }
                   <small class="ward-mobile-context"

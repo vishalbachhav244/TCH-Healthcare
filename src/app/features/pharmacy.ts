@@ -110,9 +110,12 @@ export class Pharmacy {
     const query = this.query().trim().toLowerCase();
     return data.data.activity.filter(
       ({ movement, productId, batch }) =>
-        [batch, movement.reference ?? '', this.product(productId)?.name ?? ''].some((value) =>
-          value.toLowerCase().includes(query),
-        ) &&
+        [
+          batch,
+          movement.reference ?? '',
+          this.product(productId)?.name ?? '',
+          movement.kind === 'Received' ? (movement.purchaseOrderReference ?? '') : '',
+        ].some((value) => value.toLowerCase().includes(query)) &&
         (!this.filter() || movement.kind === this.filter()),
     );
   });

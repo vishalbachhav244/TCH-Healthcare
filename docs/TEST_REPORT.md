@@ -6,18 +6,19 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 36 contract and domain tests passed across 3 files |
-| `npm run e2e` | All 18 Chromium journeys passed, including payer and patient settlement, medication refund decisions and collection close. |
-| `npm run build` | Passed. Initial assets approximately 372 kB raw and 97 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 375 kB raw and 97 kB estimated transfer. |
+| `npm test` | 38 contract and domain tests passed across 3 files |
+| `npm run e2e` | All 19 Chromium journeys passed, including requisition approval, purchase order issue, partial receiving and stock counts. |
+| `npm run build` | Passed. Initial assets approximately 373 kB raw and 97 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 376 kB raw and 98 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 19 to 20 in Chromium. A legacy payment survived the upgrade, Finance resolved the existing medication return, and Insurance showed the existing unpaid consultation. |
-| OpenAPI | 131 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 20 to 21 in Chromium. The legacy batch balance and Finance close survived, and the new roles could open the stock ledger and supplier directory. |
+| OpenAPI | 140 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
 
+- Request stock as Stores. Approve it as Procurement and issue a purchase order to an eligible supplier. Reject over-receiving, then record two partial receipts, reload receipt history and post a physical stock count. Verify the purchase order status and Pharmacy ledger after each handoff.
 - Place an imaging order in consultation. Confirm unavailable room times, cancel a second order and filter the modality schedule. Record acquisition and prepare a radiologist’s report. Verify draft visibility restrictions and the released report after patient reload.
 - Submit a component request from the assigned ward, verify the discharge gate and exclude an expired unit from selection. Require the review confirmation, reserve and issue a unit after reload, then verify ward status and stock.
 - Record an unassessed emergency arrival, assign priority explicitly and request admission. Allocate ICU, record and reload a review, request step-down and transfer to a regular ward. Schedule theatre, reject an overlap and block discharge until the case is complete. Reload the case and a different theatre date, then discharge and verify the emergency disposition closes.
@@ -64,3 +65,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Pharmacy stock ledger](screenshots/pharmacy-ledger-1440.png) · [Mobile patient medication history](screenshots/patient-medications-390.png)
 
 [Insurance settlement](screenshots/insurance-1440.png) · [Mobile finance reconciliation](screenshots/finance-390.png)
+
+[Purchase order register](screenshots/procurement-1440.png) · [Mobile receiving history](screenshots/receiving-390.png)

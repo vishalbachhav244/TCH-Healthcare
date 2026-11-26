@@ -41,6 +41,8 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `cashier` | Consultation and inpatient invoices, bed charges and local settlement |
 | `finance` | Patient and payer collections, medication refund review and daily reconciliation |
 | `claims` | Synthetic policy coverage, preauthorisation, claim status and local payer settlement |
+| `stores` | Stock counts, replenishment requisitions and purchase order receiving |
+| `procurement` | Requisition decisions, supplier directory and purchase order tracking |
 | `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
@@ -69,6 +71,8 @@ In **Pharmacy**, use **Receive stock** to record a batch and its receipt referen
 In **Insurance & TPA**, `claims` can open an eligible invoice, record patient coverage, request preauthorisation and record approval or denial. Prepare and submit the approved claim, then record the local payer settlement. When the claim is resolved, `cashier` can collect any outstanding patient portion.
 
 In **Finance & Revenue**, `finance` can resolve a medication return review and reconcile the facility’s posting day. The counted net amount must match the ledger before the day can be closed.
+
+In **Inventory & Stores**, `stores` can request a catalogue item. In **Procurement**, `procurement` approves the request and issues a purchase order to an eligible supplier. Back in **Receiving**, `stores` records one or more deliveries against the remaining quantity. Pharmacy shows each receipt in its stock activity. Record a physical count from **Stock levels** to post an adjustment to the same ledger.
 
 ## Verify
 

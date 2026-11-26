@@ -4831,6 +4831,389 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /inventory:
+    get:
+      operationId: getInventoryWorkspace
+      summary: Read batch balances, requisitions, orders and receiving history at the facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inventory/requisitions:
+    post:
+      operationId: recordRequisition
+      summary: Submit a catalogue replenishment request from Stores.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productId
+                - quantity
+                - purpose
+              properties:
+                productId:
+                  type: string
+                  enum:
+                    - hydration
+                    - saline
+                    - tears
+                    - dressing
+                quantity:
+                  type: string
+                  pattern: ^([1-9][0-9]{0,3}|10000)$
+                purpose:
+                  type: string
+                  enum:
+                    - Routine replenishment
+                    - Low stock
+                    - Replace expired stock
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inventory/requisitions/withdraw:
+    patch:
+      operationId: withdrawRequisition
+      summary: Withdraw a pending requisition as its requester.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requisitionId
+                - version
+              properties:
+                requisitionId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inventory/goods-receipts:
+    post:
+      operationId: postGoodsReceipt
+      summary: Post an in-date batch receipt against the current order remainder and update the lot ledger
+        atomically.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - purchaseOrderId
+                - version
+                - reference
+                - batch
+                - expiresOn
+                - quantity
+              properties:
+                purchaseOrderId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                reference:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+                batch:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{1,23}$
+                expiresOn:
+                  type: string
+                  format: date
+                quantity:
+                  type: string
+                  pattern: ^([1-9][0-9]{0,3}|10000)$
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inventory/counts:
+    post:
+      operationId: recordStockCount
+      summary: Record a count adjustment against the expected on-hand quantity. Quarantine is maintained
+        separately.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lotId
+                - expectedOnHand
+                - countedOnHand
+                - reason
+                - reference
+              properties:
+                lotId:
+                  type: string
+                expectedOnHand:
+                  type: string
+                  pattern: ^(0|[1-9][0-9]{0,15})$
+                countedOnHand:
+                  type: string
+                  pattern: ^(0|[1-9][0-9]{0,15})$
+                reason:
+                  type: string
+                  enum:
+                    - Cycle count
+                    - Recount after discrepancy
+                reference:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /procurement:
+    get:
+      operationId: getProcurementWorkspace
+      summary: Read requisitions, purchase orders and the facility supplier directory.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcurementData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /procurement/requisitions/status:
+    patch:
+      operationId: decideRequisition
+      summary: Approve or reject the current pending requisition as a separate account.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requisitionId
+                - version
+                - decision
+              properties:
+                requisitionId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                decision:
+                  type: string
+                  enum:
+                    - approve
+                    - reject
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /procurement/orders:
+    post:
+      operationId: issuePurchaseOrder
+      summary: Issue one purchase order from an approved requisition and capture the supplier unit cost.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requisitionId
+                - version
+                - supplierId
+              properties:
+                requisitionId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                supplierId:
+                  type: string
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /procurement/orders/cancel:
+    patch:
+      operationId: cancelPurchaseOrder
+      summary: Cancel an order before a receipt has posted.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - purchaseOrderId
+                - version
+              properties:
+                purchaseOrderId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -7236,6 +7619,7 @@ components:
             - Dispensed
             - Supplier return
             - Patient return
+            - Count adjustment
         reference:
           type: string
           pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
@@ -7262,6 +7646,17 @@ components:
                 - Unused medication returned
                 - Dispensing discrepancy
                 - Patient declined supply
+            - type: string
+              enum:
+                - Cycle count
+                - Recount after discrepancy
+        purchaseOrderId:
+          type: string
+        purchaseOrderReference:
+          type: string
+        countedOnHand:
+          type: integer
+          minimum: 0
       allOf:
         - if:
             properties:
@@ -7312,6 +7707,21 @@ components:
                   - Unused medication returned
                   - Dispensing discrepancy
                   - Patient declined supply
+        - if:
+            properties:
+              kind:
+                const: Count adjustment
+          then:
+            required:
+              - reference
+              - reason
+              - countedOnHand
+            properties:
+              reason:
+                type: string
+                enum:
+                  - Cycle count
+                  - Recount after discrepancy
     PharmacyStockEntry:
       type: object
       required:
@@ -7607,6 +8017,305 @@ components:
             $ref: "#/components/schemas/InsuranceCoverage"
         claim:
           $ref: "#/components/schemas/InsuranceClaim"
+    RequisitionRow:
+      type: object
+      required:
+        - id
+        - facilityId
+        - reference
+        - productId
+        - quantity
+        - purpose
+        - status
+        - version
+        - requestedAt
+        - requestedBy
+        - changedAt
+        - changedBy
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        reference:
+          type: string
+        productId:
+          type: string
+          enum:
+            - hydration
+            - saline
+            - tears
+            - dressing
+        quantity:
+          type: integer
+          minimum: 0
+        purpose:
+          type: string
+          enum:
+            - Routine replenishment
+            - Low stock
+            - Replace expired stock
+        status:
+          type: string
+          enum:
+            - Requested
+            - Approved
+            - Rejected
+            - Withdrawn
+            - Ordered
+        version:
+          type: integer
+          minimum: 1
+        requestedAt:
+          type: integer
+          minimum: 0
+        requestedBy:
+          type: string
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+        purchaseOrderReference:
+          type: string
+    ProcurementSupplier:
+      type: object
+      required:
+        - id
+        - facilityId
+        - name
+        - items
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        name:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            required:
+              - productId
+              - unitMinor
+            properties:
+              productId:
+                type: string
+                enum:
+                  - hydration
+                  - saline
+                  - tears
+                  - dressing
+              unitMinor:
+                type: integer
+                minimum: 0
+    PurchaseOrder:
+      type: object
+      required:
+        - id
+        - facilityId
+        - reference
+        - requisitionId
+        - supplierId
+        - supplierName
+        - productId
+        - quantity
+        - receivedQuantity
+        - status
+        - version
+        - issuedAt
+        - issuedBy
+        - changedAt
+        - unitMinor
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        reference:
+          type: string
+        requisitionId:
+          type: string
+        supplierId:
+          type: string
+        supplierName:
+          type: string
+        productId:
+          type: string
+          enum:
+            - hydration
+            - saline
+            - tears
+            - dressing
+        quantity:
+          type: integer
+          minimum: 0
+        receivedQuantity:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - Ordered
+            - Partially received
+            - Received
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        issuedAt:
+          type: integer
+          minimum: 0
+        issuedBy:
+          type: string
+        changedAt:
+          type: integer
+          minimum: 0
+        unitMinor:
+          type: integer
+          minimum: 0
+    GoodsReceipt:
+      type: object
+      required:
+        - id
+        - facilityId
+        - purchaseOrderId
+        - movementId
+        - lotId
+        - reference
+        - batch
+        - quantity
+        - receivedAt
+        - receivedBy
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        purchaseOrderId:
+          type: string
+        movementId:
+          type: string
+        lotId:
+          type: string
+        reference:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+        batch:
+          type: string
+        quantity:
+          type: integer
+          minimum: 0
+        receivedAt:
+          type: integer
+          minimum: 0
+        receivedBy:
+          type: string
+    ReceivingOrder:
+      type: object
+      required:
+        - id
+        - facilityId
+        - reference
+        - requisitionId
+        - supplierId
+        - supplierName
+        - productId
+        - quantity
+        - receivedQuantity
+        - status
+        - version
+        - issuedAt
+        - issuedBy
+        - changedAt
+        - receipts
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        reference:
+          type: string
+        requisitionId:
+          type: string
+        supplierId:
+          type: string
+        supplierName:
+          type: string
+        productId:
+          type: string
+          enum:
+            - hydration
+            - saline
+            - tears
+            - dressing
+        quantity:
+          type: integer
+          minimum: 0
+        receivedQuantity:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - Ordered
+            - Partially received
+            - Received
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        issuedAt:
+          type: integer
+          minimum: 0
+        issuedBy:
+          type: string
+        changedAt:
+          type: integer
+          minimum: 0
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GoodsReceipt"
+    InventoryData:
+      type: object
+      required:
+        - lots
+        - requisitions
+        - orders
+      properties:
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockLot"
+        requisitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequisitionRow"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceivingOrder"
+    ProcurementData:
+      type: object
+      required:
+        - requisitions
+        - orders
+        - suppliers
+      properties:
+        requisitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequisitionRow"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrder"
+        suppliers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProcurementSupplier"
   responses:
     Error401:
       description: 'Missing or expired session.'

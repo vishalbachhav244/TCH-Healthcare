@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Inventory and Procurement, 27 November 2026
+
+- Added D27 `/work/inventory` for medication lot balances, physical counts, requisitions, goods receipt and receipt history.
+- Added D28 `/work/procurement` for separate requisition approval, supplier selection, purchase order issue and receiving status. An order can receive multiple batches or partial quantities. Each receipt and count updates the shared Pharmacy ledger.
+- Updated supply and stock contracts, the scoped adapters and Angular workspaces, Pharmacy ledger display, schema version 21 and OpenAPI. Verified the V20 to V21 upgrade with preserved stock and Finance records and both new role memberships.
+- Coverage is 28 dashboard IDs with partial routes and 8 open. Non-pharmacy stores, supplier onboarding and multi-line purchasing remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Procurement](screenshots/procurement-1440.png) · [Receiving](screenshots/receiving-390.png)
+
 ## Finance and Insurance, 27 November 2026
 
 - Added D25 `/work/finance` for facility posting-day totals, medication return decisions and collection close. Cashier and patient bills reflect the refund resolution. Hospital and network metrics use net collections.

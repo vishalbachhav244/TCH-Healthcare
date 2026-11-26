@@ -22,6 +22,15 @@ import type {
 import type { PatientPortal } from '../domain/portal';
 import type { FinanceData, RefundOutcome } from '../domain/finance';
 import type {
+  CountFields,
+  InventoryData,
+  ProcurementData,
+  PurchaseOrder,
+  ReceiptFields,
+  Requisition,
+  RequisitionFields,
+} from '../domain/procurement';
+import type {
   ClaimAction,
   CoverageFields,
   InsuranceClaim,
@@ -902,6 +911,78 @@ export class Api {
       },
       'PATCH',
     );
+  }
+
+  inventory(token: string, facility: string) {
+    return this.get('inventory', token, facility).pipe(
+      map((value) => objectShape<InventoryData>(value, ['lots', 'requisitions', 'orders'])),
+    );
+  }
+
+  procurement(token: string, facility: string) {
+    return this.get('procurement', token, facility).pipe(
+      map((value) => objectShape<ProcurementData>(value, ['requisitions', 'orders', 'suppliers'])),
+    );
+  }
+
+  recordRequisition(token: string, facility: string, fields: RequisitionFields) {
+    return this.execute('inventory/requisitions', token, facility, {
+      ...fields,
+      quantity: String(fields.quantity),
+    });
+  }
+
+  changeRequisition(
+    token: string,
+    facility: string,
+    record: Requisition,
+    decision: 'approve' | 'reject' | 'withdraw',
+  ) {
+    const path =
+      decision === 'withdraw'
+        ? 'inventory/requisitions/withdraw'
+        : 'procurement/requisitions/status';
+    return this.execute(
+      path,
+      token,
+      facility,
+      { requisitionId: record.id, version: String(record.version), decision },
+      'PATCH',
+    );
+  }
+
+  issuePurchaseOrder(token: string, facility: string, record: Requisition, supplierId: string) {
+    return this.execute('procurement/orders', token, facility, {
+      requisitionId: record.id,
+      version: String(record.version),
+      supplierId,
+    });
+  }
+
+  cancelPurchaseOrder(token: string, facility: string, order: PurchaseOrder) {
+    return this.execute(
+      'procurement/orders/cancel',
+      token,
+      facility,
+      { purchaseOrderId: order.id, version: String(order.version) },
+      'PATCH',
+    );
+  }
+
+  postGoodsReceipt(token: string, facility: string, fields: ReceiptFields) {
+    return this.execute('inventory/goods-receipts', token, facility, {
+      ...fields,
+      version: String(fields.version),
+      quantity: String(fields.quantity),
+    });
+  }
+
+  recordStockCount(token: string, facility: string, fields: CountFields) {
+    return this.execute('inventory/counts', token, facility, {
+      ...fields,
+      expectedOnHand: String(fields.expectedOnHand),
+      countedOnHand: String(fields.countedOnHand),
+    });
   }
 
   invoiceOptions(token: string, facility: string, day: string) {

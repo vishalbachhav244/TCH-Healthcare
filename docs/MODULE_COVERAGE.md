@@ -16,5 +16,6 @@ The supplied brief provides the 28-module baseline count, the 36-dashboard list 
 | Theatre | D18 | Admission-linked room scheduling, conflict checks and readiness through recovery |
 | Diagnostics and medication | D20–D23 | Laboratory and imaging workflows, pharmacy dispensing, receiving and returns with batch ledger, and blood component review, reservation and issue |
 | Patient finance | D24–D26 | Consultation, medication and inpatient invoices, return credits and refunds, coverage and payer claims, and daily collection reconciliation |
+| Supplies and purchasing | D27–D28 | Pharmacy stock counts, replenishment requests, approval, supplier selection, purchase orders and partial goods receipts |
 
 See [dashboard registry](DASHBOARD_REGISTRY.md) for open responsibilities and [workflow specifications](WORKFLOW_SPECIFICATIONS.md) for connected workflow coverage.

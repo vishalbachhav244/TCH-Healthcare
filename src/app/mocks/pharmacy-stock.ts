@@ -22,9 +22,112 @@ export async function movementsForLot(lot: StockLot) {
     .toArray();
 }
 
+export async function stockLedger(facilityId: string) {
+  const [lots, movements] = await Promise.all([
+    db.stockLots.where('facilityId').equals(facilityId).toArray(),
+    db.stockMovements.where('facilityId').equals(facilityId).toArray(),
+  ]);
+  const byLot = new Map<string, StockMovement[]>();
+  for (const move of movements) {
+    const entries = byLot.get(move.lotId);
+    if (entries) entries.push(move);
+    else byLot.set(move.lotId, [move]);
+  }
+  return {
+    lots: lots
+      .map((lot) => ({ ...lot, ...stockBalance(byLot.get(lot.id) ?? []) }))
+      .sort((a, b) => a.expiresOn.localeCompare(b.expiresOn)),
+    movements,
+  };
+}
+
 function stockCode(value: unknown, pattern: RegExp, message: string) {
   if (typeof value !== 'string' || !pattern.test(value.trim())) throw new ApiError(422, message);
   return value.trim().toUpperCase();
+}
+
+export function stockReference(value: unknown) {
+  return stockCode(
+    value,
+    stockReferencePattern,
+    'Enter a stock reference using 3–24 letters, digits or hyphens.',
+  );
+}
+
+export function stockQuantity(value: unknown, allowZero = false) {
+  const quantity =
+    typeof value === 'string' && /^(0|[1-9][0-9]{0,15})$/.test(value) ? Number(value) : -1;
+  if (allowZero && (!Number.isSafeInteger(quantity) || quantity < 0))
+    throw new ApiError(422, 'Enter a non-negative whole count.');
+  if (!allowZero && (quantity < 1 || quantity > 10_000))
+    throw new ApiError(422, 'Enter a whole quantity from 1 to 10,000.');
+  return quantity;
+}
+
+export async function requireUnusedStockReference(facilityId: string, reference: string) {
+  if (
+    await db.stockMovements.where('[facilityId+reference]').equals([facilityId, reference]).first()
+  )
+    throw new ApiError(409, 'This stock reference has already been recorded at this facility.');
+}
+
+export async function receiveStock(
+  facility: Facility,
+  actor: string,
+  body: Record<string, unknown>,
+  purchaseOrder?: { id: string; reference: string },
+): Promise<Extract<StockMovement, { kind: 'Received' }>> {
+  const reference = stockReference(body['reference']);
+  const quantity = stockQuantity(body['quantity']);
+  await requireUnusedStockReference(facility.id, reference);
+  const product = products.find((item) => item.id === body['productId']);
+  if (!product) throw new ApiError(422, 'Choose a medication from the catalogue.');
+  const batch = stockCode(
+    body['batch'],
+    stockBatchPattern,
+    'Enter a batch code using 2–24 letters, digits or hyphens.',
+  );
+  if (typeof body['expiresOn'] !== 'string' || !body['expiresOn'])
+    throw new ApiError(422, 'Enter the batch expiry date.');
+  const expiresOn = checkedDay(body['expiresOn']);
+  const at = Date.now();
+  if (expiresOn < dayInIndia(at))
+    throw new ApiError(422, 'Choose an expiry date on or after today.');
+  const lot = await db.stockLots
+    .where('[facilityId+productId+batch]')
+    .equals([facility.id, product.id, batch])
+    .first();
+  if (lot && lot.expiresOn !== expiresOn)
+    throw new ApiError(409, 'This batch already has a different expiry date.');
+  const lotId = lot?.id ?? crypto.randomUUID();
+  const onHand = lot ? stockBalance(await movementsForLot(lot)).onHand : 0;
+  if (!Number.isSafeInteger(onHand + quantity))
+    throw new ApiError(409, 'The resulting on-hand quantity exceeds the ledger limit.');
+  if (lot) await db.stockLots.update(lot.id, { onHand: onHand + quantity });
+  else
+    await db.stockLots.add({
+      id: lotId,
+      facilityId: facility.id,
+      productId: product.id,
+      batch,
+      expiresOn,
+      onHand: quantity,
+    });
+  const movement = {
+    id: crypto.randomUUID(),
+    lotId,
+    facilityId: facility.id,
+    quantity,
+    reference,
+    at,
+    actor,
+    kind: 'Received' as const,
+    ...(purchaseOrder
+      ? { purchaseOrderId: purchaseOrder.id, purchaseOrderReference: purchaseOrder.reference }
+      : {}),
+  };
+  await db.stockMovements.add(movement);
+  return movement;
 }
 
 export async function stockCommand(
@@ -33,21 +136,19 @@ export async function stockCommand(
   session: Session,
   body: Record<string, unknown>,
 ): Promise<DomainEvent> {
-  const reference = stockCode(
-    body['reference'],
-    stockReferencePattern,
-    'Enter a stock reference using 3–24 letters, digits or hyphens.',
-  );
-  const quantity =
-    typeof body['quantity'] === 'string' && /^[1-9][0-9]{0,4}$/.test(body['quantity'])
-      ? Number(body['quantity'])
-      : 0;
-  if (quantity < 1 || quantity > 10_000)
-    throw new ApiError(422, 'Enter a whole quantity from 1 to 10,000.');
-  if (
-    await db.stockMovements.where('[facilityId+reference]').equals([facility.id, reference]).first()
-  )
-    throw new ApiError(409, 'This stock reference has already been recorded at this facility.');
+  if (path === 'pharmacy/stock/receipts') {
+    const movement = await receiveStock(facility, session.account, body);
+    return {
+      type: 'PharmacyStockReceived',
+      entityId: movement.id,
+      facilityId: facility.id,
+      occurredAt: movement.at,
+      actor: session.account,
+    };
+  }
+  const reference = stockReference(body['reference']);
+  const quantity = stockQuantity(body['quantity']);
+  await requireUnusedStockReference(facility.id, reference);
   const now = Date.now();
   const id = crypto.randomUUID();
   const entry = (lotId: string) => ({
@@ -61,40 +162,7 @@ export async function stockCommand(
   });
   let movement: StockMovement;
   let type: DomainEvent['type'];
-  if (path === 'pharmacy/stock/receipts') {
-    const product = products.find((item) => item.id === body['productId']);
-    if (!product) throw new ApiError(422, 'Choose a medication from the catalogue.');
-    const batch = stockCode(
-      body['batch'],
-      stockBatchPattern,
-      'Enter a batch code using 2–24 letters, digits or hyphens.',
-    );
-    if (typeof body['expiresOn'] !== 'string' || !body['expiresOn'])
-      throw new ApiError(422, 'Enter the batch expiry date.');
-    const expiresOn = checkedDay(body['expiresOn']);
-    if (expiresOn < dayInIndia(now))
-      throw new ApiError(422, 'Choose an expiry date on or after today.');
-    const lot = await db.stockLots
-      .where('[facilityId+productId+batch]')
-      .equals([facility.id, product.id, batch])
-      .first();
-    if (lot && lot.expiresOn !== expiresOn)
-      throw new ApiError(409, 'This batch already has a different expiry date.');
-    const lotId = lot?.id ?? crypto.randomUUID();
-    const onHand = lot ? stockBalance(await movementsForLot(lot)).onHand : 0;
-    if (lot) await db.stockLots.update(lot.id, { onHand: onHand + quantity });
-    else
-      await db.stockLots.add({
-        id: lotId,
-        facilityId: facility.id,
-        productId: product.id,
-        batch,
-        expiresOn,
-        onHand: quantity,
-      });
-    movement = { ...entry(lotId), kind: 'Received' };
-    type = 'PharmacyStockReceived';
-  } else if (path === 'pharmacy/stock/supplier-returns') {
+  if (path === 'pharmacy/stock/supplier-returns') {
     const lotId = body['lotId'];
     const lot = typeof lotId === 'string' ? await db.stockLots.get(lotId) : undefined;
     if (lot?.facilityId !== facility.id)

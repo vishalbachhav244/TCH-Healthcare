@@ -46,3 +46,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-40 | D12, D22 and D24 | `/work/pharmacy` → Prescriptions, `/work/portal` → Medications and Bills, and `/work/billing` | Patient return, dispensed medication history, credit and payment review amount |
 | TC-LOCAL-41 | D25 | `/work/finance` | Daily patient and payer collections, medication refund review and collection close |
 | TC-LOCAL-42 | D26 and D24 | `/work/insurance` and `/work/billing` | Patient coverage, claim approval, preparation, submission, payer settlement and remaining patient balance |
+| TC-LOCAL-43 | D27 | `/work/inventory` | Stock balances, physical counts, requisition submission, goods receipt and receipt history |
+| TC-LOCAL-44 | D28 | `/work/procurement` | Requisition decisions, facility suppliers, order issue and purchase order register |

@@ -36,6 +36,8 @@ export class StatusTone implements PipeTransform {
         'Dispensed',
         'Returned',
         'Settled',
+        'Received',
+        'Approved',
       ].includes(status)
     )
       return 'status positive';
@@ -54,6 +56,7 @@ export class StatusTone implements PipeTransform {
         'Submitted',
         'Prepared',
         'Insurance pending',
+        'Partially received',
       ].includes(status)
     )
       return 'status information';
@@ -74,7 +77,17 @@ export class StatusTone implements PipeTransform {
       ].includes(status)
     )
       return 'status attention';
-    if (['Priority', 'Maintenance', 'Cancelled', 'Declined', 'Expired'].includes(status))
+    if (
+      [
+        'Priority',
+        'Maintenance',
+        'Cancelled',
+        'Declined',
+        'Expired',
+        'Withdrawn',
+        'Rejected',
+      ].includes(status)
+    )
       return 'status priority';
     return 'status';
   }

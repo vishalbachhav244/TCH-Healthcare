@@ -22,6 +22,7 @@ import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
 import type { FinanceData } from '../domain/finance';
 import type { InsuranceRow } from '../domain/insurance';
+import type { InventoryData, ProcurementData } from '../domain/procurement';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -2397,5 +2398,197 @@ describe('insurance and daily reconciliation', () => {
     expect(
       ((await get('finance?day=' + day, finance, facility)) as FinanceData).close,
     ).toMatchObject({ day, countedMinor: view.summary.netMinor });
+  }, 90_000);
+});
+
+describe('inventory and procurement', () => {
+  const facility = 'mer-central';
+
+  it('approves, orders and receives into one ledger with scoped and versioned stock updates', async () => {
+    const [stores, buyer, pharmacist, cashier] = await Promise.all(
+      ['stores', 'procurement', 'pharmacy', 'cashier'].map(login),
+    );
+    const request = { productId: 'hydration', quantity: '10', purpose: 'Low stock' };
+    const expiry = shiftDay(dayInIndia(), 100);
+    const purchase = 'procurement/orders';
+    const decision = 'procurement/requisitions/status';
+    const receive = 'inventory/goods-receipts';
+    const inventory = async () => (await get('inventory', stores, facility)) as InventoryData;
+    await expect(get('inventory', cashier, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get('procurement', stores, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('inventory/requisitions', { ...request, quantity: '0' }, stores, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const { id: requisitionId } = (await post(
+      'inventory/requisitions',
+      request,
+      stores,
+      facility,
+    )) as { id: string };
+    const approval = { requisitionId, version: '1', decision: 'approve' };
+    const order = { requisitionId, version: '2', supplierId: 'mer-central-supplier-1' };
+    await expect(post(purchase, { ...order, version: '1' }, buyer, facility)).rejects.toMatchObject(
+      { status: 409 },
+    );
+    await expect(patch(decision, approval, stores, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(patch(decision, approval, buyer, 'mer-north')).rejects.toMatchObject({
+      status: 404,
+    });
+    await patch(decision, approval, buyer, facility);
+    await expect(
+      post(purchase, { ...order, supplierId: 'mer-north-supplier-1' }, buyer, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      post(purchase, { ...order, supplierId: 'mer-central-supplier-2' }, buyer, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const orders = await Promise.allSettled([
+      post(purchase, order, buyer, facility),
+      post(purchase, order, buyer, facility),
+    ]);
+    expect(orders.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const stored = (await db.purchaseOrders.where('requisitionId').equals(requisitionId).first())!;
+    expect(stored).toMatchObject({ status: 'Ordered', quantity: 10, unitMinor: 2100 });
+    expect((await inventory()).orders.find((row) => row.id === stored.id)).not.toHaveProperty(
+      'unitMinor',
+    );
+    const delivery = {
+      purchaseOrderId: stored.id,
+      version: '1',
+      batch: 'OP-RECEIVE-1',
+      expiresOn: expiry,
+      quantity: '6',
+      reference: 'GRN-PROC-101',
+    };
+    await expect(post(receive, delivery, buyer, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(post(receive, delivery, stores, 'mer-north')).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      post(receive, { ...delivery, quantity: '11' }, stores, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      post(receive, { ...delivery, expiresOn: shiftDay(dayInIndia(), -1) }, stores, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await post(receive, delivery, stores, facility);
+    expect(await db.purchaseOrders.get(stored.id)).toMatchObject({
+      status: 'Partially received',
+      receivedQuantity: 6,
+      version: 2,
+    });
+    await expect(
+      patch(
+        'procurement/orders/cancel',
+        { purchaseOrderId: stored.id, version: '2' },
+        buyer,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      post(
+        receive,
+        { ...delivery, version: '2', quantity: '4', reference: 'grn-proc-101' },
+        stores,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('reference') });
+    const final = { ...delivery, version: '2', quantity: '4', reference: 'GRN-PROC-102' };
+    await expect(
+      post(receive, { ...final, expiresOn: shiftDay(expiry, 1) }, stores, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const deliveries = await Promise.allSettled([
+      post(receive, final, stores, facility),
+      post(receive, final, stores, facility),
+    ]);
+    expect(deliveries.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const view = await inventory();
+    const lot = view.lots.find((row) => row.batch === delivery.batch)!;
+    expect(lot.onHand).toBe(10);
+    const receipts = view.orders.find((row) => row.id === stored.id);
+    expect(receipts).toMatchObject({ status: 'Received', receivedQuantity: 10 });
+    expect(receipts?.receipts).toHaveLength(2);
+    expect(receipts?.receipts.every((row) => row.lotId === lot.id)).toBe(true);
+    const count = {
+      lotId: lot.id,
+      expectedOnHand: '10',
+      countedOnHand: '8',
+      reference: 'CNT-PROC-101',
+      reason: 'Cycle count',
+    };
+    await post('inventory/counts', count, stores, facility);
+    await expect(
+      post('inventory/counts', { ...count, reference: 'CNT-PROC-102' }, stores, facility),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('Stock changed') });
+    const pharmacy = (await get('pharmacy', pharmacist, facility)) as PharmacyData;
+    expect(pharmacy.lots.find((row) => row.id === lot.id)).toMatchObject({
+      onHand: 8,
+      quarantined: 0,
+    });
+    const moves = pharmacy.activity
+      .filter((row) => row.batch === lot.batch)
+      .map((row) => row.movement);
+    expect(moves).toHaveLength(3);
+    expect(moves).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'Received', purchaseOrderId: stored.id, quantity: 6 }),
+        expect.objectContaining({ kind: 'Received', purchaseOrderId: stored.id, quantity: 4 }),
+        expect.objectContaining({ kind: 'Count adjustment', countedOnHand: 8, quantity: -2 }),
+      ]),
+    );
+    const outside = (await get('procurement', buyer, 'mer-north')) as ProcurementData;
+    expect(outside.orders).not.toContainEqual(expect.objectContaining({ id: stored.id }));
+  }, 90_000);
+
+  it('honours withdrawn and rejected requests and blocks receiving on a cancelled order', async () => {
+    const [stores, buyer] = await Promise.all(['stores', 'procurement'].map(login));
+    const request = { productId: 'saline', quantity: '4', purpose: 'Routine replenishment' };
+    const create = async () =>
+      ((await post('inventory/requisitions', request, stores, facility)) as { id: string }).id;
+    const withdrawn = await create();
+    await patch(
+      'inventory/requisitions/withdraw',
+      { requisitionId: withdrawn, version: '1' },
+      stores,
+      facility,
+    );
+    const approve = (id: string, decision = 'approve') =>
+      patch(
+        'procurement/requisitions/status',
+        { requisitionId: id, version: '1', decision },
+        buyer,
+        facility,
+      );
+    await expect(approve(withdrawn)).rejects.toMatchObject({ status: 409 });
+    const rejected = await create();
+    await approve(rejected, 'reject');
+    const purchase = (id: string) =>
+      post(
+        'procurement/orders',
+        { requisitionId: id, version: '2', supplierId: 'mer-central-supplier-2' },
+        buyer,
+        facility,
+      );
+    await expect(purchase(rejected)).rejects.toMatchObject({ status: 409 });
+    const approved = await create();
+    await approve(approved);
+    const { id: purchaseOrderId } = (await purchase(approved)) as { id: string };
+    await patch('procurement/orders/cancel', { purchaseOrderId, version: '1' }, buyer, facility);
+    await expect(
+      post(
+        'inventory/goods-receipts',
+        { purchaseOrderId, version: '2', quantity: '1' },
+        stores,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(await db.goodsReceipts.where('purchaseOrderId').equals(purchaseOrderId).count()).toBe(0);
+    await db.facilities.update(facility, { active: false });
+    try {
+      await expect(get('inventory', stores, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(get('procurement', buyer, facility)).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await db.facilities.update(facility, { active: true });
+    }
   }, 90_000);
 });

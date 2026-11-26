@@ -30,5 +30,7 @@
 | Cashier | Signed-encounter invoices, local settlements, medication credits and payment review amounts, and scoped bed charges at inpatient-enabled facilities. |
 | Finance officer | Facility posting-day collections and reconciliation. Resolves medication payment reviews and can record a local refund. |
 | Insurance coordinator | Facility consultation and inpatient invoices. Records patient coverage, versioned claim decisions and approved payer settlements. |
+| Stores officer | Facility lot balances, stock counts, replenishment requests and goods receipts. Only the requester can withdraw a pending requisition. |
+| Procurement officer | Facility requisitions, supplier costs and purchase orders. A separate account approves or rejects a requisition. Purchase orders with receipts cannot be cancelled. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications and bill balances. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

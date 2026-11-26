@@ -25,6 +25,127 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('replenishes pharmacy stock through requisition, purchase order and partial receipts', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(150_000);
+  const batch = 'PROC-BATCH-601';
+  const expiry = shiftDay(dayInIndia(), 100);
+  await signIn(page, 'stores');
+  await expect(page.getByRole('heading', { name: 'Inventory & Stores' })).toBeVisible();
+  const buyer = await page.context().newPage();
+  await signIn(buyer, 'procurement');
+  await expect(buyer.getByText('No requisitions match these filters.')).toBeVisible();
+
+  const create = page.getByRole('button', { name: 'Create requisition' });
+  await create.focus();
+  await page.keyboard.press('Enter');
+  const request = page.getByRole('dialog', { name: 'Create requisition' });
+  await expect(request).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(create).toBeFocused();
+  await create.click();
+  await request.getByLabel('Catalogue item').selectOption('hydration');
+  await request.getByLabel('Requisition purpose').selectOption('Routine replenishment');
+  await request.getByLabel('Requested quantity').fill('8');
+  await request.getByRole('button', { name: 'Submit requisition' }).click();
+  const storeRequest = page
+    .getByRole('region', { name: 'Stock requisitions', exact: true })
+    .getByRole('row', { name: /Oral hydration sachets/ });
+  await expect(storeRequest).toContainText('Requested');
+  const buyingRequest = buyer.getByRole('row', { name: /Oral hydration sachets/ });
+  await expect(buyingRequest.getByRole('button', { name: 'Issue purchase order' })).toHaveCount(0);
+  await buyingRequest.getByRole('button', { name: 'Approve requisition' }).click();
+  await buyer.getByRole('button', { name: 'Confirm approval' }).click();
+  await expect(storeRequest).toContainText('Approved');
+  await buyingRequest.getByRole('button', { name: 'Issue purchase order' }).click();
+  const order = buyer.getByRole('dialog', { name: 'Issue purchase order' });
+  const supplier = order.getByLabel('Supplier', { exact: true });
+  await expect(supplier.locator('option', { hasText: 'Harbor Care Supplies' })).toHaveCount(0);
+  await supplier.selectOption('mer-central-supplier-1');
+  await expect(order.getByText('₹168.00', { exact: true })).toBeVisible();
+  await order.getByRole('button', { name: 'Confirm purchase order' }).click();
+  const register = buyer.getByRole('row', { name: /Fieldstone Medical Supply/ });
+  await expect(register).toContainText('0 of 8 received');
+  const reference = (await register.getByRole('cell').first().innerText()).match(
+    /PO-[A-F0-9]{8}/,
+  )?.[0];
+  expect(reference).toBeTruthy();
+  await page.getByRole('button', { name: 'Receiving', exact: true }).click();
+  const delivery = page.getByRole('row', { name: new RegExp(reference!) });
+  const receipt = page.getByRole('dialog', { name: 'Post goods receipt' });
+  async function fillReceipt(code: string, quantity: string) {
+    await delivery.getByRole('button', { name: 'Receive goods' }).click();
+    await receipt.getByLabel('Batch code').fill(batch);
+    await receipt.getByLabel('Expiry date').fill(expiry);
+    await receipt.getByLabel('Received quantity').fill(quantity);
+    await receipt.getByLabel('Receipt reference').fill(code);
+  }
+  await fillReceipt('GRN-601-PROC', '9');
+  await receipt.getByRole('button', { name: 'Save receipt' }).click();
+  await expect(receipt.getByRole('alert')).toContainText('exceeds the remaining order quantity');
+  await receipt.getByLabel('Received quantity').fill('3');
+  await receipt.getByRole('button', { name: 'Save receipt' }).click();
+  await expect(delivery).toContainText('3 of 8');
+  await expect(register).toContainText('Partially received');
+  await expect(register.getByRole('button', { name: 'Cancel order' })).toHaveCount(0);
+
+  const pharmacy = await page.context().newPage();
+  await signIn(pharmacy, 'pharmacy');
+  await pharmacy.getByRole('button', { name: 'Stock lots', exact: true }).click();
+  await pharmacy.getByRole('searchbox', { name: 'Search stock lots' }).fill(batch);
+  const pharmacyLot = pharmacy.getByRole('row', { name: new RegExp(batch) });
+  await expect(pharmacyLot.getByRole('cell', { name: '3', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Receiving', exact: true }).click();
+  await fillReceipt('GRN-602-PROC', '5');
+  await receipt.getByRole('button', { name: 'Save receipt' }).click();
+  await expect(delivery).toContainText('8 of 8');
+  await expect(delivery.getByRole('button', { name: 'Receive goods' })).toHaveCount(0);
+  await expect(pharmacyLot.getByRole('cell', { name: '8', exact: true })).toBeVisible();
+  await expect(register).toContainText('8 of 8 received');
+  await checkReflow(page);
+  await checkReflow(buyer);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await delivery.getByRole('button', { name: 'View receipts' }).click();
+  const history = page.getByRole('dialog', { name: 'Goods receipt history' });
+  await expect(history).toContainText('GRN-601-PROC');
+  await expect(history).toContainText('GRN-602-PROC');
+  for (const [tab, name] of [
+    [page, 'receiving-390'],
+    [buyer, 'procurement-1440'],
+  ] as const) {
+    expect(
+      (await new AxeBuilder({ page: tab }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+        .violations,
+    ).toEqual([]);
+    await tab.screenshot({ path: testInfo.outputPath(name + '.png'), animations: 'disabled' });
+  }
+  await history.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Stock levels', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Find stock lot' }).fill(batch);
+  const localLot = page.getByRole('row', { name: new RegExp(batch) });
+  await localLot.getByRole('button', { name: 'Record count' }).click();
+  const count = page.getByRole('dialog', { name: 'Record stock count' });
+  await count.getByLabel('Counted on-hand quantity').fill('7');
+  await count.getByLabel('Count reason').selectOption('Cycle count');
+  await count.getByLabel('Count reference').fill('CNT-601-PROC');
+  await count.getByRole('button', { name: 'Save stock count' }).click();
+  await expect(pharmacyLot.getByRole('cell', { name: '7', exact: true })).toBeVisible();
+  await pharmacy.getByRole('button', { name: 'Stock activity', exact: true }).click();
+  await pharmacy.getByRole('searchbox', { name: 'Search stock activity' }).fill(batch);
+  await expect(pharmacy.getByRole('row', { name: /Count adjustment.*CNT-601-PROC/ })).toContainText(
+    '-1',
+  );
+  await expect(
+    pharmacy.getByRole('row', { name: new RegExp('GRN-602-PROC.*' + reference) }),
+  ).toBeVisible();
+  await page.goto('/work/procurement');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await buyer.close();
+  await pharmacy.close();
+});
+
 test('schedules imaging and releases the reviewed report to the patient', async ({
   page,
 }, testInfo) => {

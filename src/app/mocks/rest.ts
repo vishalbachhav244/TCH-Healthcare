@@ -11,6 +11,8 @@ import { admissionDischargeDocument } from './discharge';
 import { inpatientBillingDetail, inpatientBillingRows } from './inpatient-billing';
 import { financeData } from './finance';
 import { insuranceData } from './insurance';
+import { inventoryData } from './inventory';
+import { procurementData } from './procurement';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -91,6 +93,9 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'inpatient-physician/blood-requests/withdraw',
     'blood-bank/requests/status',
     'insurance/claims/status',
+    'inventory/requisitions/withdraw',
+    'procurement/requisitions/status',
+    'procurement/orders/cancel',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -400,6 +405,28 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
           db.patients,
         ],
         async () => insuranceData(facility, day),
+      );
+    }
+    case 'inventory': {
+      const facility = scope(session, facilityRecord, 'D27', 'inventory');
+      return db.transaction(
+        'r',
+        [
+          db.stockLots,
+          db.stockMovements,
+          db.supplyRequisitions,
+          db.purchaseOrders,
+          db.goodsReceipts,
+        ],
+        async () => inventoryData(facility),
+      );
+    }
+    case 'procurement': {
+      const facility = scope(session, facilityRecord, 'D28', 'procurement');
+      return db.transaction(
+        'r',
+        [db.supplyRequisitions, db.purchaseOrders, db.suppliers],
+        async () => procurementData(facility),
       );
     }
     case 'billing/inpatient':
