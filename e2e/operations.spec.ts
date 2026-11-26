@@ -1475,6 +1475,140 @@ test('dispenses from a current stock lot and posts the medication to billing', a
   );
 });
 
+test('tracks pharmacy receipts, supplier returns and a credited patient return', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(170_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  await signIn(page, 'pharmacy');
+  const receive = page.getByRole('button', { name: 'Receive stock', exact: true });
+  await receive.focus();
+  await page.keyboard.press('Enter');
+  const receipt = page.getByRole('dialog', { name: 'Receive stock' });
+  await expect(receipt).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(receive).toBeFocused();
+  await receive.click();
+  await receipt.getByLabel('Medication', { exact: true }).selectOption('hydration');
+  await receipt.getByLabel('Batch code').fill('PH-NEW-601');
+  await receipt.getByLabel('Expiry date').fill(shiftDay(dayInIndia(), 120));
+  await receipt.getByLabel('Stock reference').fill('GRN-601');
+  await receipt.getByLabel('Quantity', { exact: true }).fill('8');
+  await receipt.getByRole('button', { name: 'Save receipt' }).click();
+  const stocked = page.getByRole('row', { name: /PH-NEW-601/ });
+  await expect(stocked.getByRole('cell', { name: '8', exact: true })).toBeVisible();
+  await stocked.getByRole('button', { name: 'Return to supplier' }).click();
+  const supplier = page.getByRole('dialog', { name: 'Return stock to supplier' });
+  await supplier.getByLabel('Return reason').selectOption('Incorrect shipment');
+  await supplier.getByLabel('Stock reference').fill('SR-601');
+  await supplier.getByLabel('Quantity', { exact: true }).fill('2');
+  await supplier.getByRole('button', { name: 'Confirm return' }).click();
+  await expect(stocked.getByRole('cell', { name: '6', exact: true })).toBeVisible();
+
+  const patient = await page.context().newPage();
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Appointment pass', exact: true }).click();
+  const passDialog = patient.getByRole('dialog', { name: 'Appointment pass' });
+  const pass = await passDialog.locator('code').innerText();
+  await passDialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await patient.getByRole('button', { name: 'Medications', exact: true }).click();
+  const history = patient.getByRole('region', { name: 'Dispensed medications' });
+  await expect(history).toContainText('There are no dispensed medications');
+
+  const desk = await page.context().newPage();
+  await signIn(desk, 'reception');
+  await desk
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  await desk.getByRole('button', { name: 'Verify arrival' }).click();
+  const checkIn = desk.getByRole('dialog', { name: 'Verify arrival' });
+  await checkIn.getByLabel('Appointment pass code').fill(pass);
+  await checkIn.getByRole('button', { name: 'Check in patient' }).click();
+  await desk.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  await desk
+    .getByRole('row', { name: new RegExp(patientId) })
+    .getByRole('button', { name: 'Call token' })
+    .click();
+
+  const clinician = await page.context().newPage();
+  await signIn(clinician, 'clinician');
+  await clinician.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  const care = clinician.getByRole('row', { name: new RegExp(patientId) });
+  await care.getByRole('button', { name: 'Start consultation' }).click();
+  await care.getByRole('button', { name: 'Review consultation' }).click();
+  const visit = clinician.getByRole('dialog', { name: 'Consultation' });
+  await visit.getByLabel('Medication', { exact: true }).selectOption('hydration');
+  await visit.getByLabel('Dispensing quantity').fill('3');
+  await visit.getByRole('button', { name: 'Save prescription draft' }).click();
+  await visit.getByRole('button', { name: 'Sign prescription' }).click();
+
+  await page.getByRole('button', { name: 'Prescriptions', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search prescriptions' }).fill(patientId);
+  const order = page.getByRole('row', { name: new RegExp(patientId + '.*Oral hydration sachets') });
+  await order.getByRole('button', { name: 'Dispense', exact: true }).click();
+  const dispense = page.getByRole('dialog', { name: 'Dispense medication' });
+  const lot = dispense.getByLabel('Eligible stock lot');
+  const receivedLot = await lot.locator('option', { hasText: 'PH-NEW-601' }).getAttribute('value');
+  await lot.selectOption(receivedLot!);
+  await dispense.getByRole('button', { name: 'Confirm dispensing' }).click();
+  await expect(history).toContainText('3 dispensed');
+
+  const cashier = await page.context().newPage();
+  await signIn(cashier, 'cashier');
+  const bill = cashier.getByRole('row', {
+    name: new RegExp(patientId + '.*Oral hydration sachets'),
+  });
+  await expect(bill).toContainText('₹96.00');
+  await order.getByRole('button', { name: 'Record patient return' }).click();
+  const returned = page.getByRole('dialog', { name: 'Record patient return' });
+  await returned.getByLabel('Return reason').selectOption('Unused medication returned');
+  await returned.getByLabel('Stock reference').fill('PR-601');
+  await returned.getByLabel('Quantity', { exact: true }).fill('4');
+  await returned.getByRole('button', { name: 'Confirm return' }).click();
+  await expect(returned.getByRole('alert')).toContainText('within the displayed limit');
+  await returned.getByLabel('Quantity', { exact: true }).fill('1');
+  await returned.getByRole('button', { name: 'Confirm return' }).click();
+  await expect(order).toContainText('1 returned');
+  await expect(bill).toContainText('₹32.00 credited');
+  await expect(bill.getByRole('cell', { name: '₹64.00', exact: true })).toBeVisible();
+  await expect(history).toContainText('1 returned to Pharmacy');
+
+  await page.getByRole('button', { name: 'Stock lots', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search stock lots' }).fill('PH-NEW-601');
+  await expect(stocked).toContainText('1 quarantined');
+  await expect(stocked.getByRole('cell', { name: '3 1 quarantined' })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Stock activity', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search stock activity' }).fill('PH-NEW-601');
+  for (const label of ['Received', 'Supplier return', 'Dispensed', 'Patient return']) {
+    await expect(page.getByRole('row', { name: new RegExp('PH-NEW-601.*' + label) })).toBeVisible();
+  }
+  await checkReflow(page);
+  await checkReflow(patient);
+  await patient.setViewportSize({ width: 390, height: 844 });
+  for (const [tab, name] of [
+    [page, 'pharmacy-ledger-1440'],
+    [patient, 'patient-medications-390'],
+  ] as const) {
+    expect(
+      (await new AxeBuilder({ page: tab }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+        .violations,
+    ).toEqual([]);
+    await tab.screenshot({ path: testInfo.outputPath(name + '.png'), animations: 'disabled' });
+  }
+  await bill.getByRole('button', { name: 'Record settlement' }).click();
+  await cashier.getByRole('button', { name: 'Confirm settlement' }).click();
+  await expect(bill).toContainText('Paid');
+  await patient.getByRole('button', { name: 'Bills', exact: true }).click();
+  await expect(patient.getByRole('article').filter({ hasText: '₹32.00 credited' })).toContainText(
+    'Paid',
+  );
+  await patient.goto('/work/pharmacy');
+  await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  for (const tab of [desk, clinician, cashier, patient]) await tab.close();
+});
+
 test('moves a patient from admission request through cleaning and bed release', async ({
   page,
 }) => {

@@ -1,6 +1,5 @@
 import {
   dayInIndia,
-  invoiceTotal,
   observations,
   type DomainEvent,
   type Facility,
@@ -24,6 +23,8 @@ import { laboratoryCommand } from './laboratory';
 import { requestImaging, updateImaging } from './radiology';
 import { updateBloodRequest, wardBloodCommand } from './blood-bank';
 import { pharmacyCommand } from './pharmacy';
+import { stockCommand } from './pharmacy-stock';
+import { invoiceBalances } from './invoice-balances';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
 import { criticalCareCommand, emergencyCommand, theatreCommand } from './acute-care';
@@ -437,10 +438,8 @@ export async function command(
           const facility = scope(session, facilityRecord, 'D24', 'billing');
           const invoice = await db.invoices.get(field(payload, 'invoiceId'));
           if (invoice?.facilityId !== facility.id) throw new ApiError(404, 'Invoice not found.');
-          const existing = await db.payments.where('invoiceId').equals(invoice.id).toArray();
-          const amountMinor =
-            invoiceTotal(invoice) - existing.reduce((sum, payment) => sum + payment.amountMinor, 0);
-          if (amountMinor <= 0) throw new ApiError(409, 'This invoice has already been settled.');
+          const { balanceMinor: amountMinor } = (await invoiceBalances([invoice])).get(invoice.id)!;
+          if (amountMinor <= 0) throw new ApiError(409, 'This invoice has no outstanding balance.');
           const id = crypto.randomUUID();
           await db.payments.add({ id, invoiceId: invoice.id, day: dayInIndia(), amountMinor });
           changed = event(facility, 'PaymentRecorded', id);
@@ -575,6 +574,16 @@ export async function command(
           changed = await pharmacyCommand(
             path,
             scope(session, facilityRecord, 'D13', 'clinical'),
+            session,
+            payload,
+          );
+          break;
+        case 'pharmacy/stock/receipts':
+        case 'pharmacy/stock/supplier-returns':
+        case 'pharmacy/medication-returns':
+          changed = await stockCommand(
+            path,
+            scope(session, facilityRecord, 'D22', 'pharmacy'),
             session,
             payload,
           );

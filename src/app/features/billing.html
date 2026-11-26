@@ -87,7 +87,7 @@
           </thead>
           <tbody>
             @for (row of response.data; track row.invoice.id) {
-              @let status = row.balanceMinor ? 'Outstanding' : 'Paid';
+              @let status = invoiceStatus(row);
               <tr>
                 <td>
                   <strong>{{ row.patient.name }}</strong
@@ -100,10 +100,18 @@
                       : row.invoice.lines.at(0)?.description
                   }}
                 </td>
-                <td>{{ row.totalMinor | rupees }}</td>
+                <td>
+                  {{ row.totalMinor | rupees }}
+                  @if (row.creditedMinor) {
+                    <small>{{ row.creditedMinor | rupees }} credited</small>
+                  }
+                </td>
                 <td>{{ row.balanceMinor | rupees }}</td>
                 <td>
                   <span [class]="status | statusTone">{{ status }}</span>
+                  @if (row.reviewMinor) {
+                    <small>{{ row.reviewMinor | rupees }} needs payment review</small>
+                  }
                 </td>
                 <td>
                   @if (row.balanceMinor && store.writeAllowed('billing')) {

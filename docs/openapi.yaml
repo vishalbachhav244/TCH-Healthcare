@@ -4372,6 +4372,168 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /pharmacy/stock/receipts:
+    post:
+      operationId: receivePharmacyStock
+      summary: Receive a catalogue item into a facility batch. The stock reference is unique within
+        the facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productId
+                - batch
+                - expiresOn
+                - quantity
+                - reference
+              properties:
+                productId:
+                  type: string
+                  enum:
+                    - hydration
+                    - saline
+                    - tears
+                    - dressing
+                batch:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{1,23}$
+                expiresOn:
+                  type: string
+                  format: date
+                quantity:
+                  type: string
+                  pattern: ^([1-9][0-9]{0,3}|10000)$
+                reference:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+      responses:
+        "201":
+          description: Stock movement recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /pharmacy/stock/supplier-returns:
+    post:
+      operationId: returnStockToSupplier
+      summary: Record a supplier return against the lot’s on-hand balance.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lotId
+                - quantity
+                - reference
+                - reason
+              properties:
+                lotId:
+                  type: string
+                quantity:
+                  type: string
+                  pattern: ^([1-9][0-9]{0,3}|10000)$
+                reference:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+                reason:
+                  type: string
+                  enum:
+                    - Supplier recall
+                    - Damaged stock
+                    - Expired stock
+                    - Incorrect shipment
+      responses:
+        "201":
+          description: Stock movement recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /pharmacy/medication-returns:
+    post:
+      operationId: recordMedicationReturn
+      summary: Quarantine returned units and credit eligible unpaid charges. Record a review amount
+        for any remainder.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prescriptionId
+                - quantity
+                - reference
+                - reason
+              properties:
+                prescriptionId:
+                  type: string
+                quantity:
+                  type: string
+                  pattern: ^([1-9][0-9]{0,3}|10000)$
+                reference:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+                reason:
+                  type: string
+                  enum:
+                    - Unused medication returned
+                    - Dispensing discrepancy
+                    - Patient declined supply
+      responses:
+        "201":
+          description: Stock movement recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -4828,7 +4990,7 @@ components:
           type: string
     InvoiceRow:
       type: 'object'
-      required: ['invoice', 'patient', 'totalMinor', 'balanceMinor']
+      required: ['invoice', 'patient', 'totalMinor', 'balanceMinor', 'creditedMinor', 'reviewMinor']
       properties:
         invoice: { '$ref': '#/components/schemas/Invoice' }
         patient: { '$ref': '#/components/schemas/Patient' }
@@ -4836,6 +4998,8 @@ components:
           type: 'integer'
         balanceMinor:
           type: 'integer'
+        creditedMinor: { type: integer, minimum: 0 }
+        reviewMinor: { type: integer, minimum: 0 }
     BillingOptions:
       type: 'object'
       required: ['services', 'encounters']
@@ -4864,7 +5028,7 @@ components:
                 type: 'string'
     Portal:
       type: 'object'
-      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps', 'dischargeSummaries', 'imagingReports']
+      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps', 'dischargeSummaries', 'imagingReports', 'medications']
       properties:
         patient: { '$ref': '#/components/schemas/Patient' }
         clinicians:
@@ -4891,11 +5055,14 @@ components:
         imagingReports:
           type: array
           items: { '$ref': '#/components/schemas/ReleasedImagingReport' }
+        medications:
+          type: array
+          items: { '$ref': '#/components/schemas/PatientMedication' }
         invoices:
           type: 'array'
           items:
             type: 'object'
-            required: ['id', 'day', 'totalMinor', 'balanceMinor']
+            required: ['id', 'day', 'totalMinor', 'balanceMinor', 'creditedMinor', 'reviewMinor']
             properties:
               id:
                 type: 'string'
@@ -4906,6 +5073,8 @@ components:
                 type: 'integer'
               balanceMinor:
                 type: 'integer'
+              creditedMinor: { type: integer, minimum: 0 }
+              reviewMinor: { type: integer, minimum: 0 }
               inpatient:
                 type: boolean
     QueueDisplay:
@@ -5132,6 +5301,9 @@ components:
           format: date
         onHand:
           type: integer
+        quarantined:
+          type: integer
+          minimum: 0
       required:
         - id
         - facilityId
@@ -5139,6 +5311,7 @@ components:
         - batch
         - expiresOn
         - onHand
+        - quarantined
     PharmacyData:
       type: object
       properties:
@@ -5149,6 +5322,7 @@ components:
             properties:
               prescription:
                 $ref: '#/components/schemas/PharmacyPrescription'
+              returnedQuantity: { type: integer, minimum: 0 }
               patient:
                 type: object
                 properties:
@@ -5161,13 +5335,18 @@ components:
             required:
               - prescription
               - patient
+              - returnedQuantity
         lots:
           type: array
           items:
             $ref: '#/components/schemas/StockLot'
+        activity:
+          type: array
+          items: { '$ref': '#/components/schemas/PharmacyStockEntry' }
       required:
         - prescriptions
         - lots
+        - activity
     PlatformIncident:
       type: object
       required:
@@ -6724,6 +6903,152 @@ components:
           type: string
         name:
           type: string
+    StockMovement:
+      type: object
+      required:
+        - id
+        - facilityId
+        - lotId
+        - at
+        - actor
+        - quantity
+        - kind
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        lotId:
+          type: string
+        at:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+        quantity:
+          type: integer
+        kind:
+          type: string
+          enum:
+            - Opening balance
+            - Received
+            - Dispensed
+            - Supplier return
+            - Patient return
+        reference:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,23}$
+        prescriptionId:
+          type: string
+        invoiceId:
+          type: string
+        creditMinor:
+          type: integer
+          minimum: 0
+        reviewMinor:
+          type: integer
+          minimum: 0
+        reason:
+          anyOf:
+            - type: string
+              enum:
+                - Supplier recall
+                - Damaged stock
+                - Expired stock
+                - Incorrect shipment
+            - type: string
+              enum:
+                - Unused medication returned
+                - Dispensing discrepancy
+                - Patient declined supply
+      allOf:
+        - if:
+            properties:
+              kind:
+                const: Received
+          then:
+            required:
+              - reference
+        - if:
+            properties:
+              kind:
+                const: Dispensed
+          then:
+            required:
+              - prescriptionId
+        - if:
+            properties:
+              kind:
+                const: Supplier return
+          then:
+            required:
+              - reference
+              - reason
+            properties:
+              reason:
+                type: string
+                enum:
+                  - Supplier recall
+                  - Damaged stock
+                  - Expired stock
+                  - Incorrect shipment
+        - if:
+            properties:
+              kind:
+                const: Patient return
+          then:
+            required:
+              - reference
+              - reason
+              - prescriptionId
+              - invoiceId
+              - creditMinor
+              - reviewMinor
+            properties:
+              reason:
+                type: string
+                enum:
+                  - Unused medication returned
+                  - Dispensing discrepancy
+                  - Patient declined supply
+    PharmacyStockEntry:
+      type: object
+      required:
+        - movement
+        - batch
+        - productId
+        - recordedBy
+      properties:
+        movement:
+          $ref: "#/components/schemas/StockMovement"
+        batch:
+          type: string
+        productId:
+          type: string
+        recordedBy:
+          type: string
+    PatientMedication:
+      type: object
+      required:
+        - id
+        - medication
+        - quantity
+        - dispensedAt
+        - returnedQuantity
+      properties:
+        id:
+          type: string
+        medication:
+          type: string
+        quantity:
+          type: integer
+          minimum: 0
+        dispensedAt:
+          type: integer
+          minimum: 0
+        returnedQuantity:
+          type: integer
+          minimum: 0
   responses:
     Error401:
       description: 'Missing or expired session.'

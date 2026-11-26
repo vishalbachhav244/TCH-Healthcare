@@ -199,11 +199,16 @@ export interface AccessOptions {
   patients: Patient[];
 }
 
-export interface InvoiceRow {
-  invoice: Invoice;
-  patient: Patient;
+export interface InvoiceAmounts {
   balanceMinor: number;
   totalMinor: number;
+  creditedMinor: number;
+  reviewMinor: number;
+}
+
+export interface InvoiceRow extends InvoiceAmounts {
+  invoice: Invoice;
+  patient: Patient;
 }
 
 export type EventType =
@@ -272,6 +277,9 @@ export type EventType =
   | 'PrescriptionDrafted'
   | 'PrescriptionSigned'
   | 'PrescriptionDispensed'
+  | 'PharmacyStockReceived'
+  | 'PharmacyStockReturned'
+  | 'MedicationReturnRecorded'
   | 'IncidentOpened'
   | 'IncidentInvestigating'
   | 'IncidentResolved'
@@ -309,4 +317,12 @@ export function shiftDay(day: string, amount: number) {
 
 export function invoiceTotal(invoice: Invoice) {
   return invoice.lines.reduce((total, line) => total + line.unitMinor * line.quantity, 0);
+}
+
+export function invoiceStatus(amounts: InvoiceAmounts) {
+  if (amounts.balanceMinor > 0) return 'Outstanding';
+  if (amounts.reviewMinor > 0) return 'Review needed';
+  return amounts.creditedMinor === amounts.totalMinor && amounts.totalMinor > 0
+    ? 'Credited'
+    : 'Paid';
 }

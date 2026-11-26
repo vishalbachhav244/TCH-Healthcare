@@ -197,8 +197,14 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         scope(session, facilityRecord, 'D10', 'appointments'),
         params.get('patientId') ?? '',
       );
-    case 'pharmacy':
-      return pharmacyData(scope(session, facilityRecord, 'D22'));
+    case 'pharmacy': {
+      const facility = scope(session, facilityRecord, 'D22');
+      return db.transaction(
+        'r',
+        [db.prescriptions, db.stockLots, db.stockMovements, db.patients],
+        async () => pharmacyData(facility),
+      );
+    }
     case 'patients':
     case 'appointments/options':
     case 'admissions/options': {
@@ -344,8 +350,15 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     }
     case 'portal':
       return portal(scope(session, facilityRecord, 'D12'), session);
-    case 'billing':
-      return invoiceRows(scope(session, facilityRecord, 'D24'), checkedDay(params.get('day')));
+    case 'billing': {
+      const facility = scope(session, facilityRecord, 'D24');
+      const day = checkedDay(params.get('day'));
+      return db.transaction(
+        'r',
+        [db.invoices, db.patients, db.payments, db.stockMovements],
+        async () => invoiceRows(facility, day),
+      );
+    }
     case 'billing/inpatient':
     case 'billing/inpatient/detail': {
       const facility = scope(session, facilityRecord, 'D24', 'billing');

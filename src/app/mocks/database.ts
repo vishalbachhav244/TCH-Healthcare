@@ -21,7 +21,7 @@ import type { Organisation } from '../domain/platform';
 import type { StaffMembership } from '../domain/access';
 import { initialStaff } from './accounts';
 import type { Prescription, StockLot, StockMovement } from '../domain/pharmacy';
-import { pharmacyFixtures } from './pharmacy-seed';
+import { openingStock, pharmacyFixtures, type LegacyDispensingMovement } from './pharmacy-seed';
 import type { PlatformIncident } from '../domain/platform-operations';
 import type {
   ConsentGrant,
@@ -398,6 +398,23 @@ db.version(18)
     }
   });
 
+db.version(19)
+  .stores({
+    stockLots: 'id, facilityId, [facilityId+productId+batch]',
+    stockMovements: 'id, facilityId, lotId, prescriptionId, invoiceId, &[facilityId+reference]',
+  })
+  .upgrade(async (transaction) => {
+    const movements = transaction.table<StockMovement, string>('stockMovements');
+    const [lots, history, reference] = await Promise.all([
+      transaction.table<StockLot, string>('stockLots').toArray(),
+      transaction.table<LegacyDispensingMovement, string>('stockMovements').toArray(),
+      transaction.table<{ key: string; value: string }, string>('metadata').get('referenceDay'),
+    ]);
+    const at = Date.parse((reference?.value ?? dayInIndia()) + 'T00:00:00+05:30');
+    await movements.bulkPut(history.map((move) => ({ ...move, kind: 'Dispensed' })));
+    await movements.bulkAdd(openingStock(lots, at, history));
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -420,6 +437,7 @@ export function initialize() {
         db.memberships,
         db.prescriptions,
         db.stockLots,
+        db.stockMovements,
         db.platformIncidents,
         db.connectors,
         db.qualityCases,
@@ -454,6 +472,9 @@ export function initialize() {
           db.facilities.bulkAdd(initialFacilities),
           db.memberships.bulkAdd(initialStaff),
           db.stockLots.bulkAdd(pharmacy.lots),
+          db.stockMovements.bulkAdd(
+            openingStock(pharmacy.lots, Date.parse(referenceDay + 'T00:00:00+05:30')),
+          ),
           db.platformIncidents.bulkAdd(initialIncidents(referenceDay)),
           db.connectors.bulkAdd(initialConnectors),
           db.qualityCases.bulkAdd(initialQualityCases(referenceDay)),

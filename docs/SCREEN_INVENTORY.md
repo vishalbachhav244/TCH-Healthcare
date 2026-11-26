@@ -42,3 +42,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-36 | D12 and D13 | `/work/clinical` → Consultation and `/work/portal` → Reports | Imaging order and status in the assigned consultation and the patient’s released report |
 | TC-LOCAL-37 | D23 | `/work/blood-bank` | Component request review, unit reservation and issue, and stock inventory |
 | TC-LOCAL-38 | D14 | `/work/inpatient-physician` → Care plan | Blood component request, withdrawal and unit issue status |
+| TC-LOCAL-39 | D22 | `/work/pharmacy` → Stock lots and Stock activity | Batch receipt, supplier return, on-hand and quarantine counts and movement ledger |
+| TC-LOCAL-40 | D12, D22 and D24 | `/work/pharmacy` → Prescriptions, `/work/portal` → Medications and Bills, and `/work/billing` | Patient return, dispensed medication history, credit and payment review amount |

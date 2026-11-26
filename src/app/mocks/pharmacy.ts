@@ -1,27 +1,126 @@
 import { dayInIndia, type DomainEvent, type Facility, type Session } from '../domain/operations';
-import { products, type PharmacyData, type Prescription } from '../domain/pharmacy';
+import {
+  products,
+  stockBalance,
+  type PatientMedication,
+  type PharmacyData,
+  type Prescription,
+  type StockMovement,
+} from '../domain/pharmacy';
 import { ApiError } from './access';
+import { accountNames } from './accounts';
 import { db } from './database';
+import { movementsForLot } from './pharmacy-stock';
+
+function returnedQuantities(movements: readonly StockMovement[]) {
+  const quantities = new Map<string, number>();
+  for (const move of movements) {
+    if (move.kind !== 'Patient return') continue;
+    const key = move.prescriptionId + ':' + move.lotId;
+    quantities.set(key, (quantities.get(key) ?? 0) + move.quantity);
+  }
+  return quantities;
+}
 
 export async function pharmacyData(facility: Facility): Promise<PharmacyData> {
-  const [visible, lots] = await Promise.all([
+  const [visible, lots, movements] = await Promise.all([
     db.prescriptions
       .where('facilityId')
       .equals(facility.id)
       .filter((row) => row.status !== 'Draft')
       .toArray(),
     db.stockLots.where('facilityId').equals(facility.id).toArray(),
+    db.stockMovements.where('facilityId').equals(facility.id).toArray(),
   ]);
   const patients = await db.patients.bulkGet(visible.map((row) => row.patientId));
+  const returned = returnedQuantities(movements);
+  const lotsById = new Map(lots.map((lot) => [lot.id, lot]));
+  const byLot = new Map<string, StockMovement[]>();
+  for (const move of movements) {
+    const entries = byLot.get(move.lotId);
+    if (entries) entries.push(move);
+    else byLot.set(move.lotId, [move]);
+  }
   return {
-    prescriptions: visible.flatMap((prescription, index) => {
-      const patient = patients[index];
-      return patient?.tenantId === facility.tenantId
-        ? [{ prescription, patient: { id: patient.id, name: patient.name } }]
-        : [];
-    }),
-    lots: lots.sort((a, b) => a.expiresOn.localeCompare(b.expiresOn)),
+    prescriptions: visible
+      .flatMap((prescription, index) => {
+        const patient = patients[index];
+        return patient?.tenantId === facility.tenantId
+          ? [
+              {
+                prescription,
+                patient: { id: patient.id, name: patient.name },
+                returnedQuantity: returned.get(prescription.id + ':' + prescription.lotId) ?? 0,
+              },
+            ]
+          : [];
+      })
+      .sort(
+        (a, b) =>
+          (b.prescription.dispensedAt ?? b.prescription.createdAt) -
+          (a.prescription.dispensedAt ?? a.prescription.createdAt),
+      ),
+    lots: lots
+      .map((lot) => ({ ...lot, ...stockBalance(byLot.get(lot.id) ?? []) }))
+      .sort((a, b) => a.expiresOn.localeCompare(b.expiresOn)),
+    activity: movements
+      .flatMap((movement) => {
+        const lot = lotsById.get(movement.lotId);
+        return lot
+          ? [
+              {
+                movement,
+                batch: lot.batch,
+                productId: lot.productId,
+                recordedBy: accountNames[movement.actor] ?? 'Opening balance',
+              },
+            ]
+          : [];
+      })
+      .sort((a, b) => b.movement.at - a.movement.at || a.movement.id.localeCompare(b.movement.id)),
   };
+}
+
+export async function patientMedications(
+  facility: Facility,
+  patientId: string,
+): Promise<PatientMedication[]> {
+  const records = await db.prescriptions
+    .where('facilityId')
+    .equals(facility.id)
+    .filter((row) => row.patientId === patientId && row.status === 'Dispensed')
+    .toArray();
+  const [encounters, moves] = await Promise.all([
+    db.encounters.bulkGet(records.map((row) => row.encounterId)),
+    db.stockMovements
+      .where('prescriptionId')
+      .anyOf(records.map((row) => row.id))
+      .filter((move) => move.facilityId === facility.id)
+      .toArray(),
+  ]);
+  const returned = returnedQuantities(moves);
+  return records
+    .flatMap((record, index) => {
+      const encounter = encounters[index];
+      const product = products.find((item) => item.id === record.productId);
+      if (
+        encounter?.facilityId !== facility.id ||
+        encounter.patientId !== patientId ||
+        record.dispensedAt === undefined ||
+        !product
+      )
+        return [];
+      return [
+        {
+          id: record.id,
+          medication: product.name,
+          dispensedAt: record.dispensedAt,
+          quantity: record.quantity,
+          returnedQuantity: returned.get(record.id + ':' + record.lotId) ?? 0,
+        },
+      ];
+    })
+    .sort((a, b) => b.dispensedAt - a.dispensedAt);
 }
 
 export async function clinicalPrescriptions(
@@ -113,17 +212,19 @@ export async function pharmacyCommand(
     throw new ApiError(404, 'Stock lot is unavailable for this medication.');
   const day = dayInIndia(now);
   if (lot.expiresOn < day) throw new ApiError(409, 'This stock lot has expired.');
-  if (lot.onHand < prescription.quantity)
+  const { onHand } = stockBalance(await movementsForLot(lot));
+  if (onHand < prescription.quantity)
     throw new ApiError(409, 'This stock lot has insufficient quantity.');
   const product = products.find((item) => item.id === prescription.productId);
   if (!product) throw new ApiError(422, 'Medication catalogue entry is unavailable.');
   const invoiceId = crypto.randomUUID();
-  await db.stockLots.update(lot.id, { onHand: lot.onHand - prescription.quantity });
+  await db.stockLots.update(lot.id, { onHand: onHand - prescription.quantity });
   await db.stockMovements.add({
     id: crypto.randomUUID(),
     lotId: lot.id,
     facilityId: facility.id,
     prescriptionId: prescription.id,
+    kind: 'Dispensed',
     quantity: -prescription.quantity,
     at: now,
     actor: session.account,

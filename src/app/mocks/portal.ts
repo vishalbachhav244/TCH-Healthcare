@@ -1,10 +1,12 @@
-import { invoiceTotal, type Facility, type Session } from '../domain/operations';
+import type { Facility, Session } from '../domain/operations';
 import type { PatientPortal } from '../domain/portal';
 import { ApiError, patientSubject } from './access';
 import { db } from './database';
 import { followUpsForPatient } from './continuity';
 import { patientDischargeSummaries } from './discharge';
 import { releasedImaging } from './radiology';
+import { patientMedications } from './pharmacy';
+import { invoiceBalances } from './invoice-balances';
 
 export async function portal(facility: Facility, session: Session): Promise<PatientPortal> {
   const patientId = patientSubject(session);
@@ -17,6 +19,7 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
     followUps,
     dischargeSummaries,
     imagingReports,
+    medications,
   ] = await Promise.all([
     db.patients.get(patientId),
     db.appointments
@@ -38,18 +41,16 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
     followUpsForPatient(facility, patientId),
     patientDischargeSummaries(facility, patientId),
     releasedImaging(facility, patientId),
+    patientMedications(facility, patientId),
   ]);
   if (patient?.tenantId !== facility.tenantId)
     throw new ApiError(404, 'Patient profile unavailable.');
-  const [tickets, payments] = await Promise.all([
+  const [tickets, balances] = await Promise.all([
     db.tickets
       .where('appointmentId')
       .anyOf(appointments.map((row) => row.id))
       .toArray(),
-    db.payments
-      .where('invoiceId')
-      .anyOf(invoices.map((row) => row.id))
-      .toArray(),
+    invoiceBalances(invoices),
   ]);
   return {
     patient,
@@ -58,6 +59,7 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
     followUps,
     dischargeSummaries,
     imagingReports,
+    medications,
     appointments: appointments
       .sort((a, b) => b.day.localeCompare(a.day) || b.time.localeCompare(a.time))
       .flatMap(({ pass: _pass, ...appointment }) => {
@@ -74,20 +76,11 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
       }),
     invoices: invoices
       .sort((a, b) => b.day.localeCompare(a.day))
-      .map((invoice) => {
-        const totalMinor = invoiceTotal(invoice);
-        const balanceMinor =
-          totalMinor -
-          payments
-            .filter((row) => row.invoiceId === invoice.id)
-            .reduce((total, row) => total + row.amountMinor, 0);
-        return {
-          id: invoice.id,
-          day: invoice.day,
-          totalMinor,
-          balanceMinor,
-          ...(invoice.admissionId ? { inpatient: true } : {}),
-        };
-      }),
+      .map((invoice) => ({
+        id: invoice.id,
+        day: invoice.day,
+        ...balances.get(invoice.id)!,
+        ...(invoice.admissionId ? { inpatient: true } : {}),
+      })),
   };
 }

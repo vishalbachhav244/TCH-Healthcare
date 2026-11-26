@@ -9,12 +9,12 @@ The supplied brief provides the 28-module baseline count, the 36-dashboard list 
 | Leadership | D05–D06 | Scoped facility comparison, branch drill-down, derived KPIs, alerts and summary exports |
 | Clinical governance and quality | D07–D08 | Flagged report reviews, de-identified referrals and facility case lifecycle |
 | Patient access | D09, D10, D11 | Registration, returning-clinician suggestions, follow-up booking, slot checks, waitlists, schedule blocks and QR arrivals |
-| Patient portal | D12 | Own appointments, follow-up booking, passes, published laboratory and imaging reports, released discharge summaries, record sharing and balances |
+| Patient portal | D12 | Own appointments, follow-up booking, passes, released reports and discharge summaries, record sharing, medication history and balances |
 | Outpatient consultation | D13 | Assigned encounters, signed history by specialty, follow-up requests, observation signing and laboratory and imaging orders |
 | Inpatient | D14, D15, D19 | Bed assignment and history, care teams, physician rounds and orders, nursing tasks and observations, discharge sign-off, summary release and bed cleaning |
 | Emergency and critical care | D16–D17 | Clinician-assigned priority, emergency admission handoff, ICU census and reviews, and step-down transfers |
 | Theatre | D18 | Admission-linked room scheduling, conflict checks and readiness through recovery |
-| Diagnostics and medication | D20–D23 | Laboratory order lifecycle, imaging schedules and report release, signed prescriptions and dispensing, and blood component review, reservation and issue |
-| Patient finance | D24 | Consultation, medication and inpatient invoices with daily bed ledger and local settlement |
+| Diagnostics and medication | D20–D23 | Laboratory and imaging workflows, pharmacy dispensing, receiving and returns with batch ledger, and blood component review, reservation and issue |
+| Patient finance | D24 | Consultation, medication and inpatient invoices, daily bed ledger, return credits and local settlement |
 
 See [dashboard registry](DASHBOARD_REGISTRY.md) for open responsibilities and [workflow specifications](WORKFLOW_SPECIFICATIONS.md) for connected workflow coverage.

@@ -85,6 +85,14 @@
     <button
       class="button secondary"
       type="button"
+      [attr.aria-pressed]="active() === 'medications'"
+      (click)="active.set('medications')"
+    >
+      Medications
+    </button>
+    <button
+      class="button secondary"
+      type="button"
       [attr.aria-pressed]="active() === 'billing'"
       (click)="active.set('billing')"
     >
@@ -206,6 +214,27 @@
         }
       </section>
     }
+    @case ('medications') {
+      <section class="panel portal-list" aria-labelledby="portal-medications">
+        <h2 id="portal-medications">Dispensed medications</h2>
+        @for (item of response.data.medications; track item.id) {
+          <article>
+            <span class="square-icon teal"><ng-icon name="cross" /></span>
+            <div>
+              <strong>{{ item.medication }}</strong>
+              <p>
+                {{ item.quantity }} dispensed on {{ item.dispensedAt | date: 'd MMM y' : '+0530' }}
+              </p>
+              @if (item.returnedQuantity) {
+                <small>{{ item.returnedQuantity }} returned to Pharmacy</small>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="subtle">There are no dispensed medications for this facility.</p>
+        }
+      </section>
+    }
     @case ('billing') {
       <section class="panel portal-list">
         <h2>Bills and balances</h2>
@@ -217,14 +246,18 @@
               @if (bill.inpatient) {
                 <small>Inpatient stay</small>
               }
+              @if (bill.creditedMinor) {
+                <small>{{ bill.creditedMinor | rupees }} credited</small>
+              }
+              @if (bill.reviewMinor) {
+                <small>{{ bill.reviewMinor | rupees }} needs payment review</small>
+              }
               <p>
                 {{ bill.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} · Balance
                 {{ bill.balanceMinor | rupees }}
               </p>
             </div>
-            <span [class]="(bill.balanceMinor ? 'Outstanding' : 'Paid') | statusTone">{{
-              bill.balanceMinor ? 'Outstanding' : 'Paid'
-            }}</span>
+            <span [class]="invoiceStatus(bill) | statusTone">{{ invoiceStatus(bill) }}</span>
           </article>
         } @empty {
           <p class="subtle">There are no bills for this facility.</p>

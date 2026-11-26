@@ -7,7 +7,7 @@ import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
-import { dayInIndia, shiftDay } from '../domain/operations';
+import { dayInIndia, invoiceStatus, shiftDay } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
 import type { FollowUpDetails } from '../domain/continuity';
 import { PatientSharing } from './patient-sharing';
@@ -33,7 +33,10 @@ export class Portal {
   protected readonly store = inject(SessionStore);
   protected readonly today = dayInIndia();
   protected readonly latest = shiftDay(this.today, 90);
-  protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing'>('visits');
+  protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing' | 'medications'>(
+    'visits',
+  );
+  protected readonly invoiceStatus = invoiceStatus;
   protected readonly report = signal<LabOrder | undefined>(undefined);
   protected readonly imagingReport = signal<ReleasedImagingReport | undefined>(undefined);
   protected readonly dischargeSummary = signal<ReleasedSummary | undefined>(undefined);

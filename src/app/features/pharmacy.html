@@ -2,8 +2,17 @@
   <div>
     <p class="eyebrow"><span></span> MEDICATION SERVICES</p>
     <h1>Pharmacy</h1>
-    <p>Fill signed prescriptions and monitor the stock lots available for dispensing.</p>
+    <p>Fill signed prescriptions, receive stock and track returns by batch.</p>
   </div>
+  @if (store.writeAllowed('pharmacy')) {
+    <button
+      type="button"
+      class="button primary"
+      (click)="openStock(stockDialog, { kind: 'receipt' })"
+    >
+      <ng-icon name="plus" /> Receive stock
+    </button>
+  }
 </section>
 @if (notice()) {
   <p class="inline-notice success" role="status">{{ notice() }}</p>
@@ -39,41 +48,103 @@
       <p>Expired lots</p>
       <strong>{{ expired() }}</strong>
     </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="shield" /></span>
+      </div>
+      <p>Quarantined units</p>
+      <strong>{{ quarantined() }}</strong>
+    </article>
   </div>
-  <section class="panel table-panel" aria-label="Pharmacy worklist">
+  <div class="view-controls" role="group" aria-label="Pharmacy views">
+    <button
+      type="button"
+      class="button secondary"
+      [attr.aria-pressed]="tab() === 'orders'"
+      (click)="show('orders')"
+    >
+      Prescriptions
+    </button>
+    <button
+      type="button"
+      class="button secondary"
+      [attr.aria-pressed]="tab() === 'stock'"
+      (click)="show('stock')"
+    >
+      Stock lots
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="tab() === 'activity'"
+      (click)="show('activity')"
+    >
+      Stock activity
+    </button>
+  </div>
+  <section class="panel table-panel" aria-labelledby="pharmacy-table-title">
+    <div class="panel-heading">
+      <h2 id="pharmacy-table-title">
+        {{
+          tab() === 'orders'
+            ? 'Dispensing worklist'
+            : tab() === 'stock'
+              ? 'Medication stock lots'
+              : 'Stock movement ledger'
+        }}
+      </h2>
+    </div>
     <div class="filter-bar">
-      <button
-        type="button"
-        class="button secondary"
-        [attr.aria-pressed]="tab() === 'orders'"
-        (click)="tab.set('orders')"
-      >
-        Prescriptions
-      </button>
-      <button
-        type="button"
-        class="button secondary"
-        [attr.aria-pressed]="tab() === 'stock'"
-        (click)="tab.set('stock')"
-      >
-        Stock lots
-      </button>
-      @if (tab() === 'orders') {
-        <label class="search-field"
-          ><ng-icon name="search" /><span class="sr-only">Search prescriptions</span
-          ><input
-            type="search"
-            #search
-            placeholder="Patient or medication"
-            [value]="query()"
-            (input)="query.set(search.value)"
-        /></label>
-      }
+      <label class="search-field"
+        ><ng-icon name="search" /><span class="sr-only">{{
+          tab() === 'orders'
+            ? 'Search prescriptions'
+            : tab() === 'stock'
+              ? 'Search stock lots'
+              : 'Search stock activity'
+        }}</span
+        ><input
+          type="search"
+          #search
+          [placeholder]="
+            tab() === 'orders'
+              ? 'Patient or medication'
+              : tab() === 'stock'
+                ? 'Batch or medication'
+                : 'Reference, batch or medication'
+          "
+          [value]="query()"
+          (input)="query.set(search.value); pageSize.set(12)"
+      /></label>
+      <div class="select-control">
+        <label for="pharmacy-filter">{{ tab() === 'activity' ? 'Movement' : 'Status' }}</label>
+        <select
+          id="pharmacy-filter"
+          #filterInput
+          [value]="filter()"
+          (change)="filter.set(filterInput.value); pageSize.set(12)"
+        >
+          <option value="">{{ tab() === 'activity' ? 'All movements' : 'All statuses' }}</option>
+          @if (tab() === 'orders') {
+            <option>Signed</option>
+            <option>Dispensed</option>
+            <option>Returned</option>
+          } @else if (tab() === 'stock') {
+            <option>Current</option>
+            <option>Expired</option>
+            <option>Out of stock</option>
+          } @else {
+            @for (kind of stockKinds; track kind) {
+              <option>{{ kind }}</option>
+            }
+          }
+        </select>
+      </div>
     </div>
     @if (tab() === 'orders') {
       @if (visible().length) {
         <div class="table-scroll" tabindex="0" role="region" aria-label="Dispensing worklist">
-          <table>
+          <table class="ward-record-list">
             <caption class="sr-only">
               Dispensing worklist
             </caption>
@@ -87,7 +158,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (row of visible(); track row.prescription.id) {
+              @for (row of visible().slice(0, pageSize()); track row.prescription.id) {
                 <tr>
                   <td>
                     <strong>{{ row.patient.name }}</strong
@@ -96,21 +167,32 @@
                   <td>{{ product(row.prescription.productId)?.name }}</td>
                   <td>{{ row.prescription.quantity }}</td>
                   <td>
-                    <span
-                      [class]="
-                        'status ' +
-                        (row.prescription.status === 'Dispensed' ? 'positive' : 'information')
-                      "
-                      >{{ row.prescription.status }}</span
-                    >
+                    <span [class]="prescriptionStatus(row) | statusTone">{{
+                      prescriptionStatus(row)
+                    }}</span>
+                    @if (row.returnedQuantity) {
+                      <small>{{ row.returnedQuantity }} returned</small>
+                    }
                   </td>
                   <td>
-                    @if (row.prescription.status === 'Signed') {
+                    @if (row.prescription.status === 'Signed' && store.writeAllowed('pharmacy')) {
                       <button class="text-button" type="button" (click)="open(row, editor)">
                         Dispense
                       </button>
+                    } @else if (
+                      row.prescription.status === 'Dispensed' &&
+                      row.returnedQuantity < row.prescription.quantity &&
+                      store.writeAllowed('pharmacy')
+                    ) {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="openStock(stockDialog, { kind: 'patient return', row })"
+                      >
+                        Record patient return
+                      </button>
                     } @else {
-                      <span aria-label="Charge posted">Charge posted</span>
+                      <span aria-label="No action available">—</span>
                     }
                   </td>
                 </tr>
@@ -121,9 +203,9 @@
       } @else {
         <p class="state-panel">No signed prescriptions match the worklist.</p>
       }
-    } @else if (lots().length) {
+    } @else if (tab() === 'stock' && visibleLots().length) {
       <div class="table-scroll" tabindex="0" role="region" aria-label="Medication stock lots">
-        <table>
+        <table class="ward-record-list">
           <caption class="sr-only">
             Medication stock lots
           </caption>
@@ -131,22 +213,96 @@
             <tr>
               <th scope="col">Medication</th>
               <th scope="col">Batch</th>
-              <th scope="col">Expiry</th>
+              <th scope="col" class="ward-desktop-context">Expiry</th>
               <th scope="col">On hand</th>
               <th scope="col">Status</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
-            @for (lot of lots(); track lot.id) {
+            @for (lot of visibleLots().slice(0, pageSize()); track lot.id) {
               <tr>
                 <td>{{ product(lot.productId)?.name }}</td>
-                <td>{{ lot.batch }}</td>
-                <td>{{ lot.expiresOn + 'T12:00:00Z' | date: 'd MMM yyyy' : 'UTC' }}</td>
-                <td>{{ lot.onHand }}</td>
                 <td>
-                  <span [class]="'status ' + (lot.expiresOn < today ? 'attention' : 'positive')">{{
-                    lot.expiresOn < today ? 'Expired' : 'Current'
-                  }}</span>
+                  <strong>{{ lot.batch }}</strong
+                  ><small class="ward-mobile-context"
+                    >Expires {{ lot.expiresOn + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }}</small
+                  >
+                </td>
+                <td class="ward-desktop-context">
+                  {{ lot.expiresOn + 'T12:00:00Z' | date: 'd MMM yyyy' : 'UTC' }}
+                </td>
+                <td>
+                  {{ lot.onHand }}
+                  @if (lot.quarantined) {
+                    <small>{{ lot.quarantined }} quarantined</small>
+                  }
+                </td>
+                <td>
+                  <span [class]="lotStatus(lot) | statusTone">{{ lotStatus(lot) }}</span>
+                </td>
+                <td>
+                  @if (lot.onHand && store.writeAllowed('pharmacy')) {
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="openStock(stockDialog, { kind: 'supplier return', lot })"
+                    >
+                      Return to supplier
+                    </button>
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (tab() === 'activity' && activity().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Stock movement ledger">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Stock movement ledger
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Medication and batch</th>
+              <th scope="col">Movement</th>
+              <th scope="col">Quantity</th>
+              <th scope="col" class="ward-desktop-context">Recorded</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of activity().slice(0, pageSize()); track row.movement.id) {
+              @let move = row.movement;
+              <tr>
+                <td>
+                  <strong>{{ product(row.productId)?.name }}</strong
+                  ><small>{{ row.batch }}</small>
+                </td>
+                <td>
+                  <strong>{{ move.kind }}</strong>
+                  @if (move.reference) {
+                    <small>{{ move.reference }}</small>
+                  }
+                  @if (move.kind === 'Supplier return' || move.kind === 'Patient return') {
+                    <small>{{ move.reason }}</small>
+                  }
+                  <small class="ward-mobile-context"
+                    >{{ move.at | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+                  >
+                </td>
+                <td>
+                  {{ move.quantity > 0 ? '+' : '' }}{{ move.quantity }}
+                  @if (move.kind === 'Patient return') {
+                    <small>Quarantine</small>
+                  }
+                </td>
+                <td class="ward-desktop-context">
+                  {{ move.at | date: 'd MMM y, HH:mm' : '+0530' }} IST<small>{{
+                    row.recordedBy
+                  }}</small>
                 </td>
               </tr>
             }
@@ -154,7 +310,20 @@
         </table>
       </div>
     } @else {
-      <p class="state-panel">This facility has no recorded stock lots.</p>
+      <p class="state-panel">
+        {{
+          tab() === 'stock'
+            ? 'No stock lots match these filters.'
+            : 'No stock movements match these filters.'
+        }}
+      </p>
+    }
+    @if (resultCount() > pageSize()) {
+      <div class="table-footer">
+        <button class="button secondary" type="button" (click)="pageSize.set(pageSize() + 12)">
+          Show more records
+        </button>
+      </div>
     }
   </section>
 }
@@ -195,6 +364,108 @@
       }
       <button class="button primary" type="submit" [disabled]="lot.invalid || saving()">
         Confirm dispensing
+      </button>
+    </form>
+  }
+</dialog>
+<dialog
+  #stockDialog
+  aria-labelledby="pharmacy-stock-dialog-title"
+  (close)="stockEditor.set(undefined)"
+>
+  <div class="dialog-head">
+    <h2 id="pharmacy-stock-dialog-title">{{ stockTitle() }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="stockDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (stockEditor(); as editor) {
+    <form class="dialog-body fields" [formGroup]="stockForm" (ngSubmit)="recordStock(stockDialog)">
+      @if (editor.kind === 'receipt') {
+        <label for="receipt-medication">Medication</label>
+        <select id="receipt-medication" formControlName="productId" required>
+          <option value="">Choose a medication</option>
+          @for (product of catalogue; track product.id) {
+            <option [value]="product.id">{{ product.name }}</option>
+          }
+        </select>
+        <label for="receipt-batch">Batch code</label>
+        <input
+          id="receipt-batch"
+          formControlName="batch"
+          maxlength="24"
+          autocomplete="off"
+          required
+        />
+        <label for="receipt-expiry">Expiry date</label>
+        <input id="receipt-expiry" type="date" formControlName="expiresOn" [min]="today" required />
+      } @else if (editor.kind === 'supplier return') {
+        <p>
+          <strong>{{ product(editor.lot.productId)?.name }}</strong> · Batch {{ editor.lot.batch }}
+        </p>
+        <label for="supplier-return-reason">Return reason</label>
+        <select id="supplier-return-reason" formControlName="supplierReason" required>
+          <option value="">Choose a reason</option>
+          @for (reason of supplierReasons; track reason) {
+            <option>{{ reason }}</option>
+          }
+        </select>
+      } @else {
+        <p>
+          <strong>{{ editor.row.patient.name }}</strong> ·
+          {{ product(editor.row.prescription.productId)?.name }}
+        </p>
+        <label for="patient-return-reason">Return reason</label>
+        <select id="patient-return-reason" formControlName="returnReason" required>
+          <option value="">Choose a reason</option>
+          @for (reason of returnReasons; track reason) {
+            <option>{{ reason }}</option>
+          }
+        </select>
+        <p class="subtle">
+          Returned units go to quarantine. Any eligible credit is applied to the outstanding
+          medication bill.
+        </p>
+      }
+      <label for="stock-reference">Stock reference</label>
+      <input
+        id="stock-reference"
+        formControlName="reference"
+        maxlength="24"
+        autocomplete="off"
+        aria-describedby="stock-reference-hint"
+        required
+      />
+      <p id="stock-reference-hint" class="subtle">
+        Use a unique code with 3–24 letters, digits or hyphens.
+      </p>
+      <label for="stock-quantity">Quantity</label>
+      <input
+        id="stock-quantity"
+        type="number"
+        formControlName="quantity"
+        min="1"
+        [max]="maxQuantity()"
+        step="1"
+        required
+      />
+      @if (editor.kind !== 'receipt') {
+        <p class="subtle">{{ maxQuantity() }} units available for this return.</p>
+      }
+      @if (failure()) {
+        <p class="field-error" role="alert">{{ failure() }}</p>
+      }
+      <button
+        class="button primary"
+        type="submit"
+        [disabled]="
+          saving() ||
+          maxQuantity() === 0 ||
+          (editor.kind === 'supplier return' && !stockForm.controls.supplierReason.value) ||
+          (editor.kind === 'patient return' && !stockForm.controls.returnReason.value)
+        "
+      >
+        {{ editor.kind === 'receipt' ? 'Save receipt' : 'Confirm return' }}
       </button>
     </form>
   }

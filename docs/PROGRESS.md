@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Pharmacy receiving and returns, 27 November 2026
+
+- Extended D22 with batch receipts, supplier returns, patient returns, and a stock movement ledger. The lot projection separates on-hand stock from quarantined units. Dispensing reads the same on-hand ledger.
+- Connected D12 medication history and D24 invoice balances. A patient return applies the eligible unpaid credit to its original medicine invoice. Paid amounts requiring review remain visible. The original charge and settlement are preserved.
+- Updated the pharmacy domain, stock and invoice adapters, typed API, Pharmacy, Revenue Cycle and patient views, and OpenAPI. Verified schema 18 to 19 against a legacy lot, dispense and invoice and recorded a new return from that dispense.
+- Coverage remains 24 dashboard IDs with partial routes and 12 open. Quarantine disposition, linked procurement receipts, reconciliation, partial fills and payment review resolution remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Stock ledger](screenshots/pharmacy-ledger-1440.png) · [Medication history](screenshots/patient-medications-390.png)
+
 ## Radiology and Blood Bank, 26 November 2026
 
 - Added D21 `/work/radiology` for imaging orders, room scheduling, acquisition and report release. The assigned outpatient clinician can order a study and read its released summary. The patient portal shows its own released report.

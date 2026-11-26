@@ -13,7 +13,7 @@ import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
-import { dayInIndia, type InvoiceRow } from '../domain/operations';
+import { dayInIndia, invoiceStatus, type InvoiceRow } from '../domain/operations';
 import { InpatientBilling } from './inpatient-billing';
 
 @Component({
@@ -25,6 +25,7 @@ export class Billing {
   private readonly api = inject(Api);
   private readonly invoiceView = viewChild<ElementRef<HTMLButtonElement>>('invoiceView');
   protected readonly store = inject(SessionStore);
+  protected readonly invoiceStatus = invoiceStatus;
   protected readonly settings = signal<Awaited<ReturnType<Api['invoiceOptions']>> | undefined>(
     undefined,
   );

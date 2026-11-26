@@ -26,7 +26,7 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `quality` | Case intake, investigation ownership, resolution and history |
 | `reception` | Patient registration, appointments, waitlist, arrival verification and queue |
 | `clinician` | Assigned consultations, signed visit history, follow-up requests, laboratory orders and prescriptions |
-| `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
+| `pharmacy` | Signed prescriptions, stock receipts, dispensing, supplier and patient returns, and batch ledger |
 | `admissions` | Admission requests, bed allocation and transfer, care-team assignment and discharge |
 | `wardphysician`, `wardcover` | Assigned inpatient care plans, rounds, ward orders and discharge sign-off |
 | `wardnurse`, `wardrelief` | Assigned nursing tasks, task completion and ward observations |
@@ -39,7 +39,7 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `radiologist` | Imaging report preparation and release |
 | `bloodbank` | Component request review, reservation, issue and unit inventory |
 | `cashier` | Consultation and inpatient invoices, bed charges and local settlement |
-| `patient` | Own appointments and follow-up booking, QR passes, published laboratory reports, released discharge summaries and billing balances |
+| `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
 Registration accepts evaluation codes such as `REG-1001` that generate a fictional profile. A new appointment yields a QR image and opaque code for same-date reception check-in. Booking, check-in, consultation, laboratory and invoice records persist in this browser across role sign-ins.
@@ -61,6 +61,8 @@ In **Revenue Cycle**, `cashier` can review a stay under **Inpatient charges**. D
 During an active consultation, `clinician` can order an imaging study. Use `imaging` to reserve a modality slot and record acquisition. Use `radiologist` to save and release the report. The ordering clinician and the patient’s **Reports** tab show the released summary.
 
 On an assigned admission, `wardphysician` can request a blood component and track its status. Use `bloodbank` to record a synthetic review, reserve a unit and issue it to the linked admission. The inventory shows which units are available, reserved, issued or expired.
+
+In **Pharmacy**, use **Receive stock** to record a batch and its receipt reference. **Stock lots** shows on-hand and quarantined quantities and allows supplier returns. **Stock activity** shows the ledger. A patient return goes into quarantine and credits the unpaid portion of the original medication invoice where applicable. The cashier and patient can see the credited balance or an amount needing payment review.
 
 ## Verify
 

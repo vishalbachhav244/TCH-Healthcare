@@ -7,6 +7,7 @@ import {
   invoiceTotal,
   shiftDay,
   type AppointmentPage,
+  type InvoiceRow,
   type Session,
 } from '../domain/operations';
 import type { SchedulingDay } from '../domain/scheduling';
@@ -17,6 +18,7 @@ import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
 import type { ImagingOrder, ImagingRow } from '../domain/radiology';
 import type { BloodBankView } from '../domain/blood-bank';
+import type { PharmacyData } from '../domain/pharmacy';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -2035,4 +2037,200 @@ describe('medication authorization and dispensing', () => {
     );
     expect(await db.invoices.where('encounterId').equals(encounter.id).count()).toBe(2);
   });
+
+  it('receives batches once per reference and serializes supplier returns against on-hand stock', async () => {
+    const facility = 'mer-central';
+    const [pharmacist, cashier] = await Promise.all([login('pharmacy'), login('cashier')]);
+    const receive = 'pharmacy/stock/receipts';
+    const supplierReturn = 'pharmacy/stock/supplier-returns';
+    const record = {
+      productId: 'dressing',
+      batch: 'demo-r42',
+      expiresOn: shiftDay(dayInIndia(), 70),
+      quantity: '3',
+      reference: 'grn-9001',
+    };
+    await expect(post(receive, record, cashier, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post(receive, { ...record, quantity: '3.5' }, pharmacist, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      post(receive, { ...record, expiresOn: shiftDay(dayInIndia(), -1) }, pharmacist, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const outcomes = await Promise.allSettled([
+      post(receive, record, pharmacist, facility),
+      post(receive, { ...record, reference: 'GRN-9001' }, pharmacist, facility),
+    ]);
+    expect(outcomes.map((item) => item.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(outcomes).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    await expect(
+      post(
+        receive,
+        { ...record, reference: 'GRN-9002', expiresOn: shiftDay(record.expiresOn, 1) },
+        pharmacist,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await post(
+      receive,
+      { ...record, reference: 'GRN-9002', batch: 'DEMO-R42', quantity: '2' },
+      pharmacist,
+      facility,
+    );
+    const feed = async () => (await get('pharmacy', pharmacist, facility)) as PharmacyData;
+    const lot = (await feed()).lots.find((item) => item.batch === 'DEMO-R42')!;
+    expect(lot).toMatchObject({ onHand: 5, quarantined: 0 });
+    const correction = {
+      lotId: lot.id,
+      quantity: '4',
+      reference: 'SR-8001',
+      reason: 'Supplier recall',
+    };
+    await expect(
+      post(supplierReturn, { ...correction, lotId: 'mer-north-dressing-1' }, pharmacist, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      post(supplierReturn, { ...correction, reason: 'Other' }, pharmacist, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const returns = await Promise.allSettled([
+      post(supplierReturn, correction, pharmacist, facility),
+      post(supplierReturn, { ...correction, reference: 'SR-8002' }, pharmacist, facility),
+    ]);
+    expect(returns.map((item) => item.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const view = await feed();
+    expect(view.lots.filter((row) => row.batch === lot.batch)).toMatchObject([
+      { id: lot.id, onHand: 1 },
+    ]);
+    const ledger = view.activity
+      .filter((row) => row.movement.lotId === lot.id)
+      .map((row) => row.movement);
+    expect(ledger).toHaveLength(3);
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'Received', quantity: 3, reference: 'GRN-9001' }),
+        expect.objectContaining({ kind: 'Received', quantity: 2, reference: 'GRN-9002' }),
+        expect.objectContaining({ kind: 'Supplier return', quantity: -4 }),
+      ]),
+    );
+    await db.facilities.update(facility, { active: false });
+    try {
+      await expect(get('pharmacy', pharmacist, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(post(receive, record, pharmacist, facility)).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await db.facilities.update(facility, { active: true });
+    }
+  }, 90_000);
+
+  it('quarantines patient returns and credits only the outstanding medication charge', async () => {
+    const facility = 'mer-central';
+    const patientId = 'TC-MERIDIAN-01001';
+    const practitionerId = 'mer-central-DR-1';
+    const [desk, clinician, pharmacist, cashier, patient] = await Promise.all(
+      ['reception', 'clinician', 'pharmacy', 'cashier', 'patient'].map(login),
+    );
+    const day = dayInIndia();
+    const times = (await get(
+      'appointments/availability?practitionerId=' +
+        practitionerId +
+        '&day=' +
+        day +
+        '&patientId=' +
+        patientId,
+      desk,
+      facility,
+    )) as string[];
+    const visit = (await post(
+      'appointments',
+      { patientId, practitionerId, day, time: times.at(-1)! },
+      desk,
+      facility,
+    )) as { id: string; pass: string };
+    await post('queue/check-in', { pass: visit.pass }, desk, facility);
+    await post('queue/call', { appointmentId: visit.id }, desk, facility);
+    const { id: encounterId } = (await post(
+      'clinical/start',
+      { appointmentId: visit.id },
+      clinician,
+      facility,
+    )) as { id: string };
+    const { id: prescriptionId } = (await post(
+      'clinical/prescriptions',
+      { encounterId, productId: 'hydration', quantity: '3' },
+      clinician,
+      facility,
+    )) as { id: string };
+    await post('clinical/prescriptions/sign', { prescriptionId }, clinician, facility);
+    const path = 'pharmacy/medication-returns';
+    const fields = {
+      prescriptionId,
+      quantity: '1',
+      reference: 'PR-7001',
+      reason: 'Unused medication returned',
+    };
+    await expect(post(path, fields, pharmacist, facility)).rejects.toMatchObject({ status: 409 });
+    const lotId = 'mer-central-hydration-1';
+    await post('pharmacy/dispense', { prescriptionId, lotId }, pharmacist, facility);
+    const invoice = (await db.invoices.where('prescriptionId').equals(prescriptionId).first())!;
+    const cashierInvoice = async () =>
+      ((await get('billing?day=' + day, cashier, facility)) as InvoiceRow[]).find(
+        (row) => row.invoice.id === invoice.id,
+      );
+    expect(await cashierInvoice()).toMatchObject({ totalMinor: 9600, balanceMinor: 9600 });
+    const lotBefore = (await db.stockLots.get(lotId))!.onHand;
+    await expect(
+      post(path, { ...fields, quantity: '4' }, pharmacist, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await post(path, fields, pharmacist, facility);
+    await expect(post(path, fields, pharmacist, facility)).rejects.toMatchObject({ status: 409 });
+    expect(await cashierInvoice()).toMatchObject({
+      totalMinor: 9600,
+      balanceMinor: 6400,
+      creditedMinor: 3200,
+      reviewMinor: 0,
+    });
+    const portal = async () => (await get('portal', patient, facility)) as PatientPortal;
+    expect((await portal()).medications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: prescriptionId, quantity: 3, returnedQuantity: 1 }),
+      ]),
+    );
+    await post('billing/payments', { invoiceId: invoice.id }, cashier, facility);
+    expect(await db.payments.where('invoiceId').equals(invoice.id).first()).toMatchObject({
+      amountMinor: 6400,
+    });
+    const second = { ...fields, quantity: '2', reference: 'PR-7002' };
+    const attempts = await Promise.allSettled([
+      post(path, second, pharmacist, facility),
+      post(path, { ...second, reference: 'PR-7003' }, pharmacist, facility),
+    ]);
+    expect(attempts.map((item) => item.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(await cashierInvoice()).toMatchObject({
+      balanceMinor: 0,
+      creditedMinor: 3200,
+      reviewMinor: 6400,
+    });
+    const view = (await get('pharmacy', pharmacist, facility)) as PharmacyData;
+    expect(view.lots.find((lot) => lot.id === lotId)).toMatchObject({
+      onHand: lotBefore,
+      quarantined: 3,
+    });
+    expect(
+      view.prescriptions.find((row) => row.prescription.id === prescriptionId)?.returnedQuantity,
+    ).toBe(3);
+    expect((await portal()).invoices.find((row) => row.id === invoice.id)).toMatchObject({
+      balanceMinor: 0,
+      reviewMinor: 6400,
+    });
+    expect(await db.invoices.get(invoice.id)).toEqual(invoice);
+    await expect(
+      post('billing/payments', { invoiceId: invoice.id }, cashier, facility),
+    ).rejects.toMatchObject({ status: 409 });
+  }, 90_000);
 });

@@ -1,6 +1,5 @@
 import {
   dayInIndia,
-  invoiceTotal,
   shiftDay,
   specialties,
   type Appointment,
@@ -11,6 +10,7 @@ import {
 } from '../domain/operations';
 import { db } from './database';
 import { ApiError } from './access';
+import { invoiceBalances } from './invoice-balances';
 
 export function checkedDay(day: string | null) {
   if (!day) return dayInIndia();
@@ -237,22 +237,15 @@ export async function invoiceRows(facility: Facility, day: string) {
     .equals([facility.id, day])
     .limit(200)
     .toArray();
-  const [patients, payments] = await Promise.all([
+  const [patients, balances] = await Promise.all([
     db.patients.bulkGet(invoices.map((invoice) => invoice.patientId)),
-    db.payments
-      .where('invoiceId')
-      .anyOf(invoices.map((invoice) => invoice.id))
-      .toArray(),
+    invoiceBalances(invoices),
   ]);
   return invoices
     .flatMap((invoice, i) => {
       const patient = patients[i];
       if (patient?.tenantId !== facility.tenantId) return [];
-      const totalMinor = invoiceTotal(invoice);
-      const paid = payments
-        .filter((payment) => payment.invoiceId === invoice.id)
-        .reduce((sum, payment) => sum + payment.amountMinor, 0);
-      return [{ invoice, patient, totalMinor, balanceMinor: totalMinor - paid }];
+      return [{ invoice, patient, ...balances.get(invoice.id)! }];
     })
     .sort((a, b) => b.balanceMinor - a.balanceMinor);
 }

@@ -16,4 +16,6 @@ The patient Reports view and inpatient accounts worklist passed reflow checks at
 
 The Radiology schedule and Blood Bank worklist passed reflow checks at 390, 768, 1024 and 1440 px. The desktop schedule, mobile released imaging report and mobile unit review passed the selected axe rules. Enter opens the scheduling and reservation dialogs and Escape restores focus to their row actions. [Modality schedule](screenshots/radiology-schedule-1440.png) · [Imaging report](screenshots/imaging-report-390.png) · [Blood Bank review](screenshots/blood-bank-review-390.png)
 
+The stock activity ledger and patient medication history passed reflow checks at 390, 768, 1024 and 1440 px. The ledger at 1440 px and medication history at 390 px passed the selected axe rules. Enter opens the stock receipt dialog and Escape restores focus to the receipt action. [Pharmacy stock ledger](screenshots/pharmacy-ledger-1440.png) · [Mobile patient medication history](screenshots/patient-medications-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

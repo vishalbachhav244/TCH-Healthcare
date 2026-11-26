@@ -29,7 +29,13 @@ import type {
 import type { PlatformData } from '../domain/platform';
 import type { SubscriptionRow } from '../domain/platform';
 import type { NetworkFacilityMetrics } from '../domain/operations';
-import type { PharmacyData, Prescription } from '../domain/pharmacy';
+import type {
+  MedicationReturn,
+  PharmacyData,
+  Prescription,
+  StockReceipt,
+  SupplierReturn,
+} from '../domain/pharmacy';
 import type { PlatformOperationsData } from '../domain/platform-operations';
 import type {
   Connector,
@@ -207,8 +213,33 @@ export class Api {
 
   pharmacy(token: string, facility: string) {
     return this.get('pharmacy', token, facility).pipe(
-      map((value) => objectShape<PharmacyData>(value, ['prescriptions', 'lots'])),
+      map((value) => objectShape<PharmacyData>(value, ['prescriptions', 'lots', 'activity'])),
     );
+  }
+
+  dispenseMedication(token: string, facility: string, prescriptionId: string, lotId: string) {
+    return this.execute('pharmacy/dispense', token, facility, { prescriptionId, lotId });
+  }
+
+  receivePharmacyStock(token: string, facility: string, fields: StockReceipt) {
+    return this.execute('pharmacy/stock/receipts', token, facility, {
+      ...fields,
+      quantity: String(fields.quantity),
+    });
+  }
+
+  returnPharmacyStock(token: string, facility: string, fields: SupplierReturn) {
+    return this.execute('pharmacy/stock/supplier-returns', token, facility, {
+      ...fields,
+      quantity: String(fields.quantity),
+    });
+  }
+
+  returnMedication(token: string, facility: string, fields: MedicationReturn) {
+    return this.execute('pharmacy/medication-returns', token, facility, {
+      ...fields,
+      quantity: String(fields.quantity),
+    });
   }
 
   prescriptions(token: string, facility: string, encounterId: string) {
@@ -737,6 +768,7 @@ export class Api {
           'records',
           'dischargeSummaries',
           'imagingReports',
+          'medications',
           'followUps',
           'invoices',
         ]),
@@ -755,7 +787,14 @@ export class Api {
   invoices(token: string, facility: string, day: string) {
     return this.get('billing', token, facility, { day }).pipe(
       map((value) =>
-        collection<InvoiceRow>(value, ['invoice', 'patient', 'balanceMinor', 'totalMinor']),
+        collection<InvoiceRow>(value, [
+          'invoice',
+          'patient',
+          'balanceMinor',
+          'totalMinor',
+          'creditedMinor',
+          'reviewMinor',
+        ]),
       ),
     );
   }
