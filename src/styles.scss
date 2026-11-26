@@ -1051,6 +1051,51 @@ tbody tr:nth-child(3n) .table-initials {
 .continuity-history p {
   margin-block: 0.2rem 0;
 }
+.ward-back {
+  margin-block-end: 1rem;
+}
+.ward-team {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 3rem;
+  margin-block-end: 1rem;
+  padding: 0.875rem 1rem;
+}
+.ward-team small {
+  display: block;
+  margin-block-end: 0.2rem;
+  color: var(--muted);
+}
+.ward-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  gap: 1rem;
+  margin-block-start: 1rem;
+  align-items: start;
+}
+.ward-history-grid .portal-list {
+  margin-block-start: 0;
+}
+.ward-mobile-context {
+  display: none;
+}
+@media (max-width: 620px) {
+  .ward-record-list th,
+  .ward-record-list td {
+    padding-inline: 8px;
+    white-space: normal;
+  }
+  .ward-record-list .ward-desktop-context {
+    display: none;
+  }
+  .ward-mobile-context {
+    display: block;
+  }
+  .ward-record-list .text-button {
+    white-space: normal;
+    text-align: start;
+  }
+}
 .pipeline {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));

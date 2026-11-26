@@ -18,6 +18,12 @@ export const staffRoles = {
     writes: ['patients', 'appointments', 'queue'],
   },
   clinician: { label: 'Clinician', workspaces: ['D13'], writes: ['clinical'] },
+  wardPhysician: {
+    label: 'Inpatient physician',
+    workspaces: ['D14'],
+    writes: ['inpatient-physician'],
+  },
+  wardNurse: { label: 'Ward nurse', workspaces: ['D15'], writes: ['nursing-station'] },
   cashier: { label: 'Cashier', workspaces: ['D24'], writes: ['billing'] },
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },

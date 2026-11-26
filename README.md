@@ -27,7 +27,9 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `reception` | Patient registration, appointments, waitlist, arrival verification and queue |
 | `clinician` | Assigned consultations, signed visit history, follow-up requests, laboratory orders and prescriptions |
 | `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
-| `admissions` | Admission requests, bed allocation, transfer and release |
+| `admissions` | Admission requests, bed allocation and transfer, care-team assignment and discharge |
+| `wardphysician`, `wardcover` | Assigned inpatient care plans, rounds and ward orders |
+| `wardnurse`, `wardrelief` | Assigned nursing tasks, task completion and ward observations |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |
 | `cashier` | Consultation invoices and local settlement |
@@ -43,6 +45,8 @@ To exercise clinical governance, refer a flagged report as `medicaldirector`. Op
 In **Scheduling**, `reception` can add a patient to a clinician’s waitlist and book an available time. At the same facility, `executive` can block and release clinician time. A separate `patient` tab shows how those changes affect available times in **Book a visit**.
 
 In **Appointments**, `reception` can select an existing patient and use their previous clinician at the current facility. After signing a consultation, `clinician` can open **View note** and request a follow-up with a date window. For the demonstration patient, the `patient` tab can book that request under **Follow-up requests**. Reception can also book the request from the patient’s appointment form.
+
+In **Bed Management**, `admissions` can allocate a bed and assign an inpatient physician and ward nurse from the active facility roster. The `wardphysician` and `wardnurse` accounts have sample assignments at both Meridian facilities. A physician’s ward order appears as a nursing task. Its observation and status appear in both workspaces when the assigned nurse completes it. Admissions can discharge after the linked tasks are closed.
 
 ## Verify
 

@@ -1,6 +1,7 @@
 import type { Admission, DomainEvent, Facility, InpatientBoard } from '../domain/operations';
 import { ApiError } from './access';
 import { db } from './database';
+import { openTask } from './ward-care';
 
 export async function board(
   facility: Facility,
@@ -78,6 +79,21 @@ export async function inpatientCommand(
   if (path === 'admissions/discharge') {
     if (admission.status !== 'Admitted' || !admission.bedId)
       throw new ApiError(409, 'Only an admitted patient can be discharged.');
+    const bed = await db.beds.get(admission.bedId);
+    if (bed?.facilityId !== facility.id || bed.status !== 'Occupied')
+      throw new ApiError(409, 'The assigned bed could not be verified.');
+    if (
+      await db.nursingTasks
+        .where('admissionId')
+        .equals(admission.id)
+        .filter((task) => task.facilityId === facility.id && openTask(task))
+        .first()
+    ) {
+      throw new ApiError(
+        409,
+        'Complete or cancel open nursing tasks before discharging this patient.',
+      );
+    }
     await db.beds.update(admission.bedId, { status: 'Cleaning' });
     await db.admissions.update(admission.id, { ...next, status: 'Discharged', dischargedAt: time });
     return event('PatientDischarged', admission.id);

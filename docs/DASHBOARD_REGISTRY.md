@@ -17,12 +17,12 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility` | Partial | Recall, skip, transfer, delays and performance reports |
 | D12 | Patient & Family | `/work/portal` | Partial | Family access, consent, secure uploads, notifications and discovery |
 | D13 | Doctor / OPD Workspace | `/work/clinical` | Partial | Clinical history and vitals, prescriptions, referrals and follow-up |
-| D14 | IPD Physician Workspace | — | Open | Rounds, orders and discharge coordination |
-| D15 | Nursing Station | — | Open | Tasks, observations and medication administration |
+| D14 | IPD Physician Workspace | `/work/inpatient-physician` | Partial | Inpatient prescribing, expanded charting and discharge planning |
+| D15 | Nursing Station | `/work/nursing-station` | Partial | Medication administration, detailed vitals and shift roster |
 | D16 | Emergency / Casualty | — | Open | Clinician-managed priority, observations and admission handoff |
 | D17 | ICU & Critical Care | — | Open | Monitoring, observations and escalation |
 | D18 | Operation Theatre | — | Open | Theatre, team, checklist and recovery |
-| D19 | Admission, Bed & Discharge | `/work/beds` | Partial | Nursing, charges, discharge documents and financial linkage |
+| D19 | Admission, Bed & Discharge | `/work/beds` | Partial | Inpatient charges, discharge documents and financial linkage |
 | D20 | Laboratory / LIMS | `/work/laboratory` | Partial | Numeric panels, reporting files, corrections and richer audit |
 | D21 | Radiology & Imaging | — | Open | Imaging orders, modality schedule and release |
 | D22 | Pharmacy | `/work/pharmacy` | Partial | Catalogue authoring, receiving, returns, stock reconciliation and partial fills |

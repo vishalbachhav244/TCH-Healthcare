@@ -4,7 +4,12 @@ import { evaluationAvailable } from './evaluation';
 import { configurationChanges } from './events';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, EMPTY, from, switchMap } from 'rxjs';
-import { navigation, platformResources, type Resource } from '../domain/workspaces';
+import {
+  inpatientWorkspaces,
+  navigation,
+  platformResources,
+  type Resource,
+} from '../domain/workspaces';
 import type { Facility, Session } from '../domain/operations';
 
 @Injectable({ providedIn: 'root' })
@@ -80,7 +85,7 @@ export class SessionStore {
       (platformResources.includes(resource)
         ? !!this.session()?.workspaces.includes(entry.workspace) && this.canPerform(resource)
         : !!this.access()?.workspaces.includes(entry.workspace)) &&
-      (resource !== 'beds' || !!this.facility()?.inpatient)
+      (!inpatientWorkspaces.has(entry.workspace) || !!this.facility()?.inpatient)
     );
   }
 

@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Inpatient physician and nursing workspaces, 26 November 2026
+
+- Added D14 `/work/inpatient-physician` and D15 `/work/nursing-station` with assigned admissions, ward filters, care team context, rounds, orders, task transitions and observations.
+- Added versioned care-team assignment in Bed Management. Physician orders and nurse tasks are linked. Completing a task records its observation in the same transaction. Discharge checks that linked tasks are closed. Facility inpatient controls govern route, navigation, data and writes in both workspaces.
+- Updated the ward-care domain and adapter, Beds and ward-care components, schema version 15, the OpenAPI contract and cross-role verification. Existing user-created admissions retain their ward and admission state during upgrade. Named fixture assignments populate the sample worklists.
+- Coverage is 19 dashboards with partial routes and 17 open. Emergency, ICU, theatre, discharge documentation and inpatient billing remain in the M4 checkpoint. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Physician workspace](screenshots/inpatient-physician-1440.png) · [Mobile nursing station](screenshots/nursing-station-390.png)
+
 ## Returning-patient scheduling and follow-up, 26 November 2026
 
 - Added a prior-clinician suggestion derived from the selected patient’s latest verified, completed visit at the current facility. Added recent signed observations and a specialty filter within the assigned clinician’s consultation dialog.

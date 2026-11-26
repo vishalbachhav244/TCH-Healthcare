@@ -31,6 +31,18 @@ import type {
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
 import type { ScheduleException, SchedulingDay, WaitlistEntry } from '../domain/scheduling';
 import type {
+  NursingTask,
+  ObservationFields,
+  ObservationResult,
+  RoundFields,
+  WardAssignmentOptions,
+  WardDetail,
+  WardOrderKind,
+  WardRecordVersion,
+  WardRole,
+  WardWorklistRow,
+} from '../domain/ward-care';
+import type {
   BookingContext,
   ClinicalContinuity,
   FollowUpRequest,
@@ -338,6 +350,123 @@ export class Api {
     return this.get('beds', token, facility).pipe(
       map((value) => objectShape<InpatientBoard>(value, ['beds', 'admissions'])),
     );
+  }
+
+  wardAssignment(token: string, facility: string, admissionId: string) {
+    return this.get('admissions/care-team', token, facility, { admissionId }).pipe(
+      map((value) =>
+        objectShape<WardAssignmentOptions>(value, ['physicians', 'nurses', 'assignment']),
+      ),
+    );
+  }
+
+  assignWardTeam(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    team: { physician: string; nurse: string },
+  ) {
+    return this.execute(
+      'admissions/care-team',
+      token,
+      facility,
+      { ...this.wardVersions(context), ...team },
+      'PATCH',
+    );
+  }
+
+  wardWorklist(token: string, facility: string, role: WardRole) {
+    return this.get(role, token, facility).pipe(
+      map((value) =>
+        collection<WardWorklistRow>(value, [
+          'admission',
+          'patient',
+          'bed',
+          'openTasks',
+          'completedTasks',
+        ]),
+      ),
+    );
+  }
+
+  wardDetail(token: string, facility: string, role: WardRole, admissionId: string) {
+    return this.get(role + '/detail', token, facility, { admissionId }).pipe(
+      map((value) =>
+        objectShape<WardDetail>(value, [
+          'admission',
+          'patient',
+          'bed',
+          'team',
+          'rounds',
+          'observations',
+          'orders',
+        ]),
+      ),
+    );
+  }
+
+  recordWardRound(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    fields: RoundFields,
+  ) {
+    return this.execute('inpatient-physician/rounds', token, facility, {
+      ...this.wardVersions(context),
+      ...fields,
+    });
+  }
+
+  placeWardOrder(token: string, facility: string, context: WardRecordVersion, kind: WardOrderKind) {
+    return this.execute('inpatient-physician/orders', token, facility, {
+      ...this.wardVersions(context),
+      kind,
+    });
+  }
+
+  recordWardObservation(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    fields: ObservationFields,
+  ) {
+    return this.execute('nursing-station/observations', token, facility, {
+      ...this.wardVersions(context),
+      ...fields,
+    });
+  }
+
+  updateWardTask(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    task: Pick<NursingTask, 'id' | 'version'>,
+    command: { action: 'cancel' | 'start' } | { action: 'complete'; result: ObservationResult },
+  ) {
+    const path =
+      command.action === 'cancel'
+        ? 'inpatient-physician/orders/cancel'
+        : 'nursing-station/tasks/' + command.action;
+    return this.execute(
+      path,
+      token,
+      facility,
+      {
+        ...this.wardVersions(context),
+        taskId: task.id,
+        taskVersion: String(task.version),
+        ...(command.action === 'complete' ? { result: command.result } : {}),
+      },
+      'PATCH',
+    );
+  }
+
+  private wardVersions(context: WardRecordVersion) {
+    return {
+      admissionId: context.admissionId,
+      admissionVersion: String(context.admissionVersion),
+      assignmentVersion: String(context.assignmentVersion),
+    };
   }
 
   laboratory(token: string, facility: string, params: Record<string, string | number>) {

@@ -29,3 +29,6 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-23 | D10 | `/work/scheduling` | Date and clinician filters, appointment waitlist, slot conversion, withdrawals and schedule blocks |
 | TC-LOCAL-24 | D13 | `/work/clinical` → Consultation | Assigned patient’s signed history, specialty filter and follow-up request lifecycle |
 | TC-LOCAL-25 | D12 | `/work/portal` → Appointments | Own follow-up requests, date-window booking, appointment pass and visit status |
+| TC-LOCAL-26 | D14 | `/work/inpatient-physician` | Assigned ward worklist, care plan, rounds, ward order placement and status |
+| TC-LOCAL-27 | D15 | `/work/nursing-station` | Assigned ward worklist, nursing tasks, observations and completion evidence |
+| TC-LOCAL-28 | D19 | `/work/beds` → Admissions → Assign care team | Facility staff directory and versioned physician and nurse assignment |

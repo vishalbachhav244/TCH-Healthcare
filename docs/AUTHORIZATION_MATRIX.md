@@ -16,7 +16,9 @@
 | Executive | Meridian facilities. Overview, alert acknowledgement and clinician schedule blocks. Read-only appointments, waitlist, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointment and waitlist commands, and queue operations. Follow-up booking exposes the clinician, date window and booking state. Appointment, queue and dashboard worklists omit encounter records. |
 | Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, requests or withdraws follow-up and orders laboratory tests. |
-| Admissions | Default Meridian facility. Bed and admission lifecycle. |
+| Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, places ward orders and cancels pending orders. Reads related nursing tasks and observations. |
+| Ward nurse | Active assigned admissions at inpatient-enabled facilities. Starts and completes linked tasks and records observations. Reads rounds and orders for the assigned admission. |
+| Admissions | Default Meridian facility. Bed and admission lifecycle, including assignment of active facility physicians and nurses. Discharge requires all linked nursing tasks to be closed. |
 | Laboratory technician | Collection, processing and result entry. |
 | Laboratory reviewer | Authorisation and publication. |
 | Cashier | Signed-encounter invoices and local settlements. |

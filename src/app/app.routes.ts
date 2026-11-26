@@ -153,6 +153,20 @@ export const routes: Routes = [
         title: 'Patient Registry · TrueCare',
       },
       {
+        path: 'inpatient-physician',
+        data: { resource: 'inpatient-physician' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/ward-care').then((m) => m.WardCare),
+        title: 'Inpatient Physician · TrueCare',
+      },
+      {
+        path: 'nursing-station',
+        data: { resource: 'nursing-station' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/ward-care').then((m) => m.WardCare),
+        title: 'Nursing Station · TrueCare',
+      },
+      {
         path: 'beds',
         data: { resource: 'beds' },
         canActivate: [workspaceAccess],

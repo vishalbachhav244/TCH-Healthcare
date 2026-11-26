@@ -25,6 +25,147 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('hands an admitted patient from physician rounds to nursing evidence and discharge', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(160_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  await signIn(page, 'admissions');
+  await page.getByRole('button', { name: 'Request admission' }).click();
+  const request = page.getByRole('dialog', { name: 'Request admission' });
+  await request.getByLabel('Find patient').fill(patientId);
+  await request.getByLabel('Patient', { exact: true }).selectOption(patientId);
+  await request.getByRole('button', { name: 'Request admission' }).click();
+  await page.getByLabel('Find admission').fill(patientId);
+  const admitted = page.getByRole('row', { name: new RegExp(patientId) });
+  await admitted.getByRole('button', { name: 'Allocate bed' }).click();
+  const allocate = page.getByRole('dialog', { name: 'Assign bed' });
+  await allocate.getByLabel('Available bed').selectOption({ index: 1 });
+  await allocate.getByRole('button', { name: 'Confirm bed allocation' }).click();
+  await expect(admitted).toContainText('Admitted');
+
+  const physician = await page.context().newPage();
+  await signIn(physician, 'wardphysician');
+  const nurse = await page.context().newPage();
+  await signIn(nurse, 'wardnurse');
+  await expect(physician.getByRole('heading', { name: 'Inpatient Physician' })).toBeVisible();
+  await expect(nurse.getByRole('heading', { name: 'Nursing Station' })).toBeVisible();
+  await physician.getByRole('searchbox', { name: 'Find assigned patient' }).fill(patientId);
+  await nurse.getByRole('searchbox', { name: 'Find assigned patient' }).fill(patientId);
+  const physicianRow = physician.getByRole('row', { name: new RegExp(patientId) });
+  const nurseRow = nurse.getByRole('row', { name: new RegExp(patientId) });
+  await expect(physicianRow).toHaveCount(0);
+  await expect(nurseRow).toHaveCount(0);
+  await admitted.getByRole('button', { name: 'Assign care team' }).click();
+  const team = page.getByRole('dialog', { name: 'Assign care team' });
+  await team.getByLabel('Inpatient physician').selectOption('wardphysician');
+  await team.getByLabel('Ward nurse').selectOption('wardnurse');
+  await team.getByRole('button', { name: 'Save care team' }).click();
+  await expect(page.getByText('Care team assigned.')).toBeVisible();
+  await physicianRow.getByRole('link', { name: 'Open care plan' }).click();
+  await nurseRow.getByRole('link', { name: 'Open care plan' }).click();
+
+  await physician.getByRole('button', { name: 'Record round' }).click();
+  const round = physician.getByRole('dialog', { name: 'Record physician round' });
+  await round.getByLabel('Round focus').selectOption('Post-admission review');
+  await round.getByLabel('Round summary').selectOption('Reviewed with the ward team');
+  await round.getByRole('button', { name: 'Save round' }).click();
+  await expect(nurse.getByRole('region', { name: 'Physician rounds' })).toContainText(
+    'Post-admission review',
+  );
+
+  const place = physician.getByRole('button', { name: 'Place ward order' });
+  await place.focus();
+  await physician.keyboard.press('Enter');
+  const order = physician.getByRole('dialog', { name: 'Place ward order' });
+  await expect(order).toBeVisible();
+  await physician.keyboard.press('Escape');
+  await expect(place).toBeFocused();
+  async function orderTask(kind: string) {
+    await place.click();
+    await order.getByLabel('Order type').selectOption(kind);
+    await order.getByRole('button', { name: 'Place order' }).click();
+    await expect(order).toBeHidden();
+  }
+  await orderTask('Record ward observations');
+  await orderTask('Document shift handover');
+  const openTask = nurse.getByRole('row', { name: /Record ward observations/ });
+  const cancelled = physician.getByRole('row', { name: /Document shift handover/ });
+  await cancelled.getByRole('button', { name: 'Cancel order' }).click();
+  await physician
+    .getByRole('dialog', { name: 'Cancel ward order' })
+    .getByRole('button', { name: 'Confirm cancellation' })
+    .click();
+  await expect(nurse.getByRole('row', { name: /Document shift handover/ })).toContainText(
+    'Cancelled',
+  );
+
+  await admitted.getByRole('button', { name: 'Discharge', exact: true }).click();
+  const discharge = page.getByRole('dialog', { name: 'Discharge patient' });
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(discharge.getByRole('alert')).toContainText('Complete or cancel open nursing tasks');
+  await discharge.getByRole('button', { name: 'Close', exact: true }).click();
+  await nurse.setViewportSize({ width: 390, height: 844 });
+  const start = openTask.getByRole('button', { name: 'Start task' });
+  await start.scrollIntoViewIfNeeded();
+  await expect(start).toBeInViewport({ ratio: 1 });
+  await start.click();
+  const tracked = physician.getByRole('row', { name: /Record ward observations/ });
+  await expect(tracked).toContainText('In progress');
+  await openTask.getByRole('button', { name: 'Complete task' }).click();
+  const completion = nurse.getByRole('dialog', { name: 'Complete nursing task' });
+  await completion.getByLabel('Observation status').selectOption('Physician review requested');
+  await completion.getByRole('button', { name: 'Complete task' }).click();
+  await expect(tracked).toContainText('Completed');
+  await expect(physician.getByRole('region', { name: 'Nursing observations' })).toContainText(
+    'Physician review requested',
+  );
+  await nurse.getByRole('button', { name: 'Record observation' }).click();
+  const standalone = nurse.getByRole('dialog', { name: 'Record nursing observation' });
+  await standalone.getByLabel('Observation type').selectOption('Comfort check');
+  await standalone.getByLabel('Observation status').selectOption('Recorded');
+  await standalone.getByRole('button', { name: 'Save observation' }).click();
+  await expect(nurse.getByText('Nursing observation recorded.', { exact: true })).toBeVisible();
+  await nurse.reload();
+  await expect(nurse.getByRole('region', { name: 'Nursing observations' })).toContainText(
+    'Comfort check',
+  );
+  await expect(openTask).toContainText('Completed');
+  await nurse.getByLabel('Task status').selectOption({ label: 'Completed' });
+  await expect(nurse.getByRole('row', { name: /Document shift handover/ })).toHaveCount(0);
+  await nurse.getByLabel('Task status').selectOption('');
+  await checkReflow(physician);
+  await checkReflow(nurse);
+  await nurse.setViewportSize({ width: 390, height: 844 });
+  for (const [workspace, name] of [
+    [physician, 'inpatient-physician-1440'],
+    [nurse, 'nursing-station-390'],
+  ] as const) {
+    expect(
+      (
+        await new AxeBuilder({ page: workspace })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+          .analyze()
+      ).violations,
+    ).toEqual([]);
+    await workspace.screenshot({
+      path: testInfo.outputPath(name + '.png'),
+      animations: 'disabled',
+      fullPage: true,
+    });
+  }
+
+  await admitted.getByRole('button', { name: 'Discharge', exact: true }).click();
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(admitted).toContainText('Discharged');
+  await expect(physician.getByRole('alert')).toContainText('This admission is no longer active');
+  await expect(nurse.getByRole('alert')).toContainText('This admission is no longer active');
+  await page.goto('/work/inpatient-physician');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await physician.close();
+  await nurse.close();
+});
+
 test('uses prior care in booking and hands a signed follow-up to the patient and reception', async ({
   page,
 }, testInfo) => {
@@ -434,9 +575,10 @@ test('refers a diagnostic result and resolves the quality case across roles', as
   await coordinator.close();
 });
 
-test('platform provisions organizations and facilities and revokes an active bed workspace', async ({
+test('platform provisions organizations and revokes active inpatient workspaces', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(100_000);
   const staff = await page.context().newPage();
   await signIn(page, 'platform');
   await page.getByRole('button', { name: 'Create organization' }).click();
@@ -491,6 +633,12 @@ test('platform provisions organizations and facilities and revokes an active bed
     animations: 'disabled',
     fullPage: true,
   });
+  const ward = await page.context().newPage();
+  const nursing = await page.context().newPage();
+  await signIn(ward, 'wardphysician');
+  await signIn(nursing, 'wardnurse');
+  await expect(ward.getByRole('heading', { name: 'Inpatient Physician' })).toBeVisible();
+  await expect(nursing.getByRole('heading', { name: 'Nursing Station' })).toBeVisible();
   await page
     .getByRole('row', { name: /Meridian Medical Centre/ })
     .getByRole('button', { name: 'Edit entitlement' })
@@ -500,6 +648,10 @@ test('platform provisions organizations and facilities and revokes an active bed
   await editor.getByRole('button', { name: 'Save entitlement' }).click();
   await expect(page.getByText('Inpatient entitlement updated.', { exact: true })).toBeVisible();
   await expect(staff.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(ward.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(nursing.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await ward.close();
+  await nursing.close();
   await staff.close();
 });
 

@@ -6,7 +6,7 @@
 | 2 Returning patient | Search patient → suggest the most recent completed clinician at the facility → check slots → book, or add a waitlist request | Recurring schedules and authorized cross-facility continuity |
 | 3 QR check-in | Issue opaque QR → decode an image or enter code → verify facility and date → issue one ticket → update token-only display | Camera, kiosk, patient notifications and enhanced identity checks |
 | 4 Connected records | View published laboratory results → choose a report for a recipient → grant or revoke access → review access history | Uploads, document classification, and expanded report types |
-| 5 Inpatient | Request → allocate → transfer → discharge → cleaning → available | Nursing, daily charges, orders and discharge documentation |
+| 5 Inpatient | Request → allocate bed → assign physician and nurse → record round → place order → start and complete linked nursing task with observation → discharge → clean and release bed | Medication administration, daily charges, discharge documentation and inpatient billing |
 | 6 Laboratory | Clinician order → collect → process → enter result → separate reviewer authorises and publishes → patient-scoped view | Numeric panels, corrections, report files and richer audit |
 | 7 Pharmacy | Draft → authorized signature → signed worklist → lot and expiry validation → stock movement and separate invoice | Stock receiving, returns, customer instructions and partial fills |
 | 8 Billing | Signed encounter → line-item invoice → local settlement → balance and collections update | Deposits, receipts, price rules, refunds and reconciliation |
@@ -21,3 +21,5 @@
 Reception can add a patient to a clinician’s waitlist for a date and convert the request into a standard booking with an appointment pass. An executive at that facility can block an unoccupied time range or release the block. Changes update available times for the patient portal and staff booking. The evaluation uses 15-minute slots and permits new bookings and blocks up to 90 days ahead.
 
 The clinical governance worklist groups published, flagged laboratory reports by reporting period and review status. A Medical Director can acknowledge a report or refer it to Quality & Compliance. The referral opens a de-identified facility case. A coordinator claims the case, selects a resolution and closes it. Each step updates the persisted case history and the linked clinical worklist.
+
+The inpatient workflow uses the current facility’s active physician and nurse roster. The assigned physician records rounds and places or cancels pending orders. The assigned nurse starts a task and records its observation when completing it. Reassignment moves open tasks to the new nurse while preserving prior events. Pending and in-progress tasks stop discharge until completed or cancelled under the applicable role rules.

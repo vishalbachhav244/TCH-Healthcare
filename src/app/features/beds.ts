@@ -9,11 +9,12 @@ import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import type { InpatientBoard } from '../domain/operations';
+import { WardTeamEditor } from './ward-team-editor';
 
 type AdmissionRow = InpatientBoard['admissions'][number];
 
 @Component({
-  imports: [DatePipe, NgIcon, ReactiveFormsModule, StatusTone],
+  imports: [DatePipe, NgIcon, ReactiveFormsModule, StatusTone, WardTeamEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './beds.html',
 })
@@ -32,7 +33,9 @@ export class Beds {
   protected readonly feedback = signal('');
   protected readonly failure = signal('');
   protected readonly dialogFailure = signal('');
-  protected readonly task = signal<'request' | 'allocate' | 'discharge' | undefined>(undefined);
+  protected readonly task = signal<'request' | 'allocate' | 'discharge' | 'team' | undefined>(
+    undefined,
+  );
   protected readonly selected = signal<AdmissionRow | undefined>(undefined);
   protected readonly visible = signal(24);
   private readonly searchValue = toSignal(this.search.valueChanges.pipe(debounceTime(200)), {
@@ -90,7 +93,7 @@ export class Beds {
   }
 
   protected open(
-    task: 'request' | 'allocate' | 'discharge',
+    task: 'request' | 'allocate' | 'discharge' | 'team',
     dialog: HTMLDialogElement,
     row?: AdmissionRow,
   ) {
@@ -117,7 +120,7 @@ export class Beds {
         'Admission requested.',
         dialog,
       );
-    } else if (task && record) {
+    } else if ((task === 'allocate' || task === 'discharge') && record) {
       if (task === 'allocate' && !this.selectedBed.value) {
         this.dialogFailure.set('Select an available bed.');
         return;
@@ -135,6 +138,11 @@ export class Beds {
 
   protected release(id: string) {
     return this.change('beds/release', { bedId: id }, 'Bed available for allocation.');
+  }
+
+  protected teamSaved(dialog: HTMLDialogElement) {
+    this.feedback.set('Care team assigned.');
+    dialog.close();
   }
 
   private async change(

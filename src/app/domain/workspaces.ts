@@ -13,6 +13,8 @@ export type Resource =
   | 'patients'
   | 'queue'
   | 'clinical'
+  | 'inpatient-physician'
+  | 'nursing-station'
   | 'beds'
   | 'billing'
   | 'laboratory'
@@ -126,8 +128,16 @@ export const workspaces: readonly Workspace[] = [
     group: 'Clinical',
     icon: 'clipboard',
     inpatient: true,
+    resource: 'inpatient-physician',
   },
-  { id: 'D15', title: 'Nursing Station', group: 'Clinical', icon: 'heart', inpatient: true },
+  {
+    id: 'D15',
+    title: 'Nursing Station',
+    group: 'Clinical',
+    icon: 'heart',
+    inpatient: true,
+    resource: 'nursing-station',
+  },
   {
     id: 'D16',
     title: 'Emergency / Casualty',
@@ -176,6 +186,10 @@ export const workspaces: readonly Workspace[] = [
   { id: 'D36', title: 'AI & Automation Control Center', group: 'Intelligence', icon: 'settings' },
 ];
 
+export const inpatientWorkspaces = new Set(
+  workspaces.filter((workspace) => workspace.inpatient).map((workspace) => workspace.id),
+);
+
 export const navigation = [
   { title: 'Organizations', resource: 'platform', icon: 'building', workspace: 'D01' },
   { title: 'Subscriptions', resource: 'subscriptions', icon: 'wallet', workspace: 'D02' },
@@ -201,6 +215,13 @@ export const navigation = [
   { title: 'Patients', resource: 'patients', icon: 'users', workspace: 'D09' },
   { title: 'Consultation queue', resource: 'queue', icon: 'list', workspace: 'D11' },
   { title: 'Clinical workspace', resource: 'clinical', icon: 'stethoscope', workspace: 'D13' },
+  {
+    title: 'Inpatient physician',
+    resource: 'inpatient-physician',
+    icon: 'clipboard',
+    workspace: 'D14',
+  },
+  { title: 'Nursing station', resource: 'nursing-station', icon: 'heart', workspace: 'D15' },
   { title: 'Bed management', resource: 'beds', icon: 'bed', workspace: 'D19' },
   { title: 'Laboratory', resource: 'laboratory', icon: 'flask', workspace: 'D20' },
   { title: 'Pharmacy', resource: 'pharmacy', icon: 'cross', workspace: 'D22' },

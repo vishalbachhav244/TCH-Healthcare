@@ -13,6 +13,7 @@ import type { SchedulingDay } from '../domain/scheduling';
 import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
 import type { GovernanceData, QualityView } from '../domain/governance';
+import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
 import { seed } from './seed';
@@ -53,6 +54,184 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('assigned inpatient care', () => {
+  const facility = 'mer-central';
+  const physicianPath = 'inpatient-physician';
+  const nursePath = 'nursing-station';
+
+  it('enforces assignment, facility, role and inpatient entitlement in ward queries', async () => {
+    const [physician, nurse, cover, admissions] = await Promise.all([
+      login('wardphysician'),
+      login('wardnurse'),
+      login('wardcover'),
+      login('admissions'),
+    ]);
+    const list = (await get(physicianPath, physician, facility)) as WardWorklistRow[];
+    expect(list.length).toBeGreaterThan(0);
+    const id = list[0].admission.id;
+    const detail = `${physicianPath}/detail?admissionId=${id}`;
+    await expect(get(detail, physician, facility)).resolves.toHaveProperty('rounds');
+    await expect(get(detail, cover, facility)).rejects.toMatchObject({ status: 404 });
+    await expect(get(detail, physician, 'mer-north')).rejects.toMatchObject({ status: 404 });
+    await expect(get(detail, nurse, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(nursePath, admissions, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      get('admissions/care-team?admissionId=' + id, physician, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    const available = (await get(
+      'admissions/care-team?admissionId=' + id,
+      admissions,
+      facility,
+    )) as WardAssignmentOptions;
+    expect(available.physicians.map((row) => row.account)).toContain('wardcover');
+    expect(available.nurses.map((row) => row.account)).toContain('wardrelief');
+    await db.facilities.update(facility, { inpatient: false });
+    try {
+      await expect(get(detail, physician, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(get(nursePath, nurse, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(
+        post(`${physicianPath}/rounds`, { admissionId: id }, physician, facility),
+      ).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await db.facilities.update(facility, { inpatient: true });
+    }
+  });
+
+  it('hands off ordered tasks, prevents discharge while open and keeps completion evidence through reassignment', async () => {
+    const [physician, nurse, relief, admissions] = await Promise.all([
+      login('wardphysician'),
+      login('wardnurse'),
+      login('wardrelief'),
+      login('admissions'),
+    ]);
+    const patientId = 'TC-MERIDIAN-01001';
+    const bed = (await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .first())!;
+    const { id: admissionId } = (await post('admissions', { patientId }, admissions, facility)) as {
+      id: string;
+    };
+    const roles = { physician: 'wardphysician', nurse: 'wardnurse' };
+    await expect(
+      patch(
+        'admissions/care-team',
+        { admissionId, admissionVersion: '1', assignmentVersion: '0', ...roles },
+        admissions,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await post(
+      'admissions/allocate',
+      { admissionId, version: '1', bedId: bed.id },
+      admissions,
+      facility,
+    );
+    const registration = { admissionId, admissionVersion: '2', assignmentVersion: '0', ...roles };
+    await expect(
+      patch('admissions/care-team', { ...registration, nurse: 'reception' }, admissions, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await patch('admissions/care-team', registration, admissions, facility);
+    await expect(
+      patch('admissions/care-team', registration, admissions, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const versions = { admissionId, admissionVersion: '2', assignmentVersion: '1' };
+    const readWard = (role: string, session: Session) =>
+      get(`${role}/detail?admissionId=${admissionId}`, session, facility) as Promise<WardDetail>;
+    await post(
+      `${physicianPath}/rounds`,
+      { ...versions, focus: 'Post-admission review', summary: 'Reviewed with the ward team' },
+      physician,
+      facility,
+    );
+    await expect(readWard(nursePath, relief)).rejects.toMatchObject({ status: 404 });
+    const order = { ...versions, kind: 'Record ward observations' };
+    await expect(post(`${physicianPath}/orders`, order, nurse, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await post(`${physicianPath}/orders`, order, physician, facility);
+    await expect(post(`${physicianPath}/orders`, order, physician, facility)).rejects.toMatchObject(
+      { status: 409 },
+    );
+    const pending = await readWard(nursePath, nurse);
+    expect(pending.rounds[0]).toMatchObject({ focus: 'Post-admission review' });
+    const taskId = pending.orders[0].task.id;
+    const command = { ...versions, taskId, taskVersion: '1' };
+    const discharge = { admissionId, version: '2' };
+    await expect(
+      post('admissions/discharge', discharge, admissions, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      patch(`${nursePath}/tasks/complete`, { ...command, result: 'Recorded' }, nurse, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(`${nursePath}/tasks/start`, command, nurse, facility);
+    await expect(
+      patch(
+        `${physicianPath}/orders/cancel`,
+        { ...command, taskVersion: '2' },
+        physician,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(
+      'admissions/care-team',
+      { ...versions, ...roles, nurse: 'wardrelief' },
+      admissions,
+      facility,
+    );
+    await expect(
+      patch(
+        `${nursePath}/tasks/complete`,
+        { ...command, taskVersion: '2', result: 'Recorded' },
+        nurse,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+    const current = { ...command, assignmentVersion: '2', taskVersion: '2' };
+    await expect(
+      patch(`${nursePath}/tasks/complete`, current, relief, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const outcomes = await Promise.allSettled([
+      patch(
+        `${nursePath}/tasks/complete`,
+        { ...current, result: 'Physician review requested' },
+        relief,
+        facility,
+      ),
+      patch(
+        `${nursePath}/tasks/complete`,
+        { ...current, result: 'Physician review requested' },
+        relief,
+        facility,
+      ),
+    ]);
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    const complete = await readWard(physicianPath, physician);
+    expect(complete.orders[0].task).toMatchObject({
+      status: 'Completed',
+      version: 3,
+      updatedBy: 'Ishani Joshi',
+    });
+    expect(complete.observations).toMatchObject([
+      { taskId, kind: 'Ward observations', result: 'Physician review requested' },
+    ]);
+    await post('admissions/discharge', discharge, admissions, facility);
+    await expect(readWard(physicianPath, physician)).rejects.toMatchObject({ status: 409 });
+    await expect(get(physicianPath, physician, facility)).resolves.not.toContainEqual(
+      expect.objectContaining({ admission: expect.objectContaining({ id: admissionId }) }),
+    );
+    expect(await db.wardObservations.where('admissionId').equals(admissionId).count()).toBe(1);
+    await post('beds/release', { bedId: bed.id }, admissions, facility);
+  }, 60_000);
+});
 
 describe('consultation continuity', () => {
   const facility = 'mer-central';
@@ -624,7 +803,12 @@ describe('evaluation REST contract', () => {
       ),
     );
     expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
-    const allocated = (await db.admissions.where('bedId').equals(bed.id).first())!;
+    const allocated = (await db.admissions
+      .where('bedId')
+      .equals(bed.id)
+      .filter((row) => row.status === 'Admitted')
+      .first())!;
+    expect([first.id, second.id]).toContain(allocated.id);
     await expect(
       post('admissions/discharge', { admissionId: allocated.id, version: '1' }, user, facility),
     ).rejects.toMatchObject({ status: 409 });

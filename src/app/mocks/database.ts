@@ -34,7 +34,15 @@ import { initialConnectors, initialSharingReport } from './interoperability-seed
 import type { ClinicalReview, QualityCase } from '../domain/governance';
 import type { ScheduleException, WaitlistEntry } from '../domain/scheduling';
 import type { FollowUpRequest } from '../domain/continuity';
+import type {
+  NursingTask,
+  WardAssignment,
+  WardObservation,
+  WardOrder,
+  WardRound,
+} from '../domain/ward-care';
 import { initialQualityCases } from './governance-seed';
+import { initialWardAssignments } from './ward-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -61,6 +69,11 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   waitlist: EntityTable<WaitlistEntry, 'id'>;
   scheduleExceptions: EntityTable<ScheduleException, 'id'>;
   followUps: EntityTable<FollowUpRequest, 'id'>;
+  wardAssignments: EntityTable<WardAssignment, 'admissionId'>;
+  wardRounds: EntityTable<WardRound, 'id'>;
+  wardOrders: EntityTable<WardOrder, 'id'>;
+  nursingTasks: EntityTable<NursingTask, 'id'>;
+  wardObservations: EntityTable<WardObservation, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -285,6 +298,25 @@ db.version(14).stores({
   followUps: 'id, [facilityId+patientId], encounterId, &appointmentId',
 });
 
+db.version(15)
+  .stores({
+    wardAssignments: 'admissionId, facilityId',
+    wardRounds: 'id, admissionId',
+    wardOrders: 'id, admissionId',
+    nursingTasks: 'id, admissionId, &orderId',
+    wardObservations: 'id, admissionId',
+  })
+  .upgrade(async (transaction) => {
+    const admissions = await transaction.table<Admission, string>('admissions').toArray();
+    await transaction.table('wardAssignments').bulkAdd(initialWardAssignments(admissions));
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    for (const grant of initialStaff.filter(
+      (row) => row.role === 'wardPhysician' || row.role === 'wardNurse',
+    )) {
+      if (!(await memberships.get(grant.id))) await memberships.add(grant);
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -298,6 +330,7 @@ export function initialize() {
         db.encounters,
         db.beds,
         db.admissions,
+        db.wardAssignments,
         db.labOrders,
         db.facilities,
         db.memberships,
@@ -326,6 +359,7 @@ export function initialize() {
           db.encounters.bulkAdd(data.encounters),
           db.beds.bulkAdd(data.beds),
           db.admissions.bulkAdd(data.admissions),
+          db.wardAssignments.bulkAdd(initialWardAssignments(data.admissions)),
           db.labOrders.bulkAdd([
             ...labFixtures(data.encounters),
             ...initialSharingReport(data.encounters),

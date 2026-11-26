@@ -1,0 +1,445 @@
+@if (!admissionId()) {
+  <section class="page-intro">
+    <div>
+      <h1>{{ heading }}</h1>
+      <p>
+        {{
+          physician
+            ? 'Review assigned admissions, record rounds and place ward orders.'
+            : 'Review assigned admissions, complete tasks and record observations.'
+        }}
+      </p>
+    </div>
+  </section>
+  @let state = worklist();
+  @if (state.state === 'loading') {
+    <p class="panel state-panel" role="status">Loading assigned admissions…</p>
+  } @else if (state.state === 'error') {
+    <div class="panel state-panel">
+      <p role="alert">{{ state.message }}</p>
+      <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">
+        Retry
+      </button>
+    </div>
+  } @else {
+    <div class="metric-grid">
+      <article class="panel metric">
+        <div class="metric-top">
+          <span class="square-icon teal"><ng-icon name="bed" /></span>
+        </div>
+        <p>Assigned admissions</p>
+        <strong>{{ rows().length }}</strong>
+      </article>
+      <article class="panel metric">
+        <div class="metric-top">
+          <span class="square-icon amber"><ng-icon name="clipboard" /></span>
+        </div>
+        <p>Open nursing tasks</p>
+        <strong>{{ openTasks() }}</strong>
+      </article>
+      <article class="panel metric">
+        <div class="metric-top">
+          <span class="square-icon teal"><ng-icon name="check" /></span>
+        </div>
+        <p>Completed nursing tasks</p>
+        <strong>{{ completedTasks() }}</strong>
+      </article>
+    </div>
+    <section class="panel table-panel" aria-labelledby="ward-assigned-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="ward-assigned-heading">Assigned patients</h2>
+          <p>{{ store.facility()?.name }}</p>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <label class="search-field"
+          ><ng-icon name="search" /><span class="sr-only">Find assigned patient</span>
+          <input
+            type="search"
+            [formControl]="search"
+            placeholder="Search by patient or bed"
+            (input)="visible.set(12)"
+          />
+        </label>
+        <div class="select-control">
+          <label for="assigned-ward">Ward</label
+          ><select id="assigned-ward" [formControl]="ward" (change)="visible.set(12)">
+            <option value="">All wards</option>
+            @for (name of wards(); track name) {
+              <option [value]="name">{{ name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+      @if (filtered().length) {
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Assigned patients">
+          <table class="ward-record-list">
+            <caption class="sr-only">
+              Assigned patients
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Patient</th>
+                <th scope="col">Ward and bed</th>
+                <th scope="col" class="ward-desktop-context">Admitted</th>
+                <th scope="col">Open tasks</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of filtered().slice(0, visible()); track row.admission.id) {
+                <tr>
+                  <td>
+                    <div class="identity">
+                      <span class="table-initials">{{ row.patient.initials }}</span>
+                      <div>
+                        <strong>{{ row.patient.name }}</strong
+                        ><small>{{ row.patient.id }}</small>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <strong>{{ row.bed.label }}</strong
+                    ><small>{{ row.bed.ward }}</small>
+                    @if (row.admission.admittedAt; as admittedAt) {
+                      <small class="ward-mobile-context"
+                        >Admitted {{ admittedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+                      >
+                    }
+                  </td>
+                  <td class="ward-desktop-context">
+                    {{
+                      row.admission.admittedAt
+                        ? (row.admission.admittedAt | date: 'd MMM, HH:mm' : '+0530') + ' IST'
+                        : '—'
+                    }}
+                  </td>
+                  <td>{{ row.openTasks }}</td>
+                  <td>
+                    <a
+                      class="text-button"
+                      [routerLink]="[]"
+                      [queryParams]="{ admission: row.admission.id }"
+                      >Open care plan</a
+                    >
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (filtered().length > visible()) {
+          <div class="table-footer">
+            <button class="button secondary" type="button" (click)="visible.set(visible() + 12)">
+              Show more patients
+            </button>
+          </div>
+        }
+      } @else {
+        <p class="state-panel">
+          {{
+            rows().length
+              ? 'No assigned patients match these filters.'
+              : 'No active admissions are assigned to you at this facility.'
+          }}
+        </p>
+      }
+    </section>
+  }
+} @else {
+  <a class="button secondary ward-back" [routerLink]="[]" [queryParams]="{ admission: null }"
+    ><ng-icon name="back" /> Back to worklist</a
+  >
+  @let state = detail();
+  @if (state.state === 'loading') {
+    <p class="panel state-panel" role="status">Loading the care plan…</p>
+  } @else if (state.state === 'error') {
+    <div class="panel state-panel">
+      <p role="alert">{{ state.message }}</p>
+      <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">
+        Retry
+      </button>
+    </div>
+  } @else {
+    @let record = state.data;
+    <section class="page-intro">
+      <div>
+        <h1>{{ record.patient.name }}</h1>
+        <p>{{ record.patient.id }} · {{ record.bed.ward }} · Bed {{ record.bed.label }}</p>
+      </div>
+      <div class="page-actions">
+        @if (store.writeAllowed(role)) {
+          @if (physician) {
+            <button
+              type="button"
+              class="button secondary"
+              (click)="open(wardEditor, record, 'round')"
+            >
+              Record round
+            </button>
+            <button
+              type="button"
+              class="button primary"
+              (click)="open(wardEditor, record, 'order')"
+            >
+              <ng-icon name="plus" /> Place ward order
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="button primary"
+              (click)="open(wardEditor, record, 'observation')"
+            >
+              <ng-icon name="plus" /> Record observation
+            </button>
+          }
+        }
+      </div>
+    </section>
+    @if (notice()) {
+      <p class="inline-notice success" role="status">{{ notice() }}</p>
+    }
+    @if (error()) {
+      <p class="inline-notice" role="alert">{{ error() }}</p>
+    }
+    <div class="panel ward-team" aria-label="Assigned care team">
+      <div>
+        <small>Physician</small><strong>{{ record.team.physician }}</strong>
+      </div>
+      <div>
+        <small>Ward nurse</small><strong>{{ record.team.nurse }}</strong>
+      </div>
+    </div>
+    <section class="panel table-panel" aria-labelledby="ward-orders-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="ward-orders-heading">{{ physician ? 'Ward orders' : 'Nursing tasks' }}</h2>
+          <p>
+            {{
+              physician
+                ? 'Orders and their nursing status'
+                : 'Tasks from the assigned admission’s orders'
+            }}
+          </p>
+        </div>
+        <div class="select-control">
+          <label for="ward-task-status">Task status</label
+          ><select id="ward-task-status" [formControl]="taskStatus">
+            <option value="">All statuses</option>
+            <option>Pending</option>
+            <option>In progress</option>
+            <option>Completed</option>
+            <option>Cancelled</option>
+          </select>
+        </div>
+      </div>
+      @if (orders().length) {
+        <div
+          class="table-scroll"
+          tabindex="0"
+          role="region"
+          [attr.aria-label]="physician ? 'Ward orders' : 'Nursing tasks'"
+        >
+          <table class="ward-record-list">
+            <caption class="sr-only">
+              Orders and nursing tasks
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">{{ physician ? 'Order' : 'Task' }}</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="ward-desktop-context">Updated</th>
+                @if (store.writeAllowed(role)) {
+                  <th scope="col">Action</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of orders(); track item.id) {
+                <tr>
+                  <td>
+                    <strong>{{ item.kind }}</strong
+                    ><small
+                      >{{ item.physician }} ·
+                      {{ item.orderedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+                    >
+                    <small class="ward-mobile-context"
+                      >Updated {{ item.task.updatedAt | date: 'd MMM, HH:mm' : '+0530' }} IST ·
+                      {{ item.task.updatedBy }}</small
+                    >
+                  </td>
+                  <td>
+                    <span [class]="item.task.status | statusTone">{{ item.task.status }}</span>
+                  </td>
+                  <td class="ward-desktop-context">
+                    {{ item.task.updatedAt | date: 'd MMM, HH:mm' : '+0530' }} IST<small>{{
+                      item.task.updatedBy
+                    }}</small>
+                  </td>
+                  @if (store.writeAllowed(role)) {
+                    <td>
+                      @if (item.task.status === 'Pending' && physician) {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="openTask(wardEditor, record, item, 'cancel')"
+                        >
+                          Cancel order
+                        </button>
+                      } @else if (item.task.status === 'Pending' && !physician) {
+                        <button
+                          class="text-button"
+                          type="button"
+                          [disabled]="busy()"
+                          (click)="start(record, item)"
+                        >
+                          Start task
+                        </button>
+                      } @else if (item.task.status === 'In progress' && !physician) {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="openTask(wardEditor, record, item, 'complete')"
+                        >
+                          Complete task
+                        </button>
+                      } @else {
+                        —
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="state-panel">
+          {{
+            record.orders.length
+              ? 'Nothing matches this task status.'
+              : 'No ward orders have been placed for this admission.'
+          }}
+        </p>
+      }
+    </section>
+    <div class="ward-history-grid">
+      <section class="panel portal-list" aria-labelledby="ward-rounds-heading">
+        <h2 id="ward-rounds-heading">Physician rounds</h2>
+        @for (entry of record.rounds; track entry.id) {
+          <article>
+            <div>
+              <strong>{{ entry.focus }}</strong>
+              <p>{{ entry.summary }}</p>
+              <small
+                >{{ entry.actor }} ·
+                {{ entry.createdAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+              >
+            </div>
+          </article>
+        } @empty {
+          <p class="subtle">No rounds recorded for this admission.</p>
+        }
+      </section>
+      <section class="panel portal-list" aria-labelledby="ward-observations-heading">
+        <h2 id="ward-observations-heading">Nursing observations</h2>
+        @for (entry of record.observations; track entry.id) {
+          <article>
+            <div>
+              <strong>{{ entry.kind }}</strong>
+              <p>{{ entry.result }}</p>
+              <small
+                >{{ entry.actor }} ·
+                {{ entry.createdAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+              >
+            </div>
+          </article>
+        } @empty {
+          <p class="subtle">No observations recorded for this admission.</p>
+        }
+      </section>
+    </div>
+  }
+}
+
+<dialog #wardEditor aria-labelledby="ward-editor-title" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="ward-editor-title">{{ title() }}</h2>
+    <button type="button" class="icon-button" aria-label="Close" (click)="wardEditor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as current) {
+    <form class="dialog-body fields" (submit)="$event.preventDefault(); submit(wardEditor)">
+      @switch (current.action) {
+        @case ('round') {
+          <label for="round-focus">Round focus</label>
+          <select id="round-focus" [formControl]="round.controls.focus" required>
+            <option value="">Choose a focus</option>
+            @for (item of focuses; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+          <label for="round-summary">Round summary</label>
+          <select id="round-summary" [formControl]="round.controls.summary" required>
+            <option value="">Choose a summary</option>
+            @for (item of summaries; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        }
+        @case ('order') {
+          <label for="ward-order-kind">Order type</label>
+          <select id="ward-order-kind" [formControl]="order" required>
+            <option value="">Choose an order</option>
+            @for (item of orderTypes; track item.kind) {
+              <option [value]="item.kind">{{ item.kind }}</option>
+            }
+          </select>
+          <p class="subtle">The assigned nurse will receive this task.</p>
+        }
+        @case ('observation') {
+          <label for="ward-observation-kind">Observation type</label>
+          <select id="ward-observation-kind" [formControl]="observation" required>
+            <option value="">Choose an observation</option>
+            @for (item of observationTypes; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        }
+        @case ('complete') {
+          <p>{{ current.order.kind }}. An observation will be saved with this task.</p>
+        }
+        @case ('cancel') {
+          <p>Cancel {{ current.order.kind }} for this admission?</p>
+        }
+      }
+      @if (current.action === 'observation' || current.action === 'complete') {
+        <label for="ward-observation-result">Observation status</label>
+        <select id="ward-observation-result" [formControl]="result" required>
+          <option value="">Choose a status</option>
+          @for (item of results; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      }
+      @if (editorError()) {
+        <p class="field-error" role="alert">{{ editorError() }}</p>
+      }
+      <button type="submit" class="button primary" [disabled]="busy()">
+        {{
+          current.action === 'cancel'
+            ? 'Confirm cancellation'
+            : current.action === 'complete'
+              ? 'Complete task'
+              : current.action === 'order'
+                ? 'Place order'
+                : current.action === 'round'
+                  ? 'Save round'
+                  : 'Save observation'
+        }}
+      </button>
+    </form>
+  }
+</dialog>

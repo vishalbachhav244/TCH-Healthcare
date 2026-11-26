@@ -161,6 +161,13 @@
                       <button
                         class="text-button"
                         type="button"
+                        (click)="open('team', teamDialog, row)"
+                      >
+                        Assign care team
+                      </button>
+                      <button
+                        class="text-button"
+                        type="button"
                         (click)="open('discharge', admissionDialog, row)"
                       >
                         Discharge
@@ -185,6 +192,23 @@
     </section>
   }
 }
+<dialog #teamDialog (close)="task.set(undefined)" aria-labelledby="ward-team-editor-title">
+  <div class="dialog-head">
+    <h2 id="ward-team-editor-title">Assign care team</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="teamDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (task() === 'team' && selected(); as row) {
+    <div class="dialog-body fields">
+      <p>
+        <strong>{{ row.patient.name }}</strong> · {{ row.patient.id }} · Bed
+        {{ location(row.admission.bedId) }}
+      </p>
+      <tc-ward-team-editor [admission]="row.admission" (saved)="teamSaved(teamDialog)" />
+    </div>
+  }
+</dialog>
 <dialog #admissionDialog (close)="task.set(undefined)" aria-labelledby="admission-dialog-title">
   <div class="dialog-head">
     <h2 id="admission-dialog-title">

@@ -793,7 +793,7 @@ paths:
   '/admissions/discharge':
     post:
       operationId: 'dischargePatient'
-      summary: 'Discharge and mark a bed for cleaning.'
+      summary: 'Discharge after all linked nursing tasks are closed, then mark the bed for cleaning.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -2946,6 +2946,510 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /admissions/care-team:
+    get:
+      operationId: getWardAssignmentOptions
+      summary: List eligible facility staff and the active admission care team.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - in: query
+          name: admissionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardAssignmentOptions"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+    patch:
+      operationId: assignInpatientCareTeam
+      summary: Assign an active physician and nurse at the expected admission and care
+        team versions.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - physician
+                - nurse
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                physician:
+                  type: string
+                nurse:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician:
+    get:
+      operationId: getAssignedInpatientWorklist
+      summary: Read active admissions assigned to the physician at this facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WardWorklistRow"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /nursing-station:
+    get:
+      operationId: getAssignedNursingWorklist
+      summary: Read active admissions assigned to the nurse at this facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WardWorklistRow"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/detail:
+    get:
+      operationId: getInpatientPhysicianDetail
+      summary: Read the assigned admission care plan, ward orders and observations.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - in: query
+          name: admissionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardDetail"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /nursing-station/detail:
+    get:
+      operationId: getNursingStationDetail
+      summary: Read the assigned admission care plan, nursing tasks and observations.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - in: query
+          name: admissionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WardDetail"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/rounds:
+    post:
+      operationId: recordPhysicianRound
+      summary: Record a structured round for an active assigned admission.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - focus
+                - summary
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                focus:
+                  type: string
+                  enum:
+                    - Daily review
+                    - Post-admission review
+                    - Care coordination
+                summary:
+                  type: string
+                  enum:
+                    - Reviewed with the ward team
+                    - Care plan discussed
+                    - Follow-up review requested
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/orders:
+    post:
+      operationId: placeWardOrder
+      summary: Place a structured ward order and create its linked nursing task
+        atomically.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - kind
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                kind:
+                  type: string
+                  enum:
+                    - Record ward observations
+                    - Document shift handover
+                    - Confirm mobility assistance
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/orders/cancel:
+    patch:
+      operationId: cancelWardOrder
+      summary: Cancel a pending nursing task and retain its linked order.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - taskId
+                - taskVersion
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                taskId:
+                  type: string
+                taskVersion:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /nursing-station/observations:
+    post:
+      operationId: recordWardObservation
+      summary: Record an observation on an active assigned admission.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - kind
+                - result
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                kind:
+                  type: string
+                  enum:
+                    - Ward observations
+                    - Shift handover
+                    - Mobility assistance
+                    - Comfort check
+                result:
+                  type: string
+                  enum:
+                    - Recorded
+                    - Physician review requested
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /nursing-station/tasks/start:
+    patch:
+      operationId: startNursingTask
+      summary: Move a pending task to in progress at its expected version.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - taskId
+                - taskVersion
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                taskId:
+                  type: string
+                taskVersion:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /nursing-station/tasks/complete:
+    patch:
+      operationId: completeNursingTask
+      summary: Complete an in-progress task and record its observation atomically.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - assignmentVersion
+                - taskId
+                - taskVersion
+                - result
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion:
+                  type: string
+                assignmentVersion:
+                  type: string
+                taskId:
+                  type: string
+                taskVersion:
+                  type: string
+                result:
+                  type: string
+                  enum:
+                    - Recorded
+                    - Physician review requested
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -4432,6 +4936,285 @@ components:
           anyOf:
             - $ref: "#/components/schemas/FollowUpDetails"
             - type: "null"
+    WardAssignmentOptions:
+      type: object
+      required:
+        - physicians
+        - nurses
+        - assignment
+      properties:
+        physicians:
+          type: array
+          items:
+            type: object
+            required:
+              - account
+              - name
+            properties:
+              account:
+                type: string
+              name:
+                type: string
+        nurses:
+          type: array
+          items:
+            type: object
+            required:
+              - account
+              - name
+            properties:
+              account:
+                type: string
+              name:
+                type: string
+        assignment:
+          anyOf:
+            - type: object
+              required:
+                - physician
+                - nurse
+                - version
+              properties:
+                physician:
+                  type: string
+                nurse:
+                  type: string
+                version:
+                  type: integer
+                  minimum: 0
+            - type: "null"
+    WardWorklistRow:
+      type: object
+      required:
+        - admission
+        - patient
+        - bed
+        - openTasks
+        - completedTasks
+      properties:
+        admission:
+          type: object
+          required:
+            - id
+            - version
+          properties:
+            id:
+              type: string
+            version:
+              type: integer
+              minimum: 0
+            admittedAt:
+              type: integer
+              minimum: 0
+        patient:
+          type: object
+          required:
+            - id
+            - name
+            - initials
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            initials:
+              type: string
+        bed:
+          type: object
+          required:
+            - label
+            - ward
+          properties:
+            label:
+              type: string
+            ward:
+              type: string
+        openTasks:
+          type: integer
+          minimum: 0
+        completedTasks:
+          type: integer
+          minimum: 0
+    WardRoundEntry:
+      type: object
+      required:
+        - id
+        - actor
+        - createdAt
+        - focus
+        - summary
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+        createdAt:
+          type: integer
+          minimum: 0
+        focus:
+          type: string
+          enum:
+            - Daily review
+            - Post-admission review
+            - Care coordination
+        summary:
+          type: string
+          enum:
+            - Reviewed with the ward team
+            - Care plan discussed
+            - Follow-up review requested
+    WardObservationEntry:
+      type: object
+      required:
+        - id
+        - actor
+        - createdAt
+        - kind
+        - result
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+        createdAt:
+          type: integer
+          minimum: 0
+        kind:
+          type: string
+          enum:
+            - Ward observations
+            - Shift handover
+            - Mobility assistance
+            - Comfort check
+        result:
+          type: string
+          enum:
+            - Recorded
+            - Physician review requested
+        taskId:
+          type: string
+    WardOrderEntry:
+      type: object
+      required:
+        - id
+        - kind
+        - physician
+        - orderedAt
+        - task
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+            - Record ward observations
+            - Document shift handover
+            - Confirm mobility assistance
+        physician:
+          type: string
+        orderedAt:
+          type: integer
+          minimum: 0
+        task:
+          type: object
+          required:
+            - id
+            - status
+            - version
+            - updatedAt
+            - updatedBy
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum:
+                - Pending
+                - In progress
+                - Completed
+                - Cancelled
+            version:
+              type: integer
+              minimum: 0
+            updatedAt:
+              type: integer
+              minimum: 0
+            updatedBy:
+              type: string
+    WardDetail:
+      type: object
+      required:
+        - admission
+        - patient
+        - bed
+        - team
+        - rounds
+        - observations
+        - orders
+      properties:
+        admission:
+          type: object
+          required:
+            - id
+            - version
+          properties:
+            id:
+              type: string
+            version:
+              type: integer
+              minimum: 0
+            admittedAt:
+              type: integer
+              minimum: 0
+        patient:
+          type: object
+          required:
+            - id
+            - name
+            - initials
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            initials:
+              type: string
+        bed:
+          type: object
+          required:
+            - label
+            - ward
+          properties:
+            label:
+              type: string
+            ward:
+              type: string
+        team:
+          type: object
+          required:
+            - physician
+            - nurse
+            - version
+          properties:
+            physician:
+              type: string
+            nurse:
+              type: string
+            version:
+              type: integer
+              minimum: 0
+        rounds:
+          type: array
+          items:
+            $ref: "#/components/schemas/WardRoundEntry"
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/WardObservationEntry"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/WardOrderEntry"
   responses:
     Error401:
       description: 'Missing or expired session.'

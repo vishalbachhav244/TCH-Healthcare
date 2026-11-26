@@ -22,6 +22,7 @@ import {
   recipientRequests,
 } from './interoperability';
 import { clinicalGovernance, qualityRegister } from './governance';
+import { wardAssignmentOptions, wardDetail, wardWorklist } from './ward-care';
 
 export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   const url = new URL(request.urlWithParams, location.origin);
@@ -72,6 +73,10 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'scheduling/waitlist/status',
     'scheduling/exceptions/release',
     'quality/cases/status',
+    'admissions/care-team',
+    'inpatient-physician/orders/cancel',
+    'nursing-station/tasks/start',
+    'nursing-station/tasks/complete',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -231,6 +236,41 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     case 'beds': {
       const facility = scope(session, facilityRecord, 'D19');
       return board(facility, session.facilityAccess[facility.id].writes.includes('beds'));
+    }
+    case 'admissions/care-team':
+      return wardAssignmentOptions(
+        scope(session, facilityRecord, 'D19', 'beds'),
+        params.get('admissionId') ?? '',
+      );
+    case 'inpatient-physician':
+    case 'nursing-station':
+    case 'inpatient-physician/detail':
+    case 'nursing-station/detail': {
+      const role = path.startsWith('inpatient-physician')
+        ? 'inpatient-physician'
+        : 'nursing-station';
+      const facility = scope(
+        session,
+        facilityRecord,
+        role === 'inpatient-physician' ? 'D14' : 'D15',
+      );
+      return db.transaction(
+        'r',
+        [
+          db.wardAssignments,
+          db.admissions,
+          db.patients,
+          db.beds,
+          db.wardRounds,
+          db.wardOrders,
+          db.nursingTasks,
+          db.wardObservations,
+        ],
+        async () =>
+          path.endsWith('/detail')
+            ? wardDetail(facility, session, role, params.get('admissionId') ?? '')
+            : wardWorklist(facility, session, role),
+      );
     }
     case 'laboratory':
       return listLaboratory(scope(session, facilityRecord, 'D20'), params);

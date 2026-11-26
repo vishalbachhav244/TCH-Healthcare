@@ -21,6 +21,7 @@ import { inpatientCommand } from './inpatient';
 import { laboratoryCommand } from './laboratory';
 import { pharmacyCommand } from './pharmacy';
 import { governanceCommand } from './governance';
+import { assignWardTeam, wardCareCommand } from './ward-care';
 
 export const services = [
   { description: 'Outpatient consultation', unitMinor: 75000 },
@@ -83,6 +84,11 @@ export async function command(
       db.waitlist,
       db.scheduleExceptions,
       db.followUps,
+      db.wardAssignments,
+      db.wardRounds,
+      db.wardOrders,
+      db.nursingTasks,
+      db.wardObservations,
     ],
     async () => {
       const session = await requireSession(token);
@@ -430,6 +436,34 @@ export async function command(
           changed = await inpatientCommand(
             path,
             scope(session, facilityRecord, 'D19', 'beds'),
+            payload,
+          );
+          break;
+        case 'admissions/care-team': {
+          const facility = scope(session, facilityRecord, 'D19', 'beds');
+          const id = await assignWardTeam(facility, payload);
+          changed = { ...event(facility, 'WardTeamAssigned', id), actor: session.account };
+          break;
+        }
+        case 'inpatient-physician/rounds':
+        case 'inpatient-physician/orders':
+        case 'inpatient-physician/orders/cancel':
+          changed = await wardCareCommand(
+            path,
+            scope(session, facilityRecord, 'D14', 'inpatient-physician'),
+            session,
+            'inpatient-physician',
+            payload,
+          );
+          break;
+        case 'nursing-station/observations':
+        case 'nursing-station/tasks/start':
+        case 'nursing-station/tasks/complete':
+          changed = await wardCareCommand(
+            path,
+            scope(session, facilityRecord, 'D15', 'nursing-station'),
+            session,
+            'nursing-station',
             payload,
           );
           break;
