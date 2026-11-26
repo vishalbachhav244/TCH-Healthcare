@@ -21,6 +21,8 @@ export type Resource =
   | 'beds'
   | 'billing'
   | 'laboratory'
+  | 'radiology'
+  | 'blood-bank'
   | 'pharmacy'
   | 'portal';
 
@@ -180,9 +182,22 @@ export const workspaces: readonly Workspace[] = [
     icon: 'flask',
     resource: 'laboratory',
   },
-  { id: 'D21', title: 'Radiology & Imaging', group: 'Diagnostics', icon: 'monitor' },
+  {
+    id: 'D21',
+    title: 'Radiology & Imaging',
+    group: 'Diagnostics',
+    icon: 'scan',
+    resource: 'radiology',
+  },
   { id: 'D22', title: 'Pharmacy', group: 'Diagnostics', icon: 'cross', resource: 'pharmacy' },
-  { id: 'D23', title: 'Blood Bank', group: 'Diagnostics', icon: 'heart' },
+  {
+    id: 'D23',
+    title: 'Blood Bank',
+    group: 'Diagnostics',
+    icon: 'heart',
+    resource: 'blood-bank',
+    inpatient: true,
+  },
   {
     id: 'D24',
     title: 'Patient Billing & Cashier',
@@ -245,7 +260,9 @@ export const navigation = [
   { title: 'Operation theatre', resource: 'operation-theatre', icon: 'calendar', workspace: 'D18' },
   { title: 'Bed management', resource: 'beds', icon: 'bed', workspace: 'D19' },
   { title: 'Laboratory', resource: 'laboratory', icon: 'flask', workspace: 'D20' },
+  { title: 'Radiology & imaging', resource: 'radiology', icon: 'scan', workspace: 'D21' },
   { title: 'Pharmacy', resource: 'pharmacy', icon: 'cross', workspace: 'D22' },
+  { title: 'Blood bank', resource: 'blood-bank', icon: 'heart', workspace: 'D23' },
   { title: 'Revenue cycle', resource: 'billing', icon: 'wallet', workspace: 'D24' },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
 ] as const;

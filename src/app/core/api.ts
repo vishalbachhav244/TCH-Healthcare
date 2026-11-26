@@ -12,6 +12,13 @@ import type {
   Session,
 } from '../domain/operations';
 import type { LabRow, LabStage } from '../domain/diagnostics';
+import type { ImagingAction, ImagingOrder, ImagingRow, ImagingStudy } from '../domain/radiology';
+import type {
+  BloodAction,
+  BloodBankView,
+  BloodComponent,
+  WardBloodRequest,
+} from '../domain/blood-bank';
 import type { PatientPortal } from '../domain/portal';
 import type {
   DischargeDocument,
@@ -207,6 +214,85 @@ export class Api {
   prescriptions(token: string, facility: string, encounterId: string) {
     return this.get('clinical/prescriptions', token, facility, { encounterId }).pipe(
       map((value) => collection<Prescription>(value, ['id', 'productId', 'quantity', 'status'])),
+    );
+  }
+
+  imagingOrders(token: string, facility: string, encounterId: string) {
+    return this.get('clinical/imaging-orders', token, facility, { encounterId }).pipe(
+      map((value) => collection<ImagingOrder>(value, ['id', 'study', 'status', 'version'])),
+    );
+  }
+
+  requestImaging(token: string, facility: string, encounterId: string, study: ImagingStudy) {
+    return this.execute('clinical/imaging-orders', token, facility, { encounterId, study });
+  }
+
+  radiology(token: string, facility: string) {
+    return this.get('radiology', token, facility).pipe(
+      map((value) => collection<ImagingRow>(value, ['order', 'patient'])),
+    );
+  }
+
+  updateImaging(
+    token: string,
+    facility: string,
+    record: Pick<ImagingOrder, 'id' | 'version'>,
+    action: ImagingAction,
+  ) {
+    return this.execute(
+      'radiology/orders/status',
+      token,
+      facility,
+      { orderId: record.id, version: String(record.version), ...action },
+      'PATCH',
+    );
+  }
+
+  bloodBank(token: string, facility: string) {
+    return this.get('blood-bank', token, facility).pipe(
+      map((value) => objectShape<BloodBankView>(value, ['requests', 'units'])),
+    );
+  }
+
+  requestBloodComponent(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    component: BloodComponent,
+  ) {
+    return this.execute('inpatient-physician/blood-requests', token, facility, {
+      ...this.wardVersions(context),
+      component,
+    });
+  }
+
+  withdrawBloodRequest(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    request: WardBloodRequest,
+  ) {
+    return this.execute(
+      'inpatient-physician/blood-requests/withdraw',
+      token,
+      facility,
+      { ...this.wardVersions(context), requestId: request.id, version: String(request.version) },
+      'PATCH',
+    );
+  }
+
+  updateBloodRequest(
+    token: string,
+    facility: string,
+    request: WardBloodRequest,
+    action: BloodAction,
+  ) {
+    return this.execute(
+      'blood-bank/requests/status',
+      token,
+      facility,
+      { requestId: request.id, version: String(request.version), ...action },
+      'PATCH',
     );
   }
 
@@ -650,6 +736,7 @@ export class Api {
           'appointments',
           'records',
           'dischargeSummaries',
+          'imagingReports',
           'followUps',
           'invoices',
         ]),

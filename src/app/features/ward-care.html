@@ -405,6 +405,44 @@
           <p class="subtle">No discharge draft has been saved.</p>
         }
       </section>
+      <section class="panel portal-list" aria-labelledby="ward-blood-title">
+        <div class="panel-heading">
+          <div>
+            <h2 id="ward-blood-title">Blood component requests</h2>
+            <p>Track component requests and issue status for this admission.</p>
+          </div>
+          @if (store.writeAllowed(role)) {
+            <button
+              class="button secondary"
+              type="button"
+              (click)="openBloodRequest(wardEditor, record)"
+            >
+              Request component
+            </button>
+          }
+        </div>
+        @for (item of record.bloodRequests ?? []; track item.id) {
+          <article>
+            <div>
+              <strong>{{ item.component }}</strong>
+              <p>
+                <span [class]="item.status | statusTone">{{ item.status }}</span>
+              </p>
+            </div>
+            @if (item.status === 'Requested' && store.writeAllowed(role)) {
+              <button
+                class="text-button"
+                type="button"
+                (click)="openBloodRequest(wardEditor, record, item)"
+              >
+                Withdraw request
+              </button>
+            }
+          </article>
+        } @empty {
+          <p class="subtle">No blood components have been requested for this admission.</p>
+        }
+      </section>
     }
   }
 }
@@ -504,6 +542,19 @@
             </div>
           </dl>
         }
+        @case ('request-blood') {
+          <label for="ward-blood-component">Blood component</label>
+          <select id="ward-blood-component" [formControl]="bloodComponent" required>
+            <option value="">Choose a component</option>
+            @for (item of bloodComponents; track item) {
+              <option>{{ item }}</option>
+            }
+          </select>
+          <p class="subtle">Blood Bank reviews the request and selects a unit.</p>
+        }
+        @case ('withdraw-blood') {
+          <p>Withdraw the request for {{ current.request.component.toLowerCase() }}?</p>
+        }
       }
       @if (current.action === 'observation' || current.action === 'complete') {
         <label for="ward-observation-result">Observation status</label>
@@ -517,22 +568,12 @@
       @if (editorError()) {
         <p class="field-error" role="alert">{{ editorError() }}</p>
       }
-      <button type="submit" class="button primary" [disabled]="busy()">
-        {{
-          current.action === 'cancel'
-            ? 'Confirm cancellation'
-            : current.action === 'complete'
-              ? 'Complete task'
-              : current.action === 'order'
-                ? 'Place order'
-                : current.action === 'round'
-                  ? 'Save round'
-                  : current.action === 'discharge'
-                    ? 'Save discharge draft'
-                    : current.action === 'sign-discharge'
-                      ? 'Confirm signature'
-                      : 'Save observation'
-        }}
+      <button
+        type="submit"
+        class="button primary"
+        [disabled]="busy() || (current.action === 'request-blood' && !bloodComponent.value)"
+      >
+        {{ submitLabels[current.action] }}
       </button>
     </form>
   }

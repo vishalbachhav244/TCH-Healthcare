@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Radiology and Blood Bank, 26 November 2026
+
+- Added D21 `/work/radiology` for imaging orders, room scheduling, acquisition and report release. The assigned outpatient clinician can order a study and read its released summary. The patient portal shows its own released report.
+- Added D23 `/work/blood-bank` for admission-linked component requests, inventory, recorded review, reservation and issue. An open request blocks discharge. Expired units cannot be reserved or issued. Releasing a reservation restores the unit’s stock state.
+- Updated route and role configuration, the typed API, radiology and blood bank domain and mock adapters, consultation, ward and patient views, and OpenAPI. Verified the V17 to V18 upgrade with a preserved encounter, inpatient ledger and invoice and working diagnostic memberships.
+- Coverage is 24 dashboard IDs with partial routes and 12 open. Imaging attachments, configurable equipment, report corrections, blood testing records and stock receiving and returns remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Modality schedule](screenshots/radiology-schedule-1440.png) · [Imaging report](screenshots/imaging-report-390.png) · [Blood Bank review](screenshots/blood-bank-review-390.png)
+
 ## Discharge documentation and inpatient billing, 26 November 2026
 
 - Extended D14 and D19 with a versioned discharge draft, physician sign-off, a release gate and a read-only summary. D12 can view and download its own released summaries. Admissions without an assigned care team retain their administrative discharge path.

@@ -9,6 +9,7 @@ import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
+import { bloodComponents, type BloodComponent, type WardBloodRequest } from '../domain/blood-bank';
 import {
   dischargeCourses,
   dischargeDestinations,
@@ -35,7 +36,21 @@ type Editor = { context: WardRecordVersion } & (
   | { action: 'round' | 'order' | 'observation' }
   | { action: 'complete' | 'cancel'; order: WardOrderRow }
   | { action: 'discharge' | 'sign-discharge'; planVersion: number }
+  | { action: 'request-blood' }
+  | { action: 'withdraw-blood'; request: WardBloodRequest }
 );
+
+const submitLabels: Record<Editor['action'], string> = {
+  round: 'Save round',
+  order: 'Place order',
+  observation: 'Save observation',
+  complete: 'Complete task',
+  cancel: 'Confirm cancellation',
+  discharge: 'Save discharge draft',
+  'sign-discharge': 'Confirm signature',
+  'request-blood': 'Send request',
+  'withdraw-blood': 'Confirm withdrawal',
+};
 
 @Component({
   imports: [DatePipe, NgIcon, ReactiveFormsModule, RouterLink, StatusTone],
@@ -81,6 +96,9 @@ export class WardCare {
   protected readonly order = this.forms.control<WardOrderKind | ''>('');
   protected readonly observation = this.forms.control<ObservationKind | ''>('');
   protected readonly result = this.forms.control<ObservationResult | ''>('');
+  protected readonly bloodComponents = bloodComponents;
+  protected readonly bloodComponent = this.forms.control<BloodComponent | ''>('');
+  protected readonly submitLabels = submitLabels;
   protected readonly destinations = dischargeDestinations;
   protected readonly courses = dischargeCourses;
   protected readonly followUps = dischargeFollowUps;
@@ -152,6 +170,10 @@ export class WardCare {
         return 'Prepare discharge summary';
       case 'sign-discharge':
         return 'Sign discharge summary';
+      case 'request-blood':
+        return 'Request blood component';
+      case 'withdraw-blood':
+        return 'Withdraw component request';
       default:
         return 'Ward care';
     }
@@ -265,6 +287,21 @@ export class WardCare {
         'Discharge summary signed.',
         true,
       );
+    } else if (editor.action === 'request-blood') {
+      const component = this.bloodComponent.value;
+      if (!component) return;
+      success = await this.save(
+        (token, facility) => this.api.requestBloodComponent(token, facility, context, component),
+        'Component request sent to Blood Bank.',
+        true,
+      );
+    } else if (editor.action === 'withdraw-blood') {
+      success = await this.save(
+        (token, facility) =>
+          this.api.withdrawBloodRequest(token, facility, context, editor.request),
+        'Component request withdrawn.',
+        true,
+      );
     } else if (editor.action === 'cancel') {
       success = await this.save(
         (token, facility) =>
@@ -285,7 +322,22 @@ export class WardCare {
     this.order.reset();
     this.observation.reset();
     this.result.reset();
+    this.bloodComponent.reset();
     dialog.showModal();
+  }
+
+  protected openBloodRequest(
+    dialog: HTMLDialogElement,
+    detail: WardDetail,
+    request?: WardBloodRequest,
+  ) {
+    const context = this.version(detail);
+    this.openEditor(
+      dialog,
+      request
+        ? { context, request, action: 'withdraw-blood' }
+        : { context, action: 'request-blood' },
+    );
   }
 
   private version(detail: WardDetail): WardRecordVersion {

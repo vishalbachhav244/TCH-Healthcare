@@ -15,6 +15,8 @@ import type { PatientPortal } from '../domain/portal';
 import type { DischargeDocument, InpatientBillingDetail } from '../domain/discharge';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
+import type { ImagingOrder, ImagingRow } from '../domain/radiology';
+import type { BloodBankView } from '../domain/blood-bank';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -56,6 +58,351 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('radiology', () => {
+  it('schedules a clinician’s order once and releases the report only through Radiology review', async () => {
+    const facility = 'mer-central';
+    const patientId = 'TC-MERIDIAN-01001';
+    const practitionerId = 'mer-central-DR-1';
+    const [clinician, reception, technician, reviewer, patient] = await Promise.all(
+      ['clinician', 'reception', 'imaging', 'radiologist', 'patient'].map(login),
+    );
+    await expect(get('radiology', reception, facility)).rejects.toMatchObject({ status: 403 });
+    const otherEncounter = (await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.practitionerId !== practitionerId)
+      .first())!;
+    await expect(
+      get('clinical/imaging-orders?encounterId=' + otherEncounter.id, clinician, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    const today = dayInIndia();
+    const booked = (await post(
+      'appointments',
+      { patientId, practitionerId, day: today, time: '15:30' },
+      reception,
+      facility,
+    )) as { id: string; pass: string };
+    await post('queue/check-in', { pass: booked.pass }, reception, facility);
+    await post('queue/call', { appointmentId: booked.id }, reception, facility);
+    const { id: encounterId } = (await post(
+      'clinical/start',
+      { appointmentId: booked.id },
+      clinician,
+      facility,
+    )) as { id: string };
+    const fields = { encounterId, study: 'Chest radiograph' };
+    await expect(
+      post('clinical/imaging-orders', fields, reception, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('clinical/imaging-orders', { ...fields, study: 'unknown' }, clinician, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const { id: orderId } = (await post(
+      'clinical/imaging-orders',
+      fields,
+      clinician,
+      facility,
+    )) as { id: string };
+    await expect(
+      post('clinical/imaging-orders', fields, clinician, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const { id: second } = (await post(
+      'clinical/imaging-orders',
+      { encounterId, study: 'Abdominal ultrasound' },
+      clinician,
+      facility,
+    )) as { id: string };
+    const route = 'radiology/orders/status';
+    const change = (version: string, action: string, user: Session, extra = {}, at = facility) =>
+      patch(route, { orderId, version, action, ...extra }, user, at);
+    await expect(
+      change('1', 'schedule', technician, { day: today, time: '13:00' }, 'mer-north'),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(change('1', 'publish', reviewer)).rejects.toMatchObject({ status: 409 });
+    await expect(
+      change('1', 'schedule', reviewer, { day: today, time: '13:00' }),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      change('1', 'schedule', technician, { day: shiftDay(today, -1), time: '13:00' }),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      change('1', 'schedule', technician, { day: today, time: '09:00' }),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('already reserved') });
+    const schedule = { action: 'schedule', day: today, time: '13:00', version: '1' };
+    await change('1', 'schedule', technician, schedule);
+    await expect(
+      patch(route, { orderId: second, ...schedule }, technician, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(change('1', 'acquire', technician)).rejects.toMatchObject({ status: 409 });
+    await change('2', 'schedule', technician, { day: today, time: '13:30' });
+    expect(await db.imagingOrders.get(orderId)).toMatchObject({
+      scheduledTime: '13:30',
+      version: 3,
+    });
+    await change('3', 'acquire', technician);
+    await expect(
+      change('4', 'report', technician, { note: 'Image series documented' }),
+    ).rejects.toMatchObject({ status: 403 });
+    await change('4', 'report', reviewer, { note: 'Image series documented' });
+    const patientReports = async () =>
+      ((await get('portal', patient, facility)) as PatientPortal).imagingReports;
+    expect(await patientReports()).toEqual([]);
+    const orderFor = async (user: Session) =>
+      ((await get('radiology', user, facility)) as ImagingRow[]).find(
+        (row) => row.order.id === orderId,
+      )?.order;
+    expect(await orderFor(technician)).not.toHaveProperty('note');
+    expect(await orderFor(reviewer)).toMatchObject({
+      status: 'Report ready',
+      note: 'Image series documented',
+    });
+    const providerOrders = async () =>
+      (await get(
+        'clinical/imaging-orders?encounterId=' + encounterId,
+        clinician,
+        facility,
+      )) as ImagingOrder[];
+    expect((await providerOrders()).find((row) => row.id === orderId)).not.toHaveProperty('note');
+    await change('5', 'publish', reviewer);
+    expect(await orderFor(technician)).not.toHaveProperty('note');
+    expect(await patientReports()).toMatchObject([
+      { id: orderId, study: 'Chest radiograph', note: 'Image series documented' },
+    ]);
+    expect(await providerOrders()).toContainEqual(
+      expect.objectContaining({ id: orderId, status: 'Published', version: 6 }),
+    );
+    const foreign = ((await get('radiology', reviewer, facility)) as ImagingRow[]).find(
+      (row) => row.patient.id !== patientId && row.order.status === 'Report ready',
+    )!;
+    await patch(
+      route,
+      { orderId: foreign.order.id, version: String(foreign.order.version), action: 'publish' },
+      reviewer,
+      facility,
+    );
+    expect((await patientReports()).map((row) => row.id)).toEqual([orderId]);
+    await expect(
+      change('6', 'report', reviewer, { note: 'Ordering team review requested' }),
+    ).rejects.toMatchObject({ status: 409 });
+    await post(
+      'clinical/complete',
+      { appointmentId: booked.id, observation: 'Observation completed. Follow-up discussed.' },
+      clinician,
+      facility,
+    );
+    await expect(
+      post(
+        'clinical/imaging-orders',
+        { encounterId, study: 'Extremity radiograph' },
+        clinician,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  }, 90_000);
+});
+
+describe('blood bank', () => {
+  it('validates assignment, expiry and review and accounts for one reserved or issued unit', async () => {
+    const facility = 'mer-central';
+    const patientId = 'TC-MERIDIAN-01198';
+    const [physician, otherPhysician, nurse, admissions, officer] = await Promise.all(
+      ['wardphysician', 'wardcover', 'wardnurse', 'admissions', 'bloodbank'].map(login),
+    );
+    const beds = await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .toArray();
+    const { id: admissionId } = (await post('admissions', { patientId }, admissions, facility)) as {
+      id: string;
+    };
+    await post(
+      'admissions/allocate',
+      { admissionId, version: '1', bedId: beds[0].id },
+      admissions,
+      facility,
+    );
+    const context = { admissionId, admissionVersion: '2', assignmentVersion: '1' };
+    await patch(
+      'admissions/care-team',
+      { ...context, assignmentVersion: '0', physician: 'wardphysician', nurse: 'wardnurse' },
+      admissions,
+      facility,
+    );
+    const requestPath = 'inpatient-physician/blood-requests';
+    const fields = { ...context, component: 'Red cells' };
+    await expect(post(requestPath, fields, nurse, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(post(requestPath, fields, otherPhysician, facility)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      post(requestPath, { ...fields, component: 'Unknown' }, physician, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const { id: requestId } = (await post(requestPath, fields, physician, facility)) as {
+      id: string;
+    };
+    await expect(post(requestPath, fields, physician, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(get('blood-bank', nurse, facility)).rejects.toMatchObject({ status: 403 });
+    const inventory = async () => (await get('blood-bank', officer, facility)) as BloodBankView;
+    expect(
+      (await inventory()).requests.find((row) => row.request.id === requestId)?.patient.id,
+    ).toBe(patientId);
+    const { units } = await inventory();
+    const available = units.find(
+      (row) => row.component === fields.component && row.status === 'Available',
+    )!;
+    const expired = units.find(
+      (row) => row.component === fields.component && row.status === 'Expired',
+    )!;
+    const actionPath = 'blood-bank/requests/status';
+    const reserve = {
+      requestId,
+      version: '1',
+      action: 'reserve',
+      review: 'recorded',
+      unitId: available.id,
+    };
+    await expect(patch(actionPath, reserve, officer, 'mer-north')).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      patch(actionPath, { ...reserve, action: 'issue' }, officer, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      patch(actionPath, { ...reserve, review: '' }, officer, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      patch(actionPath, { ...reserve, unitId: expired.id }, officer, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const outcomes = await Promise.allSettled([
+      patch(actionPath, reserve, officer, facility),
+      patch(actionPath, reserve, officer, facility),
+    ]);
+    expect(outcomes.filter((row) => row.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    expect((await inventory()).units.find((row) => row.id === available.id)).toMatchObject({
+      status: 'Reserved',
+      requestId,
+    });
+    const draft = {
+      ...context,
+      planVersion: '0',
+      destination: 'Home',
+      course: 'Ward care reviewed',
+      followUp: 'Follow-up to be confirmed',
+    };
+    await post('inpatient-physician/discharge-summary', draft, physician, facility);
+    await patch(
+      'inpatient-physician/discharge-summary/sign',
+      { ...context, planVersion: '1' },
+      physician,
+      facility,
+    );
+    const discharge = { admissionId, version: '2' };
+    await expect(
+      post('admissions/discharge', discharge, admissions, facility),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('blood component') });
+    await expect(
+      patch(
+        requestPath + '/withdraw',
+        { ...context, requestId, version: '2' },
+        physician,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await db.bloodUnits.update(available.id, { expiresOn: shiftDay(dayInIndia(), -1) });
+    await expect(
+      patch(actionPath, { requestId, version: '2', action: 'issue' }, officer, facility),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('expired') });
+    expect(
+      (await inventory()).requests.find((row) => row.request.id === requestId)?.reservedUnitExpired,
+    ).toBe(true);
+    await patch(actionPath, { requestId, version: '2', action: 'cancel' }, officer, facility);
+    await db.bloodUnits.update(available.id, { expiresOn: available.expiresOn });
+    expect((await inventory()).units.find((row) => row.id === available.id)?.status).toBe(
+      'Available',
+    );
+    const second = (await post(requestPath, fields, physician, facility)) as { id: string };
+    await patch(actionPath, { ...reserve, requestId: second.id }, officer, facility);
+    await patch(
+      actionPath,
+      { requestId: second.id, version: '2', action: 'issue' },
+      officer,
+      facility,
+    );
+    await expect(
+      patch(actionPath, { requestId: second.id, version: '3', action: 'issue' }, officer, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await inventory()).units.find((row) => row.id === available.id)).toMatchObject({
+      status: 'Issued',
+      requestId: second.id,
+    });
+    const ward = (await get(
+      'inpatient-physician/detail?admissionId=' + admissionId,
+      physician,
+      facility,
+    )) as WardDetail;
+    expect(ward.bloodRequests).toContainEqual({
+      id: second.id,
+      component: 'Red cells',
+      status: 'Issued',
+      version: 3,
+    });
+    const nurseDetail = (await get(
+      'nursing-station/detail?admissionId=' + admissionId,
+      nurse,
+      facility,
+    )) as WardDetail;
+    expect(nurseDetail.bloodRequests).toBeUndefined();
+    const declined = (await post(
+      requestPath,
+      { ...fields, component: 'Plasma' },
+      physician,
+      facility,
+    )) as { id: string };
+    await patch(
+      actionPath,
+      { requestId: declined.id, version: '1', action: 'decline' },
+      officer,
+      facility,
+    );
+    expect(await db.bloodRequests.get(declined.id)).toMatchObject({
+      status: 'Declined',
+      reviewedBy: 'bloodbank',
+    });
+    const third = (await post(
+      requestPath,
+      { ...fields, component: 'Plasma' },
+      physician,
+      facility,
+    )) as { id: string };
+    await patch(
+      requestPath + '/withdraw',
+      { ...context, requestId: third.id, version: '1' },
+      physician,
+      facility,
+    );
+    await post('admissions/discharge', discharge, admissions, facility);
+    await post('beds/release', { bedId: beds[0].id }, admissions, facility);
+    await db.facilities.update(facility, { inpatient: false });
+    try {
+      await expect(get('blood-bank', officer, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(patch(actionPath, reserve, officer, facility)).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await db.facilities.update(facility, { inpatient: true });
+    }
+  }, 90_000);
+});
 
 describe('emergency, ICU and theatre', () => {
   const facility = 'mer-central';

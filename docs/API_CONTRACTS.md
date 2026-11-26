@@ -7,3 +7,5 @@ The appointments, queue, clinical and laboratory worklists use zero-based offset
 Facility-local dates are ISO calendar days in Asia/Kolkata. Appointment times are 24-hour local strings. Current event timestamps are epoch milliseconds. Money uses integer INR minor units.
 
 Discharge summary commands check the admission, team and draft versions. The portal and Admissions can read a summary after release. Inpatient charge list and detail responses expose the admission account and its bed charges. Invoice creation uses the frozen ledger, requires acknowledgement for partial coverage and returns 409 if the admission already has an invoice.
+
+Imaging writes check the assigned encounter or the applicable technician and reviewer scope. Modality and patient conflicts return 409. Ordering clinician and portal responses include the report summary after the reviewer releases it. Blood component commands verify the active admission and current versions. Reserve and issue validate facility, component, expiry and custody.

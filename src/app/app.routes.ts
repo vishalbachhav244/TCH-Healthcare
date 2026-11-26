@@ -202,11 +202,25 @@ export const routes: Routes = [
         title: 'Laboratory · TrueCare',
       },
       {
+        path: 'radiology',
+        data: { resource: 'radiology' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/radiology').then((m) => m.Radiology),
+        title: 'Radiology & Imaging · TrueCare',
+      },
+      {
         path: 'pharmacy',
         data: { resource: 'pharmacy' },
         canActivate: [workspaceAccess],
         loadComponent: () => import('./features/pharmacy').then((m) => m.Pharmacy),
         title: 'Pharmacy · TrueCare',
+      },
+      {
+        path: 'blood-bank',
+        data: { resource: 'blood-bank' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/blood-bank').then((m) => m.BloodBank),
+        title: 'Blood Bank · TrueCare',
       },
       {
         path: 'portal',

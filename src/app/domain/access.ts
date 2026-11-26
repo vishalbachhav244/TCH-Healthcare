@@ -39,6 +39,9 @@ export const staffRoles = {
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },
   labReviewer: { label: 'Laboratory reviewer', workspaces: ['D20'], writes: ['laboratory/review'] },
+  imagingTechnician: { label: 'Imaging technician', workspaces: ['D21'], writes: ['radiology'] },
+  radiologyReviewer: { label: 'Radiologist', workspaces: ['D21'], writes: ['radiology/review'] },
+  bloodBank: { label: 'Blood bank officer', workspaces: ['D23'], writes: ['blood-bank'] },
   clinicOperator: {
     label: 'Clinic operator',
     workspaces: ['D06', 'D09', 'D10', 'D11', 'D19'],

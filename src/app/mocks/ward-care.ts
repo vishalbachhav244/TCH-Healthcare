@@ -129,7 +129,8 @@ export async function wardDetail(
   id: string,
 ): Promise<WardDetail> {
   const { assignment, ...patient } = await assignedPatient(facility, session, role, id);
-  const [orders, tasks, rounds, observations, plan] = await Promise.all([
+  const physician = role === 'inpatient-physician';
+  const [orders, tasks, rounds, observations, plan, requests] = await Promise.all([
     db.wardOrders
       .where('admissionId')
       .equals(id)
@@ -150,11 +151,25 @@ export async function wardDetail(
       .equals(id)
       .filter((row) => row.facilityId === facility.id)
       .toArray(),
-    role === 'inpatient-physician' ? db.dischargePlans.get(id) : undefined,
+    physician ? db.dischargePlans.get(id) : undefined,
+    physician
+      ? db.bloodRequests
+          .where('admissionId')
+          .equals(id)
+          .filter((row) => row.facilityId === facility.id && row.patientId === patient.patient.id)
+          .toArray()
+      : [],
   ]);
   const taskByOrder = new Map(tasks.map((item) => [item.orderId, item]));
   return {
     ...patient,
+    ...(physician
+      ? {
+          bloodRequests: requests
+            .sort((a, b) => b.requestedAt - a.requestedAt)
+            .map(({ id, component, status, version }) => ({ id, component, status, version })),
+        }
+      : {}),
     ...(plan?.facilityId === facility.id && plan.patientId === patient.patient.id && !plan.release
       ? {
           dischargePlan: {

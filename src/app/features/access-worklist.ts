@@ -13,6 +13,7 @@ import { dayInIndia, observations, shiftDay, type AppointmentRow } from '../doma
 import { labCatalogue } from '../domain/diagnostics';
 import type { FollowUpSummary } from '../domain/continuity';
 import { ClinicalPrescriptions } from './clinical-prescriptions';
+import { ConsultationImaging } from './consultation-imaging';
 import { ConsultationContinuity } from './consultation-continuity';
 
 const headings = {
@@ -34,6 +35,7 @@ const states = {
 @Component({
   imports: [
     ClinicalPrescriptions,
+    ConsultationImaging,
     ConsultationContinuity,
     DatePipe,
     NgIcon,

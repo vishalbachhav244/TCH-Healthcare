@@ -24,7 +24,7 @@ async function scopedPatient(facility: Facility, patientId: string) {
   return patient;
 }
 
-async function assignedEncounter(facility: Facility, session: Session, id: string) {
+export async function assignedEncounter(facility: Facility, session: Session, id: string) {
   const encounter = await db.encounters.get(id);
   if (encounter?.facilityId !== facility.id) throw new ApiError(404, 'Encounter not found.');
   if (encounter.practitionerId !== session.facilityAccess[facility.id]?.practitionerId) {

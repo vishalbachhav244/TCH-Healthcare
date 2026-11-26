@@ -1,0 +1,295 @@
+<section class="page-intro">
+  <div>
+    <h1>Radiology &amp; Imaging</h1>
+    <p>Schedule ordered studies, record acquisitions and release imaging reports.</p>
+  </div>
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+<div class="view-controls" role="group" aria-label="Imaging views">
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'orders'"
+    (click)="show('orders')"
+  >
+    Imaging worklist
+  </button>
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'schedule'"
+    (click)="show('schedule')"
+  >
+    Modality schedule
+  </button>
+</div>
+@let response = data();
+@if (response.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading imaging orders…</p>
+} @else if (response.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ response.message }}</p>
+    <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid compact">
+    @for (metric of metrics(); track metric.label) {
+      <article class="panel metric">
+        <p>{{ metric.label }}</p>
+        <strong>{{ metric.count }}</strong>
+      </article>
+    }
+  </div>
+  <section class="panel table-panel" aria-labelledby="imaging-table-title">
+    <div class="panel-heading">
+      <h2 id="imaging-table-title">
+        {{ view() === 'orders' ? 'Imaging orders' : 'Room bookings' }}
+      </h2>
+    </div>
+    <div class="filter-bar">
+      @if (view() === 'orders') {
+        <label class="search-field"
+          ><ng-icon name="search" /><span class="sr-only">Find imaging order</span>
+          <input
+            type="search"
+            [formControl]="search"
+            placeholder="Search by patient or study"
+            (input)="visible.set(12)"
+          />
+        </label>
+        <div class="select-control">
+          <label for="imaging-status">Status</label>
+          <select id="imaging-status" [formControl]="status" (change)="visible.set(12)">
+            <option value="">All statuses</option>
+            @for (item of statuses; track item) {
+              <option>{{ item }}</option>
+            }
+          </select>
+        </div>
+      } @else {
+        <label class="date-filter"
+          ><span class="sr-only">Schedule date</span>
+          <input
+            #date
+            type="date"
+            [value]="day()"
+            (change)="date.value && day.set(date.value); visible.set(12)"
+          />
+        </label>
+      }
+      <div class="select-control">
+        <label for="imaging-modality">Modality</label>
+        <select id="imaging-modality" [formControl]="modality" (change)="visible.set(12)">
+          <option value="">All modalities</option>
+          @for (item of modalities; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (rows().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Imaging order table">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Imaging orders and bookings
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Patient and study</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="ward-desktop-context">Booking</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows().slice(0, visible()); track row.order.id) {
+              @let order = row.order;
+              <tr>
+                <td>
+                  <strong>{{ row.patient.name }}</strong
+                  ><small>{{ row.patient.id }}</small>
+                  <small>{{ order.study }}</small>
+                  @if (order.scheduledDay) {
+                    <small class="ward-mobile-context"
+                      >{{ order.scheduledDay + 'T12:00:00Z' | date: 'd MMM' : 'UTC' }} ·
+                      {{ order.scheduledTime }} IST · {{ exam(order.study)?.room }}</small
+                    >
+                  }
+                </td>
+                <td>
+                  <span [class]="order.status | statusTone">{{ order.status }}</span>
+                  @if (order.note) {
+                    <small>{{ order.note }}</small>
+                  }
+                </td>
+                <td class="ward-desktop-context">
+                  @if (order.scheduledDay) {
+                    {{ order.scheduledDay + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} ·
+                    {{ order.scheduledTime }} IST
+                    <small>{{ exam(order.study)?.room }}</small>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  @if (tech() && (order.status === 'Ordered' || order.status === 'Scheduled')) {
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="open(editorDialog, row, 'schedule')"
+                    >
+                      {{ order.status === 'Scheduled' ? 'Reschedule exam' : 'Schedule exam' }}
+                    </button>
+                    @if (order.status === 'Scheduled' && order.scheduledDay! <= today) {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open(editorDialog, row, 'acquire')"
+                      >
+                        Record acquisition
+                      </button>
+                    }
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="open(editorDialog, row, 'cancel')"
+                    >
+                      Cancel order
+                    </button>
+                  } @else if (
+                    reviewer() && (order.status === 'Acquired' || order.status === 'Report ready')
+                  ) {
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="open(editorDialog, row, 'report')"
+                    >
+                      {{ order.status === 'Acquired' ? 'Prepare report' : 'Edit report' }}
+                    </button>
+                    @if (order.status === 'Report ready' && order.reviewer === account()) {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open(editorDialog, row, 'publish')"
+                      >
+                        Review release
+                      </button>
+                    }
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (rows().length > visible()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="visible.set(visible() + 12)">
+            Show more imaging orders
+          </button>
+        </div>
+      }
+    } @else {
+      <p class="state-panel">
+        {{
+          view() === 'schedule'
+            ? 'No room bookings match this date and modality.'
+            : 'No imaging orders match these filters.'
+        }}
+      </p>
+    }
+  </section>
+}
+<dialog #editorDialog aria-labelledby="imaging-editor-title" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="imaging-editor-title">{{ title() }}</h2>
+    <button type="button" class="icon-button" aria-label="Close" (click)="editorDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as entry) {
+    <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="save(editorDialog)">
+      <div class="document-identity">
+        <strong>{{ entry.row.patient.name }}</strong>
+        <p>{{ entry.row.order.study }} · {{ exam(entry.row.order.study)?.room }}</p>
+      </div>
+      @switch (entry.action) {
+        @case ('schedule') {
+          <label for="imaging-day">Exam date</label>
+          <input
+            id="imaging-day"
+            type="date"
+            [min]="today"
+            [max]="latest"
+            formControlName="day"
+            (change)="form.controls.time.reset()"
+            required
+          />
+          <label for="imaging-time">Available time (IST)</label>
+          <select id="imaging-time" formControlName="time" required>
+            <option value="">Choose a time</option>
+            @for (item of availableTimes(); track item) {
+              <option>{{ item }}</option>
+            }
+          </select>
+          @if (!availableTimes().length) {
+            <p class="subtle">Choose a different date to see available times.</p>
+          }
+        }
+        @case ('report') {
+          <label for="imaging-note">Demo report summary</label>
+          <select id="imaging-note" formControlName="note" required>
+            <option value="">Choose a summary</option>
+            @for (item of notes; track item) {
+              <option>{{ item }}</option>
+            }
+          </select>
+        }
+        @case ('publish') {
+          <p>{{ entry.row.order.note }}</p>
+          <p class="subtle">The patient and ordering clinician can see the released report.</p>
+        }
+        @case ('acquire') {
+          <p>Confirm that acquisition is complete for this order.</p>
+        }
+        @case ('cancel') {
+          <p>Cancel this order and release any scheduled time.</p>
+        }
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button
+        type="submit"
+        class="button primary"
+        [disabled]="
+          busy() ||
+          (entry.action === 'schedule' && !form.controls.time.value) ||
+          (entry.action === 'report' && !form.controls.note.value)
+        "
+      >
+        @switch (entry.action) {
+          @case ('schedule') {
+            Save booking
+          }
+          @case ('report') {
+            Save imaging report
+          }
+          @case ('publish') {
+            Confirm release
+          }
+          @case ('acquire') {
+            Confirm acquisition
+          }
+          @case ('cancel') {
+            Confirm cancellation
+          }
+        }
+      </button>
+    </form>
+  }
+</dialog>

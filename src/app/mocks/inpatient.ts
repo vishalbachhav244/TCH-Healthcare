@@ -6,6 +6,7 @@ import { criticalCareWard, openTheatreCase } from '../domain/acute-care';
 import { requestAdmission } from './admission-records';
 import { releaseDischargeSummary } from './discharge';
 import { endBedStay, finalizeInpatientAccount, startBedStay } from './inpatient-billing';
+import { openBloodRequest } from '../domain/blood-bank';
 
 function pendingStepDown(facility: Facility, admissionId: string) {
   return db.icuStepDowns
@@ -127,6 +128,20 @@ export async function inpatientCommand(
         .first()
     ) {
       throw new ApiError(409, 'Complete or cancel open theatre cases before discharge.');
+    }
+    if (
+      await db.bloodRequests
+        .where('admissionId')
+        .equals(admission.id)
+        .filter(
+          (row) =>
+            row.facilityId === facility.id &&
+            row.patientId === admission.patientId &&
+            openBloodRequest(row),
+        )
+        .first()
+    ) {
+      throw new ApiError(409, 'Resolve open blood component requests before discharge.');
     }
     await releaseDischargeSummary(facility, admission, bed, time);
     await endBedStay(admission, bed, time);

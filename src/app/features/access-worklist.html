@@ -562,6 +562,7 @@
       @if (row.encounter; as encounter) {
         <tc-consultation-continuity [encounter]="encounter" />
         <div class="clinical-orders"><tc-clinical-prescriptions [encounter]="encounter" /></div>
+        <div class="clinical-orders"><tc-consultation-imaging [encounter]="encounter" /></div>
       }
       @if (row.encounter?.signedAt; as signed) {
         <p>{{ row.encounter?.observation }}</p>

@@ -25,6 +25,223 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('schedules imaging and releases the reviewed report to the patient', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(170_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  const patient = await page.context().newPage();
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Appointment pass', exact: true }).click();
+  const pass = patient.getByRole('dialog', { name: 'Appointment pass' });
+  const code = await pass.locator('code').innerText();
+  await pass.getByRole('button', { name: 'Close', exact: true }).click();
+  await patient.getByRole('button', { name: 'Reports', exact: true }).click();
+
+  await signIn(page, 'reception');
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  await page.getByRole('button', { name: 'Verify arrival' }).click();
+  const check = page.getByRole('dialog', { name: 'Verify arrival' });
+  await check.getByLabel('Appointment pass code').fill(code);
+  await check.getByRole('button', { name: 'Check in patient' }).click();
+  await page.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  await page
+    .getByRole('row', { name: new RegExp(patientId) })
+    .getByRole('button', { name: 'Call token' })
+    .click();
+
+  const clinician = await page.context().newPage();
+  await signIn(clinician, 'clinician');
+  await clinician.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  const clinical = clinician.getByRole('row', { name: new RegExp(patientId) });
+  await clinical.getByRole('button', { name: 'Start consultation' }).click();
+  await clinical.getByRole('button', { name: 'Review consultation' }).click();
+  const imaging = clinician.getByRole('region', { name: 'Consultation imaging' });
+  await imaging.getByLabel('Imaging study').selectOption('Chest radiograph');
+  await imaging.getByRole('button', { name: 'Order imaging' }).click();
+  await expect(imaging.getByText('Imaging order sent to Radiology.')).toBeVisible();
+  await imaging.getByLabel('Imaging study').selectOption('Extremity radiograph');
+  await imaging.getByRole('button', { name: 'Order imaging' }).click();
+  await expect(imaging.locator('strong').filter({ hasText: 'Extremity radiograph' })).toBeVisible();
+
+  const technician = await page.context().newPage();
+  await signIn(technician, 'imaging');
+  await expect(technician.getByRole('heading', { name: 'Radiology & Imaging' })).toBeVisible();
+  await technician.getByRole('searchbox', { name: 'Find imaging order' }).fill(patientId);
+  const chest = technician.getByRole('row', { name: new RegExp(patientId + '.*Chest radiograph') });
+  const scheduleButton = chest.getByRole('button', { name: 'Schedule exam', exact: true });
+  await scheduleButton.focus();
+  await technician.keyboard.press('Enter');
+  const editor = technician.getByRole('dialog', { name: 'Schedule exam' });
+  await expect(editor).toBeVisible();
+  await technician.keyboard.press('Escape');
+  await expect(scheduleButton).toBeFocused();
+  await scheduleButton.click();
+  await editor.getByLabel('Available time (IST)').selectOption('13:00');
+  await editor.getByRole('button', { name: 'Save booking' }).click();
+  await expect(chest).toContainText('Scheduled');
+  const second = technician.getByRole('row', {
+    name: new RegExp(patientId + '.*Extremity radiograph'),
+  });
+  await second.getByRole('button', { name: 'Schedule exam', exact: true }).click();
+  await expect(
+    editor.getByLabel('Available time (IST)').locator('option', { hasText: '13:00' }),
+  ).toHaveCount(0);
+  await technician.keyboard.press('Escape');
+  await second.getByRole('button', { name: 'Cancel order' }).click();
+  await technician.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect(second).toContainText('Cancelled');
+  await technician.getByRole('button', { name: 'Modality schedule' }).click();
+  await technician.getByLabel('Modality', { exact: true }).selectOption('X-ray');
+  await expect(chest).toContainText('13:00 IST');
+  await expect(second).toHaveCount(0);
+  await checkReflow(technician);
+  expect(
+    (
+      await new AxeBuilder({ page: technician })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await technician.screenshot({
+    path: testInfo.outputPath('radiology-schedule-1440.png'),
+    animations: 'disabled',
+  });
+  await chest.getByRole('button', { name: 'Record acquisition' }).click();
+  await technician.getByRole('button', { name: 'Confirm acquisition' }).click();
+  await expect(chest).toContainText('Acquired');
+  await expect(chest.getByRole('button', { name: 'Prepare report' })).toHaveCount(0);
+
+  const reviewer = await page.context().newPage();
+  await signIn(reviewer, 'radiologist');
+  await reviewer.getByRole('searchbox', { name: 'Find imaging order' }).fill(patientId);
+  const pending = reviewer.getByRole('row', { name: /Chest radiograph/ });
+  await pending.getByRole('button', { name: 'Prepare report' }).click();
+  const draft = reviewer.getByRole('dialog', { name: 'Prepare imaging report' });
+  await draft.getByLabel('Demo report summary').selectOption('Image series documented');
+  await draft.getByRole('button', { name: 'Save imaging report' }).click();
+  await expect(pending).toContainText('Report ready');
+  const openReport = patient.getByRole('button', { name: 'View imaging report' });
+  await expect(openReport).toHaveCount(0);
+  await expect(imaging.getByText('Image series documented')).toHaveCount(0);
+  await pending.getByRole('button', { name: 'Review release' }).click();
+  await reviewer.getByRole('button', { name: 'Confirm release' }).click();
+  await expect(pending).toContainText('Published');
+  await expect(imaging.getByText('Image series documented')).toBeVisible();
+  await patient.reload();
+  await patient.getByRole('button', { name: 'Reports', exact: true }).click();
+  await patient.setViewportSize({ width: 390, height: 844 });
+  await openReport.click();
+  const report = patient.getByRole('dialog', { name: 'Chest radiograph' });
+  await expect(report).toContainText('Image series documented');
+  expect(
+    (await new AxeBuilder({ page: patient }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await patient.screenshot({
+    path: testInfo.outputPath('imaging-report-390.png'),
+    animations: 'disabled',
+  });
+  await patient.goto('/work/radiology');
+  await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  for (const tab of [patient, clinician, technician, reviewer]) await tab.close();
+});
+
+test('hands a ward component request through review, reservation and issue', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(150_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  await signIn(page, 'admissions');
+  await page.getByRole('button', { name: 'Request admission' }).click();
+  const admission = page.getByRole('dialog', { name: 'Request admission' });
+  await admission.getByLabel('Find patient').fill(patientId);
+  await admission.getByLabel('Patient', { exact: true }).selectOption(patientId);
+  await admission.getByRole('button', { name: 'Request admission' }).click();
+  await page.getByLabel('Find admission').fill(patientId);
+  const admitted = page.getByRole('row', { name: new RegExp(patientId) });
+  await admitted.getByRole('button', { name: 'Allocate bed' }).click();
+  const allocate = page.getByRole('dialog', { name: 'Assign bed' });
+  await allocate.getByLabel('Available bed').selectOption({ index: 1 });
+  await allocate.getByRole('button', { name: 'Confirm bed allocation' }).click();
+  await admitted.getByRole('button', { name: 'Assign care team' }).click();
+  const team = page.getByRole('dialog', { name: 'Assign care team' });
+  await team.getByLabel('Inpatient physician').selectOption('wardphysician');
+  await team.getByLabel('Ward nurse').selectOption('wardnurse');
+  await team.getByRole('button', { name: 'Save care team' }).click();
+  await expect(page.getByText('Care team assigned.')).toBeVisible();
+
+  const physician = await page.context().newPage();
+  await signIn(physician, 'wardphysician');
+  await physician.getByRole('searchbox', { name: 'Find assigned patient' }).fill(patientId);
+  await physician
+    .getByRole('row', { name: new RegExp(patientId) })
+    .getByRole('link', { name: 'Open care plan' })
+    .click();
+  const plan = physician.getByRole('region', { name: 'Blood component requests' });
+  await plan.getByRole('button', { name: 'Request component' }).click();
+  const component = physician.getByRole('dialog', { name: 'Request blood component' });
+  await component.getByLabel('Blood component').selectOption('Red cells');
+  await component.getByRole('button', { name: 'Send request' }).click();
+  await expect(plan).toContainText('Requested');
+  await admitted.getByRole('button', { name: 'Discharge', exact: true }).click();
+  const discharge = page.getByRole('dialog', { name: 'Discharge patient' });
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(discharge.getByRole('alert')).toContainText('Resolve open blood component requests');
+  await discharge.getByRole('button', { name: 'Close', exact: true }).click();
+
+  const officer = await page.context().newPage();
+  await signIn(officer, 'bloodbank');
+  await expect(officer.getByRole('heading', { name: 'Blood Bank' })).toBeVisible();
+  await officer.getByRole('searchbox', { name: 'Find component request' }).fill(patientId);
+  const request = officer.getByRole('row', { name: new RegExp(patientId) });
+  const reviewButton = request.getByRole('button', { name: 'Review request', exact: true });
+  await checkReflow(officer);
+  await officer.setViewportSize({ width: 390, height: 844 });
+  await reviewButton.focus();
+  await officer.keyboard.press('Enter');
+  const review = officer.getByRole('dialog', { name: 'Review component request' });
+  await expect(review).toBeVisible();
+  await officer.keyboard.press('Escape');
+  await expect(reviewButton).toBeFocused();
+  await reviewButton.click();
+  const unit = review.getByLabel('Available component unit');
+  await expect(unit.locator('option', { hasText: 'BB-103' })).toHaveCount(0);
+  await unit.selectOption('mer-central-BB-101');
+  const reserve = review.getByRole('button', { name: 'Reserve unit' });
+  await expect(reserve).toBeDisabled();
+  await review.getByRole('checkbox', { name: /recorded the compatibility review/ }).check();
+  await expect(reserve).toBeEnabled();
+  expect(
+    (await new AxeBuilder({ page: officer }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await officer.screenshot({
+    path: testInfo.outputPath('blood-bank-review-390.png'),
+    animations: 'disabled',
+  });
+  await reserve.click();
+  await expect(plan).toContainText('Reserved');
+  await officer.reload();
+  const reserved = officer.getByRole('row', { name: new RegExp(patientId) });
+  await expect(reserved).toContainText('BB-101');
+  await reserved.getByRole('button', { name: 'Issue unit' }).click();
+  await officer.getByRole('button', { name: 'Confirm issue' }).click();
+  await expect(reserved).toContainText('Issued');
+  await expect(plan).toContainText('Issued');
+  await officer.getByRole('button', { name: 'Unit inventory' }).click();
+  await officer.getByLabel('Status', { exact: true }).selectOption('Issued');
+  await expect(officer.getByRole('row', { name: /BB-101/ })).toContainText('Issued');
+  await expect(officer.getByRole('row', { name: /BB-103/ })).toHaveCount(0);
+  await officer.goto('/work/radiology');
+  await expect(officer.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await officer.close();
+  await physician.close();
+});
+
 test('hands an emergency patient through ICU step-down and theatre recovery', async ({
   page,
 }, testInfo) => {
@@ -908,10 +1125,13 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   const nursing = await page.context().newPage();
   const theatre = await page.context().newPage();
   const cashier = await page.context().newPage();
+  const blood = await page.context().newPage();
   await signIn(ward, 'wardphysician');
   await signIn(nursing, 'wardnurse');
   await signIn(theatre, 'theatre');
   await signIn(cashier, 'cashier');
+  await signIn(blood, 'bloodbank');
+  await expect(blood.getByRole('heading', { name: 'Blood Bank' })).toBeVisible();
   const inpatientCharges = cashier.getByRole('button', { name: 'Inpatient charges' });
   await inpatientCharges.click();
   await expect(cashier.getByRole('heading', { name: 'Inpatient accounts' })).toBeVisible();
@@ -931,11 +1151,13 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(nursing.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(theatre.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(inpatientCharges).toHaveCount(0);
+  await expect(blood.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(cashier.getByRole('heading', { name: 'Invoices' })).toBeVisible();
   await ward.close();
   await nursing.close();
   await theatre.close();
   await cashier.close();
+  await blood.close();
   await staff.close();
 });
 

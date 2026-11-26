@@ -35,6 +35,9 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `theatre` | Theatre room schedule, readiness and recovery stages |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |
+| `imaging` | Imaging worklist, room scheduling and acquisition |
+| `radiologist` | Imaging report preparation and release |
+| `bloodbank` | Component request review, reservation, issue and unit inventory |
 | `cashier` | Consultation and inpatient invoices, bed charges and local settlement |
 | `patient` | Own appointments and follow-up booking, QR passes, published laboratory reports, released discharge summaries and billing balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
@@ -54,6 +57,10 @@ In **Bed Management**, `admissions` can allocate a bed and assign an inpatient p
 Use `emergency` to record a registered patient’s arrival, enter the clinician-assigned priority and request admission. Allocate a Critical care bed as `admissions` to show that patient in `icu`. Request step-down there and transfer the admission to a regular ward in Bed Management. Use `theatre` to book an active admission and record its readiness, in-theatre status, recovery and completion.
 
 In **Revenue Cycle**, `cashier` can review a stay under **Inpatient charges**. Discharge freezes the daily bed ledger. The cashier can issue one invoice for that stay and record a local settlement. The patient can see the balance under **Bills**.
+
+During an active consultation, `clinician` can order an imaging study. Use `imaging` to reserve a modality slot and record acquisition. Use `radiologist` to save and release the report. The ordering clinician and the patient’s **Reports** tab show the released summary.
+
+On an assigned admission, `wardphysician` can request a blood component and track its status. Use `bloodbank` to record a synthetic review, reserve a unit and issue it to the linked admission. The inventory shows which units are available, reserved, issued or expired.
 
 ## Verify
 

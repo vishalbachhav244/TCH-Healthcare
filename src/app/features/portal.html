@@ -149,6 +149,26 @@
     }
     @case ('records') {
       <section class="panel portal-list">
+        <h2>Released imaging reports</h2>
+        @for (report of response.data.imagingReports; track report.id) {
+          <article>
+            <div>
+              <strong>{{ report.study }}</strong>
+              <p>Released {{ report.publishedAt | date: 'd MMM y' : '+0530' }}</p>
+            </div>
+            <button
+              class="text-button"
+              type="button"
+              (click)="showImagingReport(report, imagingDialog)"
+            >
+              View imaging report
+            </button>
+          </article>
+        } @empty {
+          <p class="subtle">There are no released imaging reports at this facility.</p>
+        }
+      </section>
+      <section class="panel portal-list">
         <h2>Discharge summaries</h2>
         @for (summary of response.data.dischargeSummaries; track summary.admissionId) {
           <article>
@@ -334,6 +354,27 @@
   </div>
   @if (dischargeSummary(); as summary) {
     <div class="dialog-body"><tc-discharge-document [document]="summary" /></div>
+  }
+</dialog>
+<dialog
+  #imagingDialog
+  aria-labelledby="portal-imaging-title"
+  (close)="imagingReport.set(undefined)"
+>
+  <div class="dialog-head">
+    <h2 id="portal-imaging-title">{{ imagingReport()?.study ?? 'Imaging report' }}</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="imagingDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (imagingReport(); as report) {
+    <div class="dialog-body fields">
+      <p>{{ report.note }}</p>
+      <p class="subtle">
+        Released by {{ report.reviewer }} ·
+        {{ report.publishedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST
+      </p>
+    </div>
   }
 </dialog>
 <dialog #recordDialog aria-labelledby="record-title">

@@ -109,7 +109,7 @@ export function scope(
   session: Session,
   facility: Facility | undefined,
   workspace: string,
-  write?: Resource | 'laboratory/review' | 'schedule-exceptions',
+  write?: Resource | 'laboratory/review' | 'schedule-exceptions' | 'radiology/review',
 ): Facility {
   const access = facility ? session.facilityAccess[facility.id] : undefined;
   if (

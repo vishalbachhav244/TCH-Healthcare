@@ -21,6 +21,8 @@ import { inpatientCommand } from './inpatient';
 import { dischargePlanCommand } from './discharge';
 import { issueInpatientInvoice } from './inpatient-billing';
 import { laboratoryCommand } from './laboratory';
+import { requestImaging, updateImaging } from './radiology';
+import { updateBloodRequest, wardBloodCommand } from './blood-bank';
 import { pharmacyCommand } from './pharmacy';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -99,6 +101,9 @@ export async function command(
       db.dischargePlans,
       db.bedStays,
       db.inpatientAccounts,
+      db.imagingOrders,
+      db.bloodRequests,
+      db.bloodUnits,
     ],
     async () => {
       const session = await requireSession(token);
@@ -522,6 +527,38 @@ export async function command(
             scope(session, facilityRecord, 'D15', 'nursing-station'),
             session,
             'nursing-station',
+            payload,
+          );
+          break;
+        case 'clinical/imaging-orders':
+          changed = await requestImaging(
+            scope(session, facilityRecord, 'D13', 'clinical'),
+            session,
+            payload,
+          );
+          break;
+        case 'radiology/orders/status': {
+          const review = payload['action'] === 'report' || payload['action'] === 'publish';
+          changed = await updateImaging(
+            scope(session, facilityRecord, 'D21', review ? 'radiology/review' : 'radiology'),
+            session,
+            payload,
+          );
+          break;
+        }
+        case 'inpatient-physician/blood-requests':
+        case 'inpatient-physician/blood-requests/withdraw':
+          changed = await wardBloodCommand(
+            scope(session, facilityRecord, 'D14', 'inpatient-physician'),
+            session,
+            payload,
+            path.endsWith('/withdraw'),
+          );
+          break;
+        case 'blood-bank/requests/status':
+          changed = await updateBloodRequest(
+            scope(session, facilityRecord, 'D23', 'blood-bank'),
+            session,
             payload,
           );
           break;

@@ -46,6 +46,13 @@ export const staff = {
   admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
   lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },
   labreview: { name: 'Dr. Ajay Iyer', role: 'labReviewer', facilities: ['mer-central'] },
+  imaging: {
+    name: 'Kavya Menon',
+    role: 'imagingTechnician',
+    facilities: ['mer-central', 'mer-north'],
+  },
+  radiologist: { name: 'Dr. Tara Iyer', role: 'radiologyReviewer', facilities: ['mer-central'] },
+  bloodbank: { name: 'Vikram Shah', role: 'bloodBank', facilities: ['mer-central', 'mer-north'] },
   sunrise: { name: 'Ishita Rao', role: 'clinicOperator', facilities: ['sunrise'] },
 } satisfies Record<string, { name: string; role: StaffRole; facilities: string[] }>;
 

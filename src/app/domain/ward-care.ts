@@ -1,5 +1,6 @@
 import type { Admission, Bed, Patient } from './operations';
 import type { DischargePlanView } from './discharge';
+import type { WardBloodRequest } from './blood-bank';
 
 export const roundFocuses = ['Daily review', 'Post-admission review', 'Care coordination'] as const;
 export const roundSummaries = [
@@ -95,6 +96,7 @@ export type WardOrderRow = {
 export interface WardDetail extends WardPatient {
   team: { physician: string; nurse: string; version: number };
   dischargePlan?: DischargePlanView;
+  bloodRequests?: WardBloodRequest[];
   rounds: (RoundFields & { id: string; createdAt: number; actor: string })[];
   observations: (ObservationFields & {
     id: string;

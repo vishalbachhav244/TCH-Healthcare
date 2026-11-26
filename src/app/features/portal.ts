@@ -13,6 +13,7 @@ import type { FollowUpDetails } from '../domain/continuity';
 import { PatientSharing } from './patient-sharing';
 import { DischargeDocument } from './discharge-document';
 import type { DischargeDocument as ReleasedSummary } from '../domain/discharge';
+import type { ReleasedImagingReport } from '../domain/radiology';
 
 @Component({
   imports: [
@@ -34,6 +35,7 @@ export class Portal {
   protected readonly latest = shiftDay(this.today, 90);
   protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing'>('visits');
   protected readonly report = signal<LabOrder | undefined>(undefined);
+  protected readonly imagingReport = signal<ReleasedImagingReport | undefined>(undefined);
   protected readonly dischargeSummary = signal<ReleasedSummary | undefined>(undefined);
   protected readonly busy = signal(false);
   protected readonly message = signal('');
@@ -142,6 +144,11 @@ export class Portal {
 
   protected showReport(report: LabOrder, dialog: HTMLDialogElement) {
     this.report.set(report);
+    dialog.showModal();
+  }
+
+  protected showImagingReport(report: ReleasedImagingReport, dialog: HTMLDialogElement) {
+    this.imagingReport.set(report);
     dialog.showModal();
   }
 

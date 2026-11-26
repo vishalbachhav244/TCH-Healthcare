@@ -10,6 +10,8 @@ import { board } from './inpatient';
 import { admissionDischargeDocument } from './discharge';
 import { inpatientBillingDetail, inpatientBillingRows } from './inpatient-billing';
 import { listLaboratory } from './laboratory';
+import { consultationImaging, imagingWorklist } from './radiology';
+import { bloodBankView } from './blood-bank';
 import { portal } from './portal';
 import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
@@ -83,6 +85,9 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'nursing-station/tasks/complete',
     'emergency/visits/status',
     'operation-theatre/cases/status',
+    'radiology/orders/status',
+    'inpatient-physician/blood-requests/withdraw',
+    'blood-bank/requests/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -302,6 +307,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
           db.nursingTasks,
           db.wardObservations,
           db.dischargePlans,
+          db.bloodRequests,
         ],
         async () =>
           path.endsWith('/detail')
@@ -311,6 +317,31 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     }
     case 'laboratory':
       return listLaboratory(scope(session, facilityRecord, 'D20'), params);
+    case 'radiology': {
+      const facility = scope(session, facilityRecord, 'D21');
+      return db.transaction('r', [db.imagingOrders, db.patients, db.encounters], async () =>
+        imagingWorklist(
+          facility,
+          session.facilityAccess[facility.id].writes.includes('radiology/review'),
+        ),
+      );
+    }
+    case 'clinical/imaging-orders': {
+      const facility = scope(session, facilityRecord, 'D13', 'clinical');
+      return db.transaction(
+        'r',
+        [db.imagingOrders, db.patients, db.encounters, db.appointments],
+        async () => consultationImaging(facility, session, params.get('encounterId') ?? ''),
+      );
+    }
+    case 'blood-bank': {
+      const facility = scope(session, facilityRecord, 'D23', 'blood-bank');
+      return db.transaction(
+        'r',
+        [db.bloodRequests, db.bloodUnits, db.patients, db.admissions],
+        async () => bloodBankView(facility),
+      );
+    }
     case 'portal':
       return portal(scope(session, facilityRecord, 'D12'), session);
     case 'billing':

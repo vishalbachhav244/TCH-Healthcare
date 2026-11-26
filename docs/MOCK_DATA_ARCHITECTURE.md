@@ -7,3 +7,5 @@ Dexie version migrations preserve writes and populate new data tables. The datab
 Defer arbitrary free-text entry and document uploads until a suitable data boundary exists. The QR reader decodes a bounded image locally and retains only a valid opaque pass code.
 
 Schema version 17 carries forward the verified occupied bed of each active admission. If a legacy admission was transferred, the latest recorded transfer starts the current segment. If its transfer time is unavailable, tracking begins at upgrade. Those ledgers require cashier acknowledgement of partial coverage. Historical admissions already discharged keep their original records. No bed charges are generated for those closed stays.
+
+Schema version 18 adds imaging orders, component requests and individual units. Upgrades retain existing records and add the named diagnostic memberships where their facility exists. Sample imaging orders link older signed encounters and exclude the named patient-portal account. Stock includes in-date and expired units for inpatient facilities. Compatibility is a structured synthetic reviewer decision. The fixture does not contain donor or blood group data.

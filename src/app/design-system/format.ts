@@ -23,7 +23,15 @@ export class StatusTone implements PipeTransform {
   transform(status: string) {
     if (status === 'Enabled') return 'status positive';
     if (
-      ['Paid', 'Completed', 'Available', 'Acknowledged', 'Published', 'Discharged'].includes(status)
+      [
+        'Paid',
+        'Completed',
+        'Available',
+        'Acknowledged',
+        'Published',
+        'Discharged',
+        'Issued',
+      ].includes(status)
     )
       return 'status positive';
     if (
@@ -35,6 +43,8 @@ export class StatusTone implements PipeTransform {
         'Collected',
         'Authorised',
         'Admitted',
+        'Scheduled',
+        'Reserved',
       ].includes(status)
     )
       return 'status information';
@@ -48,10 +58,13 @@ export class StatusTone implements PipeTransform {
         'Ordered',
         'Processing',
         'Requested',
+        'Acquired',
+        'Report ready',
       ].includes(status)
     )
       return 'status attention';
-    if (['Priority', 'Maintenance', 'Cancelled'].includes(status)) return 'status priority';
+    if (['Priority', 'Maintenance', 'Cancelled', 'Declined', 'Expired'].includes(status))
+      return 'status priority';
     return 'status';
   }
 }

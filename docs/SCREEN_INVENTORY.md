@@ -38,3 +38,7 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-32 | D14 and D19 | `/work/inpatient-physician` → Care plan and `/work/beds` → Admissions | Discharge draft, signature confirmation, readiness and released summary |
 | TC-LOCAL-33 | D24 | `/work/billing` → Inpatient charges | Account worklist, status filter, daily bed ledger and inpatient invoice issue |
 | TC-LOCAL-34 | D12 | `/work/portal` → Reports | Own released discharge summaries and download |
+| TC-LOCAL-35 | D21 | `/work/radiology` | Imaging orders, date and modality schedule, acquisition and report release |
+| TC-LOCAL-36 | D12 and D13 | `/work/clinical` → Consultation and `/work/portal` → Reports | Imaging order and status in the assigned consultation and the patient’s released report |
+| TC-LOCAL-37 | D23 | `/work/blood-bank` | Component request review, unit reservation and issue, and stock inventory |
+| TC-LOCAL-38 | D14 | `/work/inpatient-physician` → Care plan | Blood component request, withdrawal and unit issue status |

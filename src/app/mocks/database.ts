@@ -46,6 +46,9 @@ import { initialWardAssignments } from './ward-seed';
 import type { EmergencyCase, IcuReview, IcuStepDown, TheatreCase } from '../domain/acute-care';
 import type { BedStay, DischargePlan, InpatientAccount } from '../domain/discharge';
 import { initialBedStays } from '../domain/bed-charges';
+import type { BloodRequest, BloodUnit } from '../domain/blood-bank';
+import type { ImagingOrder } from '../domain/radiology';
+import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -84,6 +87,9 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   bedStays: EntityTable<BedStay, 'id'>;
   dischargePlans: EntityTable<DischargePlan, 'admissionId'>;
   inpatientAccounts: EntityTable<InpatientAccount, 'admissionId'>;
+  imagingOrders: EntityTable<ImagingOrder, 'id'>;
+  bloodRequests: EntityTable<BloodRequest, 'id'>;
+  bloodUnits: EntityTable<BloodUnit, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -364,6 +370,34 @@ db.version(17)
       .bulkAdd(initialBedStays(admissions, beds, Date.now(), transfers));
   });
 
+db.version(18)
+  .stores({
+    imagingOrders: 'id, facilityId, encounterId, [facilityId+patientId], [facilityId+scheduledDay]',
+    bloodRequests: 'id, facilityId, admissionId',
+    bloodUnits: 'id, facilityId',
+  })
+  .upgrade(async (transaction) => {
+    const reference = await transaction
+      .table<{ key: string; value: string }, string>('metadata')
+      .get('referenceDay');
+    if (!reference) return;
+    const [facilities, encounters] = await Promise.all([
+      transaction.table<Facility, string>('facilities').toArray(),
+      transaction.table<Encounter, string>('encounters').toArray(),
+    ]);
+    const today = dayInIndia();
+    await transaction.table('imagingOrders').bulkAdd(initialImagingOrders(encounters, today));
+    await transaction.table('bloodUnits').bulkAdd(initialBloodUnits(facilities, today));
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    for (const membership of diagnosticMemberships) {
+      if (
+        facilities.some((facility) => facility.id === membership.facilityId) &&
+        !(await memberships.get(membership.id))
+      )
+        await memberships.add(membership);
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -380,6 +414,8 @@ export function initialize() {
         db.bedStays,
         db.wardAssignments,
         db.labOrders,
+        db.imagingOrders,
+        db.bloodUnits,
         db.facilities,
         db.memberships,
         db.prescriptions,
@@ -413,6 +449,8 @@ export function initialize() {
             ...labFixtures(data.encounters),
             ...initialSharingReport(data.encounters),
           ]),
+          db.imagingOrders.bulkAdd(initialImagingOrders(data.encounters, referenceDay)),
+          db.bloodUnits.bulkAdd(initialBloodUnits(initialFacilities, referenceDay)),
           db.facilities.bulkAdd(initialFacilities),
           db.memberships.bulkAdd(initialStaff),
           db.stockLots.bulkAdd(pharmacy.lots),

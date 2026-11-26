@@ -6,25 +6,27 @@ Verification ran locally on 26 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 31 contract and domain tests passed across 3 files |
-| `npm run e2e` | All 15 Chromium journeys passed, including discharge and inpatient billing, acute care and capability withdrawal. |
-| `npm run build` | Passed. Initial assets approximately 368 kB raw and 96 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 371 kB raw and 97 kB estimated transfer. |
+| `npm test` | 33 contract and domain tests passed across 3 files |
+| `npm run e2e` | All 17 Chromium journeys passed, including Radiology report release, Blood Bank issue and live capability withdrawal. |
+| `npm run build` | Passed. Initial assets approximately 370 kB raw and 96 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 373 kB raw and 97 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 16 to 17 in Chromium. The active bed and its verified transfer time, a closed admission and a prior invoice survived. The migrated ledger required acknowledgement before invoice issue. Prior migrations were verified at earlier checkpoints. |
-| OpenAPI | 113 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 17 to 18 in Chromium. A legacy encounter, inpatient ledger and linked invoice survived. The upgraded technician could see a study linked to the encounter. The officer could see in-date and expired units in inventory. Prior migrations were verified at earlier checkpoints. |
+| OpenAPI | 121 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
 
+- Place an imaging order in consultation. Confirm unavailable room times, cancel a second order and filter the modality schedule. Record acquisition and prepare a radiologist’s report. Verify draft visibility restrictions and the released report after patient reload.
+- Submit a component request from the assigned ward, verify the discharge gate and exclude an expired unit from selection. Require the review confirmation, reserve and issue a unit after reload, then verify ward status and stock.
 - Record an unassessed emergency arrival, assign priority explicitly and request admission. Allocate ICU, record and reload a review, request step-down and transfer to a regular ward. Schedule theatre, reject an overlap and block discharge until the case is complete. Reload the case and a different theatre date, then discharge and verify the emergency disposition closes.
 - Admit a patient and assign a physician and nurse. Record a round and complete a linked nursing task. Reject unsigned discharge, transfer to critical care, draft and sign the summary, and confirm that it is withheld until discharge. Download the released summary and issue a bed ledger invoice. Record settlement and verify the paid balance in the patient portal.
 - Suggest a returning patient’s previous clinician in intake. Check in using the patient’s pass, filter signed visits by specialty, sign a consultation and request follow-up. In the patient portal, book within the requested window. Cancel at reception, verify the request reopens, then rebook and reload to verify persistence.
 - Add a patient to a clinician’s waitlist. From an executive tab, block the day and verify both reception and the patient portal lose the available times. Release the block, book an open time from the waitlist, and confirm the appointment persists after reload. Reject an overlapping block and patient access to the staff route.
 - Match a recipient with a patient-issued code, grant one report version, preview it, pause and resume the connector, then revoke access. Check that access disappears on the recipient’s open screen and the patient’s decision survives reload.
 - Refer a flagged laboratory result using the keyboard, claim the redacted case, require a resolution and close it. Verify that status updates in the original worklist, the case history survives reload, and the Medical Director cannot open the quality register. Create and filter a facility case.
-- Create an organization and a facility, stage a staff role, activate the facility, revoke the scoped role in an open staff tab, then withdraw the inpatient capability from the open bed, physician, nursing, theatre and cashier views.
+- Create an organization and a facility, stage a staff role, activate the facility, revoke the scoped role in an open staff tab, then withdraw the inpatient capability from the open bed, physician, nursing, theatre, cashier and Blood Bank views.
 - Compare hospital facilities, time ranges and metrics. Export the patient-flow CSV and persist an alert acknowledgement. Check responsive layout, keyboard navigation and axe rules.
 - Confirm that a clinic omits bed occupancy and rejects direct access to a disabled bed route.
 - Review a subscription, reject an incompatible downgrade and drill into authorized network departments.
@@ -55,3 +57,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Mobile emergency](screenshots/emergency-390.png) · [Critical care](screenshots/critical-care-1440.png) · [Operation Theatre](screenshots/operation-theatre-1440.png)
 
 [Mobile discharge summary](screenshots/discharge-summary-390.png) · [Bed charge ledger](screenshots/inpatient-billing-1440.png)
+
+[Modality schedule](screenshots/radiology-schedule-1440.png) · [Mobile imaging report](screenshots/imaging-report-390.png) · [Mobile Blood Bank review](screenshots/blood-bank-review-390.png)

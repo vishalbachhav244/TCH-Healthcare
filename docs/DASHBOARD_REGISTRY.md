@@ -24,9 +24,9 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D18 | Operation Theatre | `/work/operation-theatre` | Partial | Team scheduling, theatre checklists and procedural documentation |
 | D19 | Admission, Bed & Discharge | `/work/beds` | Partial | Advance discharge coordination, administrative clearances and bed turnaround reporting |
 | D20 | Laboratory / LIMS | `/work/laboratory` | Partial | Numeric panels, reporting files, corrections and richer audit |
-| D21 | Radiology & Imaging | — | Open | Imaging orders, modality schedule and release |
+| D21 | Radiology & Imaging | `/work/radiology` | Partial | Image and file viewer, modality admin and report corrections |
 | D22 | Pharmacy | `/work/pharmacy` | Partial | Catalogue authoring, receiving, returns, stock reconciliation and partial fills |
-| D23 | Blood Bank | — | Open | Authorised inventory, compatibility and issue worklist |
+| D23 | Blood Bank | `/work/blood-bank` | Partial | Donor intake, testing records, inventory receiving, returns and traceability exports |
 | D24 | Patient Billing & Cashier | `/work/billing` | Partial | Deposits, taxes, discounts, receipts, refunds and invoice pagination |
 | D25 | Finance & Revenue | — | Open | Cash close, reports, accounting and reconciliation |
 | D26 | Insurance & TPA | — | Open | Coverage, authorisation, claim and settlement |

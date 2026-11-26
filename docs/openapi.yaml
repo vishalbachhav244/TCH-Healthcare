@@ -477,7 +477,7 @@ paths:
   '/portal':
     get:
       operationId: 'getPatientPortal'
-      summary: "Read the signed-in patient's own visits, follow-up requests, released reports and discharge summaries, and bills."
+      summary: "Read the signed-in patient's own visits, follow-up requests, released laboratory and imaging reports and discharge summaries, and bills."
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       responses:
@@ -793,7 +793,7 @@ paths:
   '/admissions/discharge':
     post:
       operationId: 'dischargePatient'
-      summary: 'Close the stay after nursing and theatre checks and required physician sign-off. Release the signed summary and finalize bed charges in the same transaction.'
+      summary: 'Close the stay after nursing, theatre and component request checks and required physician sign-off. Release the signed summary and finalize bed charges in the same transaction.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -4012,6 +4012,366 @@ paths:
         '409': { '$ref': '#/components/responses/Error409' }
         '422': { '$ref': '#/components/responses/Error422' }
         '503': { '$ref': '#/components/responses/Error503' }
+  /radiology:
+    get:
+      operationId: getRadiologyWorklist
+      summary: List facility imaging orders and modality bookings. Draft reports are visible to the
+        radiology reviewer.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImagingRow"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/imaging-orders:
+    get:
+      operationId: getConsultationImaging
+      summary: Read imaging orders for a consultation assigned to the current clinician.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: encounterId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImagingOrder"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+    post:
+      operationId: orderConsultationImaging
+      summary: Place a study from the catalogue for the assigned, active consultation.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - encounterId
+                - study
+              properties:
+                encounterId:
+                  type: string
+                study:
+                  $ref: "#/components/schemas/ImagingStudy"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /radiology/orders/status:
+    patch:
+      operationId: updateImagingOrder
+      summary: Schedule, acquire or cancel as a technician. Prepare and release a report as the
+        reviewer.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  required:
+                    - orderId
+                    - version
+                  properties:
+                    orderId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                - oneOf:
+                    - type: object
+                      required:
+                        - action
+                        - day
+                        - time
+                      properties:
+                        action:
+                          const: schedule
+                        day:
+                          type: string
+                          format: date
+                        time:
+                          type: string
+                          pattern: ^(0[9]|1[0-6]):(00|30)$
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: acquire
+                    - type: object
+                      required:
+                        - action
+                        - note
+                      properties:
+                        action:
+                          const: report
+                        note:
+                          $ref: "#/components/schemas/ImagingNote"
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: publish
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /blood-bank:
+    get:
+      operationId: getBloodBank
+      summary: List component requests and individual units at an authorized inpatient-enabled facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BloodBankView"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/blood-requests:
+    post:
+      operationId: requestWardBloodComponent
+      summary: Request a component for the physician’s active assigned admission.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/WardBloodContext"
+                - type: object
+                  required:
+                    - component
+                  properties:
+                    component:
+                      $ref: "#/components/schemas/BloodComponent"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /inpatient-physician/blood-requests/withdraw:
+    patch:
+      operationId: withdrawWardBloodRequest
+      summary: Withdraw a current ward request while it is awaiting review.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/WardBloodContext"
+                - type: object
+                  required:
+                    - requestId
+                    - version
+                  properties:
+                    requestId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /blood-bank/requests/status:
+    patch:
+      operationId: updateBloodBankRequest
+      summary: Record a review and reserve or decline a request. Issue a verified reservation or
+        release it to stock.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  required:
+                    - requestId
+                    - version
+                  properties:
+                    requestId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                - oneOf:
+                    - type: object
+                      required:
+                        - action
+                        - unitId
+                        - review
+                      properties:
+                        action:
+                          const: reserve
+                        unitId:
+                          type: string
+                        review:
+                          const: recorded
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: issue
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: decline
+                    - type: object
+                      required:
+                        - action
+                      properties:
+                        action:
+                          const: cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -4504,7 +4864,7 @@ components:
                 type: 'string'
     Portal:
       type: 'object'
-      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps', 'dischargeSummaries']
+      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps', 'dischargeSummaries', 'imagingReports']
       properties:
         patient: { '$ref': '#/components/schemas/Patient' }
         clinicians:
@@ -4528,6 +4888,9 @@ components:
         dischargeSummaries:
           type: array
           items: { '$ref': '#/components/schemas/DischargeDocument' }
+        imagingReports:
+          type: array
+          items: { '$ref': '#/components/schemas/ReleasedImagingReport' }
         invoices:
           type: 'array'
           items:
@@ -5732,6 +6095,9 @@ components:
         - orders
       properties:
         dischargePlan: { '$ref': '#/components/schemas/DischargePlanView' }
+        bloodRequests:
+          type: array
+          items: { '$ref': '#/components/schemas/WardBloodRequest' }
         admission:
           type: object
           required:
@@ -6094,6 +6460,270 @@ components:
         ward: { type: string }
         bed: { type: string }
         amountMinor: { type: integer, minimum: 0 }
+    ImagingStudy:
+      type: string
+      enum:
+        - Chest radiograph
+        - Extremity radiograph
+        - Abdominal ultrasound
+    ImagingNote:
+      type: string
+      enum:
+        - Image series documented
+        - Ordering team review requested
+    ImagingOrder:
+      type: object
+      required:
+        - id
+        - facilityId
+        - patientId
+        - encounterId
+        - study
+        - status
+        - version
+        - orderedAt
+        - changedAt
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        patientId:
+          type: string
+        encounterId:
+          type: string
+        study:
+          $ref: "#/components/schemas/ImagingStudy"
+        status:
+          type: string
+          enum:
+            - Ordered
+            - Scheduled
+            - Acquired
+            - Report ready
+            - Published
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        orderedAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        scheduledDay:
+          type: string
+          format: date
+        scheduledTime:
+          type: string
+          pattern: ^(0[9]|1[0-6]):(00|30)$
+        note:
+          $ref: "#/components/schemas/ImagingNote"
+        reviewer:
+          type: string
+        publishedAt:
+          type: integer
+          minimum: 0
+    ImagingRow:
+      type: object
+      required:
+        - order
+        - patient
+      properties:
+        order:
+          $ref: "#/components/schemas/ImagingOrder"
+        patient:
+          $ref: "#/components/schemas/DiagnosticsPatient"
+    ReleasedImagingReport:
+      type: object
+      required:
+        - id
+        - study
+        - note
+        - publishedAt
+        - reviewer
+      properties:
+        id:
+          type: string
+        study:
+          $ref: "#/components/schemas/ImagingStudy"
+        note:
+          $ref: "#/components/schemas/ImagingNote"
+        publishedAt:
+          type: integer
+          minimum: 0
+        reviewer:
+          type: string
+    BloodComponent:
+      type: string
+      enum:
+        - Red cells
+        - Platelets
+        - Plasma
+    BloodRequestStatus:
+      type: string
+      enum:
+        - Requested
+        - Reserved
+        - Issued
+        - Declined
+        - Cancelled
+    WardBloodContext:
+      type: object
+      required:
+        - admissionId
+        - admissionVersion
+        - assignmentVersion
+      properties:
+        admissionId:
+          type: string
+        admissionVersion:
+          type: string
+          pattern: ^[0-9]+$
+        assignmentVersion:
+          type: string
+          pattern: ^[0-9]+$
+    WardBloodRequest:
+      type: object
+      required:
+        - id
+        - component
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        component:
+          $ref: "#/components/schemas/BloodComponent"
+        status:
+          $ref: "#/components/schemas/BloodRequestStatus"
+        version:
+          type: integer
+          minimum: 1
+    BloodRequest:
+      type: object
+      required:
+        - id
+        - component
+        - status
+        - version
+        - facilityId
+        - admissionId
+        - patientId
+        - requestedAt
+        - requestedBy
+        - changedAt
+      properties:
+        id:
+          type: string
+        component:
+          $ref: "#/components/schemas/BloodComponent"
+        status:
+          $ref: "#/components/schemas/BloodRequestStatus"
+        version:
+          type: integer
+          minimum: 1
+        facilityId:
+          type: string
+        admissionId:
+          type: string
+        patientId:
+          type: string
+        requestedAt:
+          type: integer
+          minimum: 0
+        requestedBy:
+          type: string
+        changedAt:
+          type: integer
+          minimum: 0
+        unitId:
+          type: string
+        review:
+          type: string
+          enum:
+            - Recorded
+            - Declined
+        reviewedAt:
+          type: integer
+          minimum: 0
+        reviewedBy:
+          type: string
+        issuedAt:
+          type: integer
+          minimum: 0
+    BloodRequestRow:
+      type: object
+      required:
+        - request
+        - patient
+      properties:
+        request:
+          $ref: "#/components/schemas/BloodRequest"
+        patient:
+          $ref: "#/components/schemas/DiagnosticsPatient"
+        unitCode:
+          type: string
+        reservedUnitExpired:
+          type: boolean
+    BloodUnit:
+      type: object
+      required:
+        - id
+        - facilityId
+        - code
+        - component
+        - expiresOn
+        - status
+        - expired
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        code:
+          type: string
+        component:
+          $ref: "#/components/schemas/BloodComponent"
+        expiresOn:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+            - Available
+            - Reserved
+            - Issued
+            - Expired
+        expired:
+          type: boolean
+        requestId:
+          type: string
+    BloodBankView:
+      type: object
+      required:
+        - requests
+        - units
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/BloodRequestRow"
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/BloodUnit"
+    DiagnosticsPatient:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
   responses:
     Error401:
       description: 'Missing or expired session.'
