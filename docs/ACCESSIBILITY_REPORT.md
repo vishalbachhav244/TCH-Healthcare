@@ -22,4 +22,6 @@ The insurance worklist and collections view passed reflow checks at 390, 768, 10
 
 The receiving worklist and purchase order register passed reflow checks at 390, 768, 1024 and 1440 px. The desktop order register and mobile receipt history passed the selected axe rules. Enter opens the requisition form and Escape returns focus to the request button. [Purchase order register](screenshots/procurement-1440.png) · [Mobile receiving history](screenshots/receiving-390.png)
 
+The shift roster and maintenance work orders passed reflow checks at 390, 768, 1024 and 1440 px. The roster at 390 px and work orders at 1440 px passed the selected axe rules. Enter opens the shift and maintenance forms and Escape restores focus to their trigger buttons. [Mobile shift roster](screenshots/workforce-390.png) · [Biomedical work orders](screenshots/biomedical-1440.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

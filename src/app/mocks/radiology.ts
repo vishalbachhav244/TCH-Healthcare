@@ -18,6 +18,7 @@ import { accountNames } from './accounts';
 import { assignedEncounter } from './continuity';
 import { db } from './database';
 import { checkedDay } from './queries';
+import { unavailableImagingRooms } from './biomedical';
 
 function orderWithoutReport(order: ImagingOrder): ImagingOrder {
   const { note: _note, reviewer: _reviewer, ...visible } = order;
@@ -29,9 +30,10 @@ export async function imagingWorklist(
   reviewAllowed: boolean,
 ): Promise<ImagingRow[]> {
   const orders = await db.imagingOrders.where('facilityId').equals(facility.id).toArray();
-  const [patients, encounters] = await Promise.all([
+  const [patients, encounters, unavailable] = await Promise.all([
     db.patients.bulkGet(orders.map((row) => row.patientId)),
     db.encounters.bulkGet(orders.map((row) => row.encounterId)),
+    unavailableImagingRooms(facility.id),
   ]);
   return orders
     .flatMap((order, i) => {
@@ -47,6 +49,11 @@ export async function imagingWorklist(
         {
           order: reviewAllowed ? order : orderWithoutReport(order),
           patient: { id: patient.id, name: patient.name },
+          equipmentUnavailable:
+            (order.status === 'Ordered' || order.status === 'Scheduled') &&
+            unavailable.has(
+              imagingCatalogue.find((item) => item.study === order.study)?.room ?? '',
+            ),
         },
       ];
     })
@@ -163,6 +170,14 @@ export async function updateImaging(
   const now = Date.now();
   const today = dayInIndia(now);
   const next: Partial<ImagingOrder> = { version: order.version + 1, changedAt: now };
+  const room = imagingCatalogue.find((entry) => entry.study === order.study)?.room;
+  if (
+    (body['action'] === 'schedule' || body['action'] === 'acquire') &&
+    room &&
+    (await unavailableImagingRooms(facility.id)).has(room)
+  ) {
+    throw new ApiError(409, 'Equipment for this imaging room is out of service.');
+  }
   switch (body['action']) {
     case 'schedule': {
       if (order.status !== 'Ordered' && order.status !== 'Scheduled')
@@ -178,7 +193,6 @@ export async function updateImaging(
         !imagingTimes.includes(time)
       )
         throw new ApiError(422, 'Choose a listed time within the next 90 days.');
-      const room = imagingCatalogue.find((entry) => entry.study === order.study)?.room;
       const clash = await db.imagingOrders
         .where('[facilityId+scheduledDay]')
         .equals([facility.id, day])

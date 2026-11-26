@@ -32,5 +32,7 @@
 | Insurance coordinator | Facility consultation and inpatient invoices. Records patient coverage, versioned claim decisions and approved payer settlements. |
 | Stores officer | Facility lot balances, stock counts, replenishment requests and goods receipts. Only the requester can withdraw a pending requisition. |
 | Procurement officer | Facility requisitions, supplier costs and purchase orders. A separate account approves or rejects a requisition. Purchase orders with receipts cannot be cancelled. |
+| Workforce coordinator | Active staff assignments and dated shift records for the selected facility. Scheduling and check-in validate the current assignment. A cross-facility overlap returns a conflict without exposing the other roster. |
+| Biomedical engineer | Facility equipment and maintenance work orders. Return to service requires a recorded functional check. Registration limits locations according to the facility’s inpatient entitlement. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications and bill balances. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

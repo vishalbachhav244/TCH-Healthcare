@@ -24,6 +24,8 @@ export type Resource =
   | 'insurance'
   | 'inventory'
   | 'procurement'
+  | 'workforce'
+  | 'biomedical'
   | 'laboratory'
   | 'radiology'
   | 'blood-bank'
@@ -225,8 +227,14 @@ export const workspaces: readonly Workspace[] = [
     icon: 'clipboard',
     resource: 'procurement',
   },
-  { id: 'D29', title: 'HR & Workforce', group: 'Operations', icon: 'users' },
-  { id: 'D30', title: 'Asset & Biomedical Engineering', group: 'Operations', icon: 'settings' },
+  { id: 'D29', title: 'HR & Workforce', group: 'Operations', icon: 'users', resource: 'workforce' },
+  {
+    id: 'D30',
+    title: 'Asset & Biomedical Engineering',
+    group: 'Operations',
+    icon: 'settings',
+    resource: 'biomedical',
+  },
   { id: 'D31', title: 'Hospital Support Services', group: 'Operations', icon: 'layers' },
   { id: 'D32', title: 'Ambulance & Patient Transport', group: 'Operations', icon: 'activity' },
   { id: 'D33', title: 'Healthcare CRM & Contact Center', group: 'Engagement', icon: 'users' },
@@ -284,6 +292,8 @@ export const navigation = [
   { title: 'Insurance & TPA', resource: 'insurance', icon: 'shield', workspace: 'D26' },
   { title: 'Inventory & stores', resource: 'inventory', icon: 'list', workspace: 'D27' },
   { title: 'Procurement', resource: 'procurement', icon: 'clipboard', workspace: 'D28' },
+  { title: 'HR & workforce', resource: 'workforce', icon: 'users', workspace: 'D29' },
+  { title: 'Biomedical engineering', resource: 'biomedical', icon: 'settings', workspace: 'D30' },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
 ] as const;
 

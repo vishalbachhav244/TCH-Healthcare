@@ -32,4 +32,8 @@ A `RefundDecision` resolves one paid medication return review. A recorded refund
 
 A `Requisition` identifies the requesting facility, catalogue item, quantity and approval state. A `PurchaseOrder` references one approved requisition and records its supplier and quoted cost. A `GoodsReceipt` links the purchase order, lot and stock movement. Receipt posting increments the order and the lot together. A stock count records the difference between the expected on-hand quantity and the physical count. It preserves quarantine as a separate balance. [Supply contracts](../src/app/domain/procurement.ts)
 
+A `StaffShift` records a facility membership version, staff account, local date, planned times and recorded attendance timestamps. Historical shifts retain the assignment used when they were created. The roster computes whether that assignment is current. [Workforce contracts](../src/app/domain/workforce.ts)
+
+A `BiomedicalAsset` has a facility-unique tag and may link to one imaging room. A `MaintenanceOrder` references the asset and records its status, last actor and functional check. An active order locks availability. Cancellation or release updates both records in one transaction. [Biomedical contracts](../src/app/domain/biomedical.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

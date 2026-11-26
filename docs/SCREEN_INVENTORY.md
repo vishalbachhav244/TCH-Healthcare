@@ -38,7 +38,7 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-32 | D14 and D19 | `/work/inpatient-physician` → Care plan and `/work/beds` → Admissions | Discharge draft, signature confirmation, readiness and released summary |
 | TC-LOCAL-33 | D24 | `/work/billing` → Inpatient charges | Account worklist, status filter, daily bed ledger and inpatient invoice issue |
 | TC-LOCAL-34 | D12 | `/work/portal` → Reports | Own released discharge summaries and download |
-| TC-LOCAL-35 | D21 | `/work/radiology` | Imaging orders, date and modality schedule, acquisition and report release |
+| TC-LOCAL-35 | D21 | `/work/radiology` | Imaging orders, date and modality schedule, equipment availability, acquisition and report release |
 | TC-LOCAL-36 | D12 and D13 | `/work/clinical` → Consultation and `/work/portal` → Reports | Imaging order and status in the assigned consultation and the patient’s released report |
 | TC-LOCAL-37 | D23 | `/work/blood-bank` | Component request review, unit reservation and issue, and stock inventory |
 | TC-LOCAL-38 | D14 | `/work/inpatient-physician` → Care plan | Blood component request, withdrawal and unit issue status |
@@ -48,3 +48,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-42 | D26 and D24 | `/work/insurance` and `/work/billing` | Patient coverage, claim approval, preparation, submission, payer settlement and remaining patient balance |
 | TC-LOCAL-43 | D27 | `/work/inventory` | Stock balances, physical counts, requisition submission, goods receipt and receipt history |
 | TC-LOCAL-44 | D28 | `/work/procurement` | Requisition decisions, facility suppliers, order issue and purchase order register |
+| TC-LOCAL-45 | D29 | `/work/workforce` | Staff directory, dated shift roster, scheduling and attendance |
+| TC-LOCAL-46 | D30 | `/work/biomedical` | Equipment register, maintenance work orders, functional check and return to service |

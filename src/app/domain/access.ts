@@ -40,6 +40,8 @@ export const staffRoles = {
   insurance: { label: 'Insurance coordinator', workspaces: ['D26'], writes: ['insurance'] },
   inventory: { label: 'Stores officer', workspaces: ['D27'], writes: ['inventory'] },
   procurement: { label: 'Procurement officer', workspaces: ['D28'], writes: ['procurement'] },
+  workforce: { label: 'Workforce coordinator', workspaces: ['D29'], writes: ['workforce'] },
+  biomedical: { label: 'Biomedical engineer', workspaces: ['D30'], writes: ['biomedical'] },
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },
   labReviewer: { label: 'Laboratory reviewer', workspaces: ['D20'], writes: ['laboratory/review'] },

@@ -22,6 +22,15 @@ import type {
 import type { PatientPortal } from '../domain/portal';
 import type { FinanceData, RefundOutcome } from '../domain/finance';
 import type {
+  BiomedicalAsset,
+  BiomedicalData,
+  EquipmentFields,
+  MaintenanceAction,
+  MaintenanceOrder,
+  MaintenanceReason,
+} from '../domain/biomedical';
+import type { ShiftAction, ShiftFields, StaffShift, WorkforceData } from '../domain/workforce';
+import type {
   CountFields,
   InventoryData,
   ProcurementData,
@@ -983,6 +992,68 @@ export class Api {
       expectedOnHand: String(fields.expectedOnHand),
       countedOnHand: String(fields.countedOnHand),
     });
+  }
+
+  workforce(token: string, facility: string, day: string) {
+    return this.get('workforce', token, facility, { day }).pipe(
+      map((value) => objectShape<WorkforceData>(value, ['members', 'shifts'])),
+    );
+  }
+
+  scheduleShift(token: string, facility: string, fields: ShiftFields) {
+    return this.execute('workforce/shifts', token, facility, {
+      ...fields,
+      membershipVersion: String(fields.membershipVersion),
+    });
+  }
+
+  recordAttendance(token: string, facility: string, shift: StaffShift, action: ShiftAction) {
+    return this.execute(
+      'workforce/shifts/status',
+      token,
+      facility,
+      { shiftId: shift.id, version: String(shift.version), action },
+      'PATCH',
+    );
+  }
+
+  biomedical(token: string, facility: string) {
+    return this.get('biomedical', token, facility).pipe(
+      map((value) => objectShape<BiomedicalData>(value, ['equipment', 'orders'])),
+    );
+  }
+
+  registerEquipment(token: string, facility: string, fields: EquipmentFields) {
+    return this.execute('biomedical/equipment', token, facility, { ...fields });
+  }
+
+  openMaintenance(
+    token: string,
+    facility: string,
+    asset: BiomedicalAsset,
+    reason: MaintenanceReason,
+  ) {
+    return this.execute('biomedical/maintenance', token, facility, {
+      assetId: asset.id,
+      version: String(asset.version),
+      reason,
+    });
+  }
+
+  updateMaintenance(
+    token: string,
+    facility: string,
+    order: MaintenanceOrder,
+    action: MaintenanceAction,
+    verified: boolean,
+  ) {
+    return this.execute(
+      'biomedical/maintenance/status',
+      token,
+      facility,
+      { orderId: order.id, version: String(order.version), action, verified: String(verified) },
+      'PATCH',
+    );
   }
 
   invoiceOptions(token: string, facility: string, day: string) {

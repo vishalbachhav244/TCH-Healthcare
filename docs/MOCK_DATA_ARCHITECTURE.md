@@ -15,3 +15,5 @@ Schema version 19 labels existing pharmacy movements as dispensing and establish
 Schema version 20 adds refund decisions, daily collection closes, coverage and claims. Existing payments keep their recorded values. A unique claim ID identifies payer payments. The upgrade adds the named Finance and Insurance memberships at their existing facilities. All payer decisions and payment movements in the evaluation remain local synthetic records.
 
 Schema version 21 adds facility supplier catalogues, requisitions, orders and goods receipts. Existing lots and movements remain available to Stores and Pharmacy. Supplier costs are fixed synthetic catalogue values. Goods receipts reuse the pharmacy lot transaction, and stock counts append the measured difference to the existing ledger.
+
+Schema version 22 adds staff shifts, biomedical assets and maintenance orders. The upgrade retains existing data and adds Workforce and Biomedical memberships at their assigned demo facilities. It creates synthetic equipment for the existing imaging room catalogue and ward equipment at inpatient sites. Shifts and work orders are created only through commands.

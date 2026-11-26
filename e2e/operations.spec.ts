@@ -25,6 +25,58 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('rosters staff and records attendance across reload', async ({ page }, testInfo) => {
+  test.setTimeout(100_000);
+  await signIn(page, 'workforce');
+  await expect(page.getByRole('heading', { name: 'HR & Workforce' })).toBeVisible();
+  await page.getByRole('button', { name: 'Staff directory', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Find staff' }).fill('Neha Pillai');
+  await expect(page.getByRole('row', { name: /Neha Pillai/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Shift roster', exact: true }).click();
+  await expect(page.getByText('No shifts match this roster date and filters.')).toBeVisible();
+  const schedule = page.getByRole('button', { name: 'Schedule shift' });
+  const editor = page.getByRole('dialog', { name: 'Schedule shift' });
+  await schedule.focus();
+  await page.keyboard.press('Enter');
+  await expect(editor).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(schedule).toBeFocused();
+  await schedule.click();
+  const selectStaff = () => editor.getByLabel('Staff member').selectOption('wardnurse:mer-central');
+  await selectStaff();
+  await editor.getByRole('button', { name: 'Save shift' }).click();
+  const shift = page.getByRole('row', { name: /Neha Pillai/ });
+  await expect(shift).toContainText('Scheduled');
+  await schedule.click();
+  await selectStaff();
+  await editor.getByLabel('Starts at').selectOption('08:30');
+  await editor.getByRole('button', { name: 'Save shift' }).click();
+  await expect(editor.getByRole('alert')).toHaveText(
+    'This staff member already has an overlapping shift.',
+  );
+  await page.keyboard.press('Escape');
+  await shift.getByRole('button', { name: 'Check in' }).click();
+  await page.getByRole('button', { name: 'Confirm check-in' }).click();
+  await expect(shift).toContainText('Checked in');
+  await page.reload();
+  await expect(shift).toContainText('Checked in');
+  await checkReflow(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('workforce-390.png'), animations: 'disabled' });
+  await shift.getByRole('button', { name: 'Check out' }).click();
+  await page.getByRole('button', { name: 'Confirm check-out' }).click();
+  await expect(shift).toContainText('Completed');
+  await expect(shift.getByRole('button')).toHaveCount(0);
+  await page.getByLabel('Facility', { exact: true }).selectOption('mer-north');
+  await expect(page.getByText('No shifts match this roster date and filters.')).toBeVisible();
+  await page.goto('/work/biomedical');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+});
+
 test('replenishes pharmacy stock through requisition, purchase order and partial receipts', async ({
   page,
 }, testInfo) => {
@@ -231,6 +283,46 @@ test('schedules imaging and releases the reviewed report to the patient', async 
     path: testInfo.outputPath('radiology-schedule-1440.png'),
     animations: 'disabled',
   });
+  const engineer = await page.context().newPage();
+  await signIn(engineer, 'biomedical');
+  await expect(engineer.getByRole('heading', { name: 'Biomedical Engineering' })).toBeVisible();
+  const xray = engineer.getByRole('row', { name: /IMG-01/ });
+  const openWork = xray.getByRole('button', { name: 'Open work order' });
+  await openWork.focus();
+  await engineer.keyboard.press('Enter');
+  const work = engineer.getByRole('dialog', { name: 'Open work order' });
+  await expect(work).toBeVisible();
+  await engineer.keyboard.press('Escape');
+  await expect(openWork).toBeFocused();
+  await openWork.click();
+  await work.getByLabel('Maintenance reason').selectOption('Fault reported');
+  await work.getByRole('button', { name: 'Open work order' }).click();
+  await expect(chest).toContainText('Room out of service');
+  await expect(chest.getByRole('button', { name: 'Record acquisition' })).toHaveCount(0);
+  await expect(chest.getByRole('button', { name: 'Cancel order' })).toBeVisible();
+  await engineer.reload();
+  await expect(xray).toContainText('Unavailable');
+  await xray.getByRole('button', { name: 'View work orders' }).click();
+  await xray.getByRole('button', { name: 'Start maintenance' }).click();
+  await engineer.getByRole('button', { name: 'Confirm start' }).click();
+  await xray.getByRole('button', { name: 'Record functional check' }).click();
+  await engineer.getByRole('checkbox', { name: 'I recorded the local functional check.' }).check();
+  await engineer.getByRole('button', { name: 'Save functional check' }).click();
+  await expect(xray).toContainText('Ready for release');
+  await expect(chest).toContainText('Room out of service');
+  await checkReflow(engineer);
+  expect(
+    (await new AxeBuilder({ page: engineer }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await engineer.screenshot({
+    path: testInfo.outputPath('biomedical-1440.png'),
+    animations: 'disabled',
+  });
+  await xray.getByRole('button', { name: 'Return to service' }).click();
+  await engineer.getByRole('button', { name: 'Confirm return to service' }).click();
+  await expect(xray).toContainText('Completed');
+  await expect(chest.getByText('Room out of service')).toHaveCount(0);
   await chest.getByRole('button', { name: 'Record acquisition' }).click();
   await technician.getByRole('button', { name: 'Confirm acquisition' }).click();
   await expect(chest).toContainText('Acquired');
@@ -268,7 +360,7 @@ test('schedules imaging and releases the reviewed report to the patient', async 
   });
   await patient.goto('/work/radiology');
   await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
-  for (const tab of [patient, clinician, technician, reviewer]) await tab.close();
+  for (const tab of [patient, clinician, technician, reviewer, engineer]) await tab.close();
 });
 
 test('hands a ward component request through review, reservation and issue', async ({
@@ -1259,6 +1351,8 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(ward.getByRole('heading', { name: 'Inpatient Physician' })).toBeVisible();
   await expect(nursing.getByRole('heading', { name: 'Nursing Station' })).toBeVisible();
   await expect(theatre.getByRole('heading', { name: 'Operation Theatre' })).toBeVisible();
+  const biomedical = await page.context().newPage();
+  await signIn(biomedical, 'biomedical');
   await page
     .getByRole('row', { name: /Meridian Medical Centre/ })
     .getByRole('button', { name: 'Edit entitlement' })
@@ -1274,6 +1368,20 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(inpatientCharges).toHaveCount(0);
   await expect(blood.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(cashier.getByRole('heading', { name: 'Invoices' })).toBeVisible();
+  await biomedical.getByRole('button', { name: 'Register equipment' }).click();
+  const register = biomedical.getByRole('dialog', { name: 'Register equipment' });
+  await expect(register.getByLabel('Location').locator('option')).toHaveText([
+    'Choose a location',
+    'Outpatient',
+  ]);
+  await register.getByLabel('Equipment tag').fill('LIGHT-04');
+  await register.getByLabel('Category').selectOption('Examination light');
+  await register.getByLabel('Location').selectOption('Outpatient');
+  await register.getByRole('button', { name: 'Save equipment' }).click();
+  await expect(
+    biomedical.getByRole('row', { name: /LIGHT-04.*Outpatient.*Available/ }),
+  ).toBeVisible();
+  await biomedical.close();
   await ward.close();
   await nursing.close();
   await theatre.close();

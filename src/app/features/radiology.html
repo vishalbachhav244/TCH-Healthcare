@@ -120,6 +120,9 @@
                 </td>
                 <td>
                   <span [class]="order.status | statusTone">{{ order.status }}</span>
+                  @if (row.equipmentUnavailable) {
+                    <small>Room out of service</small>
+                  }
                   @if (order.note) {
                     <small>{{ order.note }}</small>
                   }
@@ -135,21 +138,23 @@
                 </td>
                 <td>
                   @if (tech() && (order.status === 'Ordered' || order.status === 'Scheduled')) {
-                    <button
-                      class="text-button"
-                      type="button"
-                      (click)="open(editorDialog, row, 'schedule')"
-                    >
-                      {{ order.status === 'Scheduled' ? 'Reschedule exam' : 'Schedule exam' }}
-                    </button>
-                    @if (order.status === 'Scheduled' && order.scheduledDay! <= today) {
+                    @if (!row.equipmentUnavailable) {
                       <button
                         class="text-button"
                         type="button"
-                        (click)="open(editorDialog, row, 'acquire')"
+                        (click)="open(editorDialog, row, 'schedule')"
                       >
-                        Record acquisition
+                        {{ order.status === 'Scheduled' ? 'Reschedule exam' : 'Schedule exam' }}
                       </button>
+                      @if (order.status === 'Scheduled' && order.scheduledDay! <= today) {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="open(editorDialog, row, 'acquire')"
+                        >
+                          Record acquisition
+                        </button>
+                      }
                     }
                     <button
                       class="text-button"

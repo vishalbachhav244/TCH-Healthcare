@@ -1,0 +1,269 @@
+<section class="page-intro">
+  <div>
+    <h1>Biomedical Engineering</h1>
+    <p>Track equipment availability and manage maintenance work orders.</p>
+  </div>
+  @if (store.writeAllowed('biomedical')) {
+    <button class="button primary" type="button" (click)="open(editorDialog, { kind: 'register' })">
+      <ng-icon name="plus" /> Register equipment
+    </button>
+  }
+</section>
+<div class="view-controls" role="group" aria-label="Biomedical views">
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'equipment'"
+    (click)="show('equipment')"
+  >
+    Equipment register
+  </button>
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'orders'"
+    (click)="show('orders')"
+  >
+    Work orders
+  </button>
+</div>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@let state = data();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading equipment and work orders…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid compact">
+    @for (metric of metrics(); track metric.label) {
+      <article class="panel metric">
+        <p>{{ metric.label }}</p>
+        <strong>{{ metric.count }}</strong>
+      </article>
+    }
+  </div>
+  @let isEquipment = view() === 'equipment';
+  @let title = isEquipment ? 'Facility equipment' : 'Maintenance work orders';
+  @let count = isEquipment ? equipment().length : orders().length;
+  <section class="panel table-panel" aria-labelledby="biomedical-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="biomedical-title">{{ title }}</h2>
+        <p>{{ store.facility()?.name }}</p>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <label class="search-field"
+        ><ng-icon name="search" /><span class="sr-only">{{
+          isEquipment ? 'Find equipment' : 'Find work order'
+        }}</span>
+        <input
+          #q
+          type="search"
+          [value]="search()"
+          placeholder="Equipment tag or location"
+          (input)="search.set(q.value); limit.set(12)"
+        />
+      </label>
+      <div class="select-control">
+        <label for="biomedical-status">Status</label>
+        <select
+          #filter
+          id="biomedical-status"
+          [value]="status()"
+          (change)="status.set(filter.value); limit.set(12)"
+        >
+          <option value="">All statuses</option>
+          @for (item of statuses(); track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (!count) {
+      <p class="state-panel">
+        {{
+          isEquipment
+            ? 'No equipment matches these filters.'
+            : 'No work orders match these filters.'
+        }}
+      </p>
+    } @else {
+      <div class="table-scroll" tabindex="0" role="region" [attr.aria-label]="title">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            {{
+              title
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Equipment</th>
+              <th scope="col">{{ isEquipment ? 'Location' : 'Maintenance reason' }}</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (isEquipment) {
+              @for (asset of equipment().slice(0, limit()); track asset.id) {
+                <tr>
+                  <td>
+                    <strong>{{ asset.tag }}</strong
+                    ><small>{{ asset.category }}</small>
+                  </td>
+                  <td>{{ asset.location }}</td>
+                  <td>
+                    <span [class]="asset.status | statusTone">{{ asset.status }}</span>
+                  </td>
+                  <td>
+                    @if (store.writeAllowed('biomedical') && asset.status === 'Available') {
+                      <button
+                        type="button"
+                        class="text-button"
+                        (click)="open(editorDialog, { kind: 'open', asset })"
+                      >
+                        Open work order
+                      </button>
+                    } @else if (asset.activeWorkId) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        (click)="show('orders'); search.set(asset.tag)"
+                      >
+                        View work orders
+                      </button>
+                    } @else {
+                      <span aria-label="No action available">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            } @else {
+              @for (order of orders().slice(0, limit()); track order.id) {
+                <tr>
+                  <td>
+                    <strong>{{ order.asset.tag }}</strong
+                    ><small>{{ order.asset.category }} · {{ order.asset.location }}</small>
+                  </td>
+                  <td>
+                    {{ order.reason
+                    }}<small
+                      >Opened {{ order.openedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST</small
+                    >
+                  </td>
+                  <td>
+                    <span [class]="order.status | statusTone">{{ order.status }}</span>
+                    @if (order.verifiedAt !== undefined) {
+                      <small
+                        >Check recorded
+                        {{ order.verifiedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST</small
+                      >
+                    }
+                  </td>
+                  <td>
+                    @if (store.writeAllowed('biomedical') && actions[order.status].length) {
+                      @for (action of actions[order.status]; track action) {
+                        <button
+                          type="button"
+                          class="text-button"
+                          (click)="open(editorDialog, { kind: action, order })"
+                        >
+                          {{ prompts[action].title }}
+                        </button>
+                      }
+                    } @else {
+                      <span aria-label="No action available">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (count > limit()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="limit.set(limit() + 12)">
+            Show more records
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+<dialog #editorDialog aria-labelledby="biomedical-editor-title" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="biomedical-editor-title">{{ prompts[editor()?.kind ?? 'register'].title }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editorDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as edit) {
+    <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="save(editorDialog)">
+      @if (edit.kind === 'register') {
+        <label for="equipment-tag">Equipment tag</label>
+        <input
+          id="equipment-tag"
+          formControlName="tag"
+          maxlength="20"
+          aria-describedby="tag-hint"
+          required
+        />
+        <p id="tag-hint" class="subtle">
+          Use 3–20 letters, digits or hyphens. Start with a letter or digit.
+        </p>
+        <label for="equipment-category">Category</label>
+        <select id="equipment-category" formControlName="category" required>
+          <option value="">Choose a category</option>
+          @for (item of categories; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+        <label for="equipment-location">Location</label>
+        <select id="equipment-location" formControlName="location" required>
+          <option value="">Choose a location</option>
+          @for (item of locations(); track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      } @else if (edit.kind === 'open') {
+        <p>
+          <strong>{{ edit.asset.tag }}</strong> · {{ edit.asset.location }}. Opening the work order
+          makes this equipment unavailable.
+        </p>
+        <label for="maintenance-reason">Maintenance reason</label>
+        <select id="maintenance-reason" formControlName="reason" required>
+          <option value="">Choose a reason</option>
+          @for (reason of reasons; track reason) {
+            <option>{{ reason }}</option>
+          }
+        </select>
+      } @else {
+        <p>
+          <strong>{{ edit.order.asset.tag }}</strong> · {{ edit.order.asset.location }}
+        </p>
+        @if (edit.kind === 'verify') {
+          <label class="checkbox"
+            ><input type="checkbox" formControlName="verified" required /> I recorded the local
+            functional check.</label
+          >
+        }
+        @if (edit.kind === 'release') {
+          <p>Returning this equipment to service makes it available immediately.</p>
+        }
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="busy()">
+        {{ prompts[edit.kind].confirm }}
+      </button>
+    </form>
+  }
+</dialog>

@@ -57,6 +57,8 @@ export class StatusTone implements PipeTransform {
         'Prepared',
         'Insurance pending',
         'Partially received',
+        'In progress',
+        'Ready for release',
       ].includes(status)
     )
       return 'status information';
@@ -74,6 +76,8 @@ export class StatusTone implements PipeTransform {
         'Report ready',
         'Review needed',
         'Out of stock',
+        'Unavailable',
+        'Absent',
       ].includes(status)
     )
       return 'status attention';

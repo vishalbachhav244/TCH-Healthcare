@@ -13,6 +13,8 @@ import { financeData } from './finance';
 import { insuranceData } from './insurance';
 import { inventoryData } from './inventory';
 import { procurementData } from './procurement';
+import { workforceData } from './workforce';
+import { biomedicalData } from './biomedical';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -96,6 +98,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'inventory/requisitions/withdraw',
     'procurement/requisitions/status',
     'procurement/orders/cancel',
+    'workforce/shifts/status',
+    'biomedical/maintenance/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -333,11 +337,14 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return listLaboratory(scope(session, facilityRecord, 'D20'), params);
     case 'radiology': {
       const facility = scope(session, facilityRecord, 'D21');
-      return db.transaction('r', [db.imagingOrders, db.patients, db.encounters], async () =>
-        imagingWorklist(
-          facility,
-          session.facilityAccess[facility.id].writes.includes('radiology/review'),
-        ),
+      return db.transaction(
+        'r',
+        [db.imagingOrders, db.patients, db.encounters, db.biomedicalAssets],
+        async () =>
+          imagingWorklist(
+            facility,
+            session.facilityAccess[facility.id].writes.includes('radiology/review'),
+          ),
       );
     }
     case 'clinical/imaging-orders': {
@@ -427,6 +434,19 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         'r',
         [db.supplyRequisitions, db.purchaseOrders, db.suppliers],
         async () => procurementData(facility),
+      );
+    }
+    case 'workforce': {
+      const facility = scope(session, facilityRecord, 'D29');
+      const day = checkedDay(params.get('day'));
+      return db.transaction('r', [db.memberships, db.staffShifts], async () =>
+        workforceData(facility, day),
+      );
+    }
+    case 'biomedical': {
+      const facility = scope(session, facilityRecord, 'D30');
+      return db.transaction('r', [db.biomedicalAssets, db.maintenanceOrders], async () =>
+        biomedicalData(facility),
       );
     }
     case 'billing/inpatient':

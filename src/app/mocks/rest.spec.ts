@@ -18,6 +18,8 @@ import type { DischargeDocument, InpatientBillingDetail } from '../domain/discha
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
 import type { ImagingOrder, ImagingRow } from '../domain/radiology';
+import type { BiomedicalData } from '../domain/biomedical';
+import type { WorkforceData } from '../domain/workforce';
 import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
 import type { FinanceData } from '../domain/finance';
@@ -65,13 +67,126 @@ function headers(session?: Session, facility?: string) {
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
 
+describe('facility workforce and equipment', () => {
+  const facility = 'mer-central';
+  const branch = 'mer-north';
+
+  it('keeps the roster branch-scoped while rejecting competing shifts and stale attendance', async () => {
+    const [coordinator, clinician] = await Promise.all(['workforce', 'clinician'].map(login));
+    const today = dayInIndia();
+    const roster = async (at = facility, day = today) =>
+      (await get('workforce?day=' + day, coordinator, at)) as WorkforceData;
+    const central = (await roster()).members.find((row) => row.account === 'wardnurse')!;
+    const north = (await roster(branch)).members.find((row) => row.account === 'wardnurse')!;
+    expect(central.id).not.toBe(north.id);
+    await expect(get('workforce', clinician, facility)).rejects.toMatchObject({ status: 403 });
+    const fields = {
+      membershipId: central.id,
+      membershipVersion: String(central.version),
+      day: today,
+      startsAt: '08:00',
+      endsAt: '16:00',
+    };
+    const create = (changes: Partial<typeof fields> = {}, at = facility) =>
+      post('workforce/shifts', { ...fields, ...changes }, coordinator, at);
+    await expect(create({ endsAt: '07:30' })).rejects.toMatchObject({ status: 422 });
+    await expect(create({}, branch)).rejects.toMatchObject({ status: 404 });
+    const results = await Promise.allSettled([create(), create()]);
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const { id: shiftId } = results.find((result) => result.status === 'fulfilled')!.value as {
+      id: string;
+    };
+    await expect(
+      create({ membershipId: north.id, membershipVersion: String(north.version) }, branch),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await roster(branch)).shifts).not.toContainEqual(
+      expect.objectContaining({ id: shiftId }),
+    );
+    const mark = (action: string, version: string, at = facility, id = shiftId) =>
+      patch('workforce/shifts/status', { shiftId: id, action, version }, coordinator, at);
+    await expect(mark('check-in', '1', branch)).rejects.toMatchObject({ status: 404 });
+    await expect(mark('check-out', '1')).rejects.toMatchObject({ status: 409 });
+    await mark('check-in', '1');
+    await expect(mark('cancel', '1')).rejects.toMatchObject({ status: 409 });
+    await db.memberships.update(central.id, { version: central.version + 1 });
+    try {
+      expect((await roster()).shifts.find((row) => row.id === shiftId)?.assignmentCurrent).toBe(
+        false,
+      );
+      await expect(create({ startsAt: '16:00', endsAt: '18:00' })).rejects.toMatchObject({
+        status: 409,
+      });
+      await mark('check-out', '2');
+      expect((await roster()).shifts).toContainEqual(
+        expect.objectContaining({
+          id: shiftId,
+          status: 'Completed',
+          checkedInAt: expect.any(Number),
+          checkedOutAt: expect.any(Number),
+        }),
+      );
+    } finally {
+      await db.memberships.update(central.id, { version: central.version });
+    }
+    const tomorrow = shiftDay(today, 1);
+    const { id: future } = (await create({ day: tomorrow })) as { id: string };
+    await expect(mark('absent', '1', facility, future)).rejects.toMatchObject({ status: 409 });
+    await mark('cancel', '1', facility, future);
+    expect((await roster(facility, tomorrow)).shifts).toContainEqual(
+      expect.objectContaining({ id: future, status: 'Cancelled' }),
+    );
+  }, 90_000);
+
+  it('registers equipment and frees it on cancellation before maintenance starts', async () => {
+    const [engineer, coordinator] = await Promise.all(['biomedical', 'workforce'].map(login));
+    const equipment = { tag: 'pump-eval', category: 'Infusion pump', location: 'Outpatient' };
+    await expect(get('biomedical', coordinator, facility)).rejects.toMatchObject({ status: 403 });
+    const { id: assetId } = (await post('biomedical/equipment', equipment, engineer, facility)) as {
+      id: string;
+    };
+    await expect(
+      post('biomedical/equipment', { ...equipment, tag: 'PUMP-EVAL' }, engineer, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const { id: orderId } = (await post(
+      'biomedical/maintenance',
+      { assetId, version: '1', reason: 'Inspection required' },
+      engineer,
+      facility,
+    )) as { id: string };
+    const cancel = (at: string) =>
+      patch(
+        'biomedical/maintenance/status',
+        { orderId, version: '1', action: 'cancel' },
+        engineer,
+        at,
+      );
+    await expect(cancel(branch)).rejects.toMatchObject({ status: 404 });
+    await cancel(facility);
+    expect(await db.biomedicalAssets.get(assetId)).toMatchObject({
+      status: 'Available',
+      tag: 'PUMP-EVAL',
+    });
+    const data = (await get('biomedical', engineer, facility)) as BiomedicalData;
+    expect(data.orders).toContainEqual(
+      expect.objectContaining({ id: orderId, status: 'Cancelled' }),
+    );
+    await db.facilities.update(facility, { active: false });
+    try {
+      await expect(get('biomedical', engineer, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(get('workforce', coordinator, facility)).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await db.facilities.update(facility, { active: true });
+    }
+  }, 90_000);
+});
+
 describe('radiology', () => {
   it('schedules a clinician’s order once and releases the report only through Radiology review', async () => {
     const facility = 'mer-central';
     const patientId = 'TC-MERIDIAN-01001';
     const practitionerId = 'mer-central-DR-1';
-    const [clinician, reception, technician, reviewer, patient] = await Promise.all(
-      ['clinician', 'reception', 'imaging', 'radiologist', 'patient'].map(login),
+    const [clinician, reception, technician, reviewer, patient, engineer] = await Promise.all(
+      ['clinician', 'reception', 'imaging', 'radiologist', 'patient', 'biomedical'].map(login),
     );
     await expect(get('radiology', reception, facility)).rejects.toMatchObject({ status: 403 });
     const otherEncounter = (await db.encounters
@@ -144,6 +259,60 @@ describe('radiology', () => {
     await change('2', 'schedule', technician, { day: today, time: '13:30' });
     expect(await db.imagingOrders.get(orderId)).toMatchObject({
       scheduledTime: '13:30',
+      version: 3,
+    });
+    const assetId = 'mer-central-imaging-1';
+    const openWork = (at = facility, actor = engineer) =>
+      post(
+        'biomedical/maintenance',
+        { assetId, version: '1', reason: 'Fault reported' },
+        actor,
+        at,
+      );
+    await expect(openWork(facility, technician)).rejects.toMatchObject({ status: 403 });
+    await expect(openWork('mer-north')).rejects.toMatchObject({ status: 404 });
+    const opened = await Promise.allSettled([openWork(), openWork()]);
+    expect(opened.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const result = opened.find((item) => item.status === 'fulfilled')!;
+    const { id: workId } = result.value as { id: string };
+    const work = (version: string, action: string, verified = 'false') =>
+      patch(
+        'biomedical/maintenance/status',
+        { orderId: workId, version, action, verified },
+        engineer,
+        facility,
+      );
+    const radiology = async () => (await get('radiology', technician, facility)) as ImagingRow[];
+    expect(await radiology()).toContainEqual(
+      expect.objectContaining({
+        order: expect.objectContaining({ id: orderId }),
+        equipmentUnavailable: true,
+      }),
+    );
+    const unaffected = (await radiology()).find((row) => row.order.id === second);
+    expect(unaffected?.equipmentUnavailable).toBe(false);
+    await expect(change('3', 'acquire', technician)).rejects.toMatchObject({ status: 409 });
+    await expect(
+      change('3', 'schedule', technician, { day: today, time: '14:00' }),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(work('1', 'release')).rejects.toMatchObject({ status: 409 });
+    await work('1', 'start');
+    await expect(work('1', 'verify', 'true')).rejects.toMatchObject({ status: 409 });
+    await expect(work('2', 'verify')).rejects.toMatchObject({ status: 422 });
+    await work('2', 'verify', 'true');
+    await expect(change('3', 'acquire', technician)).rejects.toMatchObject({ status: 409 });
+    const maintenance = (await get('biomedical', engineer, facility)) as BiomedicalData;
+    expect(maintenance.orders).toContainEqual(
+      expect.objectContaining({
+        id: workId,
+        status: 'Ready for release',
+        verifiedBy: 'biomedical',
+      }),
+    );
+    expect(maintenance.equipment.find((item) => item.id === assetId)?.status).toBe('Unavailable');
+    await work('3', 'release');
+    expect(await db.biomedicalAssets.get(assetId)).toMatchObject({
+      status: 'Available',
       version: 3,
     });
     await change('3', 'acquire', technician);
@@ -2282,10 +2451,15 @@ describe('insurance and daily reconciliation', () => {
     const [coordinator, finance, cashier] = await Promise.all(
       ['claims', 'finance', 'cashier'].map(login),
     );
+    const seenPatients = new Set<string>();
     const encounters = await db.encounters
       .where('facilityId')
       .equals(facility)
-      .filter((row) => !!row.signedAt)
+      .filter((row) => {
+        if (!row.signedAt || seenPatients.has(row.patientId)) return false;
+        seenPatients.add(row.patientId);
+        return true;
+      })
       .limit(2)
       .toArray();
     const ids = ['contract-insured-invoice', 'contract-uncollected-invoice'];

@@ -5214,6 +5214,305 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /workforce:
+    get:
+      operationId: getFacilityWorkforce
+      summary: Read the current facility staff directory and selected day’s roster.
+      parameters:
+        - &a1
+          $ref: "#/components/parameters/Facility"
+        - in: query
+          name: day
+          description: Defaults to today in Asia/Kolkata.
+          schema: &a2
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /workforce/shifts:
+    post:
+      operationId: scheduleStaffShift
+      summary: Schedule a non-overlapping shift for an active assignment within 90 days.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - membershipId
+                - membershipVersion
+                - day
+                - startsAt
+                - endsAt
+              properties:
+                membershipId:
+                  type: string
+                membershipVersion: &a4
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+                day: *a2
+                startsAt: &a3
+                  type: string
+                  pattern: ^(?:(?:[01][0-9]|2[0-3]):(?:00|30)|24:00)$
+                endsAt: *a3
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /workforce/shifts/status:
+    patch:
+      operationId: recordStaffAttendance
+      summary: Record the next attendance state for the current shift version.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - shiftId
+                - version
+                - action
+              properties:
+                shiftId:
+                  type: string
+                version: *a4
+                action:
+                  type: string
+                  enum:
+                    - check-in
+                    - check-out
+                    - absent
+                    - cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /biomedical:
+    get:
+      operationId: getBiomedicalWorkspace
+      summary: Read the current facility equipment register and maintenance orders.
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BiomedicalData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /biomedical/equipment:
+    post:
+      operationId: registerBiomedicalEquipment
+      summary: Register an equipment tag unique to this facility.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tag
+                - category
+                - location
+              properties:
+                tag:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,19}$
+                category:
+                  type: string
+                  enum:
+                    - Patient monitor
+                    - Infusion pump
+                    - Examination light
+                location:
+                  type: string
+                  enum:
+                    - Outpatient
+                    - General ward
+                    - Critical care
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /biomedical/maintenance:
+    post:
+      operationId: openBiomedicalMaintenance
+      summary: Open a work order and make the asset unavailable immediately.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - assetId
+                - version
+                - reason
+              properties:
+                assetId:
+                  type: string
+                version: *a4
+                reason:
+                  type: string
+                  enum:
+                    - Fault reported
+                    - Preventive service
+                    - Inspection required
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /biomedical/maintenance/status:
+    patch:
+      operationId: updateBiomedicalMaintenance
+      summary: Start maintenance, record a functional check, release equipment or cancel an open order.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orderId
+                - version
+                - action
+              properties:
+                orderId:
+                  type: string
+                version: *a4
+                action:
+                  type: string
+                  enum:
+                    - start
+                    - verify
+                    - release
+                    - cancel
+                verified:
+                  type: string
+                  enum:
+                    - "true"
+                    - "false"
+                  description: Use true when recording a functional check.
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -7398,6 +7697,9 @@ components:
           $ref: "#/components/schemas/ImagingOrder"
         patient:
           $ref: "#/components/schemas/DiagnosticsPatient"
+        equipmentUnavailable:
+          type: boolean
+          description: The linked imaging room is out of service for a pending study.
     ReleasedImagingReport:
       type: object
       required:
@@ -8316,6 +8618,218 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProcurementSupplier"
+    RosterMember:
+      type: object
+      required:
+        - id
+        - account
+        - name
+        - role
+        - version
+      properties:
+        id:
+          type: string
+        account:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    StaffShift:
+      type: object
+      required:
+        - id
+        - facilityId
+        - membershipId
+        - membershipVersion
+        - account
+        - name
+        - role
+        - day
+        - startsAt
+        - endsAt
+        - status
+        - version
+        - changedAt
+        - changedBy
+        - assignmentCurrent
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        membershipId:
+          type: string
+        membershipVersion:
+          type: integer
+          minimum: 1
+        account:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        day:
+          type: string
+          format: date
+        startsAt: &a1
+          type: string
+          pattern: ^(?:(?:[01][0-9]|2[0-3]):(?:00|30)|24:00)$
+        endsAt: *a1
+        status:
+          type: string
+          enum:
+            - Scheduled
+            - Checked in
+            - Completed
+            - Absent
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+        checkedInAt:
+          type: integer
+          minimum: 0
+        checkedOutAt:
+          type: integer
+          minimum: 0
+        assignmentCurrent:
+          type: boolean
+    WorkforceData:
+      type: object
+      required:
+        - members
+        - shifts
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/RosterMember"
+        shifts:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffShift"
+    BiomedicalAsset:
+      type: object
+      required:
+        - id
+        - facilityId
+        - tag
+        - category
+        - location
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        tag: &a2
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{2,19}$
+        category: &a3
+          type: string
+          enum:
+            - Patient monitor
+            - Infusion pump
+            - Examination light
+            - Imaging equipment
+        location: &a4
+          type: string
+        imagingRoom:
+          type: string
+        activeWorkId:
+          type: string
+        status:
+          type: string
+          enum:
+            - Available
+            - Unavailable
+        version:
+          type: integer
+          minimum: 1
+    MaintenanceRow:
+      type: object
+      required:
+        - id
+        - facilityId
+        - assetId
+        - reason
+        - status
+        - version
+        - openedAt
+        - changedAt
+        - changedBy
+        - asset
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        assetId:
+          type: string
+        reason:
+          type: string
+          enum:
+            - Fault reported
+            - Preventive service
+            - Inspection required
+        status:
+          type: string
+          enum:
+            - Open
+            - In progress
+            - Ready for release
+            - Completed
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        openedAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+        verifiedAt:
+          type: integer
+          minimum: 0
+        verifiedBy:
+          type: string
+        asset:
+          type: object
+          required:
+            - tag
+            - category
+            - location
+          properties:
+            tag: *a2
+            category: *a3
+            location: *a4
+    BiomedicalData:
+      type: object
+      required:
+        - equipment
+        - orders
+      properties:
+        equipment:
+          type: array
+          items:
+            $ref: "#/components/schemas/BiomedicalAsset"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceRow"
   responses:
     Error401:
       description: 'Missing or expired session.'

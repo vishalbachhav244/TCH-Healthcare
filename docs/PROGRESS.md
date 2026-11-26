@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Workforce and Biomedical Engineering, 27 November 2026
+
+- Added D29 `/work/workforce` for a searchable staff directory, dated shift roster and attendance. A current assignment is required to schedule or check in, and an overlap is rejected across branches without revealing the other roster. [Workspace](../src/app/features/workforce.ts) · [Contract tests](../src/app/mocks/rest.spec.ts)
+- Added D30 `/work/biomedical` for an equipment register and versioned work orders. Linked imaging rooms become unavailable when maintenance opens. Radiology can cancel affected bookings and resumes scheduling and acquisition after release. [Workspace](../src/app/features/biomedical.ts) · [Radiology adapter](../src/app/mocks/radiology.ts)
+- Added the typed API contracts and schema version 22. Verified in Chromium that the upgrade retained the supplier and lot records, enabled both new roles and populated linked equipment. [OpenAPI](openapi.yaml) · [Migration](../src/app/mocks/database.ts)
+- Passed 40 domain and contract tests and 20 Chromium journeys. Both builds and the release verification passed. [Test report](TEST_REPORT.md)
+- Coverage is 30 dashboard IDs with partial routes and 6 open. Credentialing, payroll, preventive service scheduling and linked room setup at newly provisioned sites remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Mobile shift roster](screenshots/workforce-390.png) · [Biomedical work orders](screenshots/biomedical-1440.png)
+
 ## Inventory and Procurement, 27 November 2026
 
 - Added D27 `/work/inventory` for medication lot balances, physical counts, requisitions, goods receipt and receipt history.

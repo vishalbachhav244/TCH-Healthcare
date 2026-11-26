@@ -52,6 +52,9 @@ import type { CollectionClose, RefundDecision } from '../domain/finance';
 import type { InsuranceClaim, InsuranceCoverage } from '../domain/insurance';
 import type { GoodsReceipt, PurchaseOrder, Requisition, Supplier } from '../domain/procurement';
 import { initialSuppliers } from './procurement-seed';
+import type { StaffShift } from '../domain/workforce';
+import type { BiomedicalAsset, MaintenanceOrder } from '../domain/biomedical';
+import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
@@ -76,6 +79,9 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   supplyRequisitions: EntityTable<Requisition, 'id'>;
   purchaseOrders: EntityTable<PurchaseOrder, 'id'>;
   goodsReceipts: EntityTable<GoodsReceipt, 'id'>;
+  staffShifts: EntityTable<StaffShift, 'id'>;
+  biomedicalAssets: EntityTable<BiomedicalAsset, 'id'>;
+  maintenanceOrders: EntityTable<MaintenanceOrder, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -470,6 +476,25 @@ db.version(21)
     }
   });
 
+db.version(22)
+  .stores({
+    staffShifts: 'id, [facilityId+day], [account+day]',
+    biomedicalAssets: 'id, facilityId, &[facilityId+tag], &[facilityId+imagingRoom]',
+    maintenanceOrders: 'id, facilityId, assetId',
+  })
+  .upgrade(async (transaction) => {
+    const sites = await transaction.table<Facility, string>('facilities').toArray();
+    await transaction.table('biomedicalAssets').bulkAdd(initialEquipment(sites));
+    const existing = new Set(sites.map((facility) => facility.id));
+    const members = transaction.table<StaffMembership, string>('memberships');
+    for (const membership of initialStaff.filter(
+      (row) => row.role === 'workforce' || row.role === 'biomedical',
+    )) {
+      if (existing.has(membership.facilityId) && !(await members.get(membership.id)))
+        await members.add(membership);
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -494,6 +519,7 @@ export function initialize() {
         db.stockLots,
         db.stockMovements,
         db.suppliers,
+        db.biomedicalAssets,
         db.platformIncidents,
         db.connectors,
         db.qualityCases,
@@ -532,6 +558,7 @@ export function initialize() {
             openingStock(pharmacy.lots, Date.parse(referenceDay + 'T00:00:00+05:30')),
           ),
           db.suppliers.bulkAdd(initialSuppliers(initialFacilities)),
+          db.biomedicalAssets.bulkAdd(initialEquipment(initialFacilities)),
           db.platformIncidents.bulkAdd(initialIncidents(referenceDay)),
           db.connectors.bulkAdd(initialConnectors),
           db.qualityCases.bulkAdd(initialQualityCases(referenceDay)),

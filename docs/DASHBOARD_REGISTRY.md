@@ -32,8 +32,8 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D26 | Insurance & TPA | `/work/insurance` | Partial | Payer rules, retries and appeals, attachments, batch remittance and claim aging |
 | D27 | Inventory & Stores | `/work/inventory` | Partial | Non-pharmacy items, bin and location transfers, quarantine disposition and count approval |
 | D28 | Procurement | `/work/procurement` | Partial | Supplier onboarding, multi-line orders, outstanding balance closure and payables matching |
-| D29 | HR & Workforce | — | Open | Roster, assignment, credentialing and attendance |
-| D30 | Asset & Biomedical Engineering | — | Open | Equipment register, maintenance, service and safety |
+| D29 | HR & Workforce | `/work/workforce` | Partial | Staff onboarding and credentialing, multi-day shift patterns and payroll |
+| D30 | Asset & Biomedical Engineering | `/work/biomedical` | Partial | Preventive service calendar, device safety records, and linked room setup for newly provisioned sites |
 | D31 | Hospital Support Services | — | Open | Housekeeping, CSSD, dietary and service requests |
 | D32 | Ambulance & Patient Transport | — | Open | Transport queue, dispatch and operational history |
 | D33 | Healthcare CRM & Contact Center | — | Open | Enquiries, follow-up, referral and conversion |

@@ -48,6 +48,7 @@ export interface ImagingOrder {
 export interface ImagingRow {
   order: ImagingOrder;
   patient: Pick<Patient, 'id' | 'name'>;
+  equipmentUnavailable?: boolean;
 }
 
 export interface ReleasedImagingReport {

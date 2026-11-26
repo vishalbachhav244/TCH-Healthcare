@@ -29,6 +29,8 @@ import { closeCollections, decideRefund, requireOpenCollectionDay } from './fina
 import { claimCommand, recordCoverage } from './insurance';
 import { postGoodsReceipt, recordStockCount } from './inventory';
 import { purchaseOrderCommand, requisitionCommand } from './procurement';
+import { workforceCommand } from './workforce';
+import { biomedicalCommand } from './biomedical';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -98,6 +100,9 @@ export async function command(
       db.supplyRequisitions,
       db.purchaseOrders,
       db.goodsReceipts,
+      db.staffShifts,
+      db.biomedicalAssets,
+      db.maintenanceOrders,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -533,6 +538,25 @@ export async function command(
             session,
             payload,
             path.endsWith('/cancel'),
+          );
+          break;
+        case 'workforce/shifts':
+        case 'workforce/shifts/status':
+          changed = await workforceCommand(
+            scope(session, facilityRecord, 'D29', 'workforce'),
+            session,
+            payload,
+            path === 'workforce/shifts',
+          );
+          break;
+        case 'biomedical/equipment':
+        case 'biomedical/maintenance':
+        case 'biomedical/maintenance/status':
+          changed = await biomedicalCommand(
+            scope(session, facilityRecord, 'D30', 'biomedical'),
+            session,
+            payload,
+            path.endsWith('/equipment') ? 'register' : path.endsWith('/status') ? 'update' : 'open',
           );
           break;
         case 'alerts/acknowledge': {

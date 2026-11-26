@@ -1,6 +1,6 @@
 # Frontend implementation status
 
-The frontend is an independent project built from the supplied brief. 28 of 36 dashboard IDs have working routes with partial workflow coverage. The other 8 remain open. No dashboard has passed every acceptance criterion in the brief.
+The frontend is an independent project built from the supplied brief. 30 of 36 dashboard IDs have working routes with partial workflow coverage. The other 6 remain open. No dashboard has passed every acceptance criterion in the brief.
 
 The 137 canonical screen rows and 171 canonical requirement rows are referenced by count in the attachment. Their IDs and individual definitions were not supplied. The register uses local screen IDs and the brief's section numbers while they are unavailable. [Screen inventory](SCREEN_INVENTORY.md)
 
@@ -33,12 +33,14 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §§9,16.9 Insurance | D26 | TC-LOCAL-42 `/work/insurance` | Partial | Patient coverage, preauthorisation, preparation, submission and payer settlement on eligible invoices | Facility and policy checks, versioned transitions, duplicate settlement rejection and claim hold | Payer configuration, outpatient medication claims, attachments, retries, appeals and remittance reconciliation |
 | §§9,16.10 Inventory | D27 | TC-LOCAL-43 `/work/inventory` | Partial | Pharmacy lot balances, stock counts, requisitions and partial goods receipt | Shared lot ledger, stale count denial, expiry and quantity checks, receipt history | Non-pharmacy items, transfers and count approvals |
 | §§9,16.10 Procurement | D28 | TC-LOCAL-44 `/work/procurement` | Partial | Requisition decisions, eligible suppliers, purchase orders and receiving status | Role and facility scope, duplicate issuance and receipt cancellation guards | Supplier onboarding, multi-line purchasing and payables matching |
+| §9 HR & Workforce | D29 | TC-LOCAL-45 `/work/workforce` | Partial | Active staff directory, daily shifts and attendance | Assignment versions, cross-facility overlap guard, attendance lifecycle and historical roster | Staff credentialing, recurring and overnight shifts and payroll |
+| §9 Biomedical Engineering | D30 | TC-LOCAL-46 `/work/biomedical` | Partial | Equipment registration, maintenance start, functional check and release, and linked imaging availability | Scoped tags and work orders, explicit check confirmation, stale write rejection and live Radiology updates | Preventive service calendar, safety records and room-asset configuration |
 
 Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBILITY_REPORT.md) for exact run evidence.
 
 ## Continuation checkpoint
 
-1. Continue M7 with D29 HR & Workforce and D30 Asset & Biomedical Engineering. Follow with D31 Hospital Support Services and D32 Ambulance & Patient Transport.
+1. Continue M7 with D31 Hospital Support Services and D32 Ambulance & Patient Transport.
 2. Continue M8 engagement and analytics D33–D36. Extend payments, insurance, diagnostic records and inventory beyond pharmacy.
 3. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
 4. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.
