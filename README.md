@@ -11,7 +11,7 @@ npm ci
 npm start
 ```
 
-Open [TrueCare on loopback](http://127.0.0.1:4200). Use the following evaluation accounts with the shared password `TrueCare-Local-2026`. Enter only fictional data. Account credentials are distributed in this developer guide.
+Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation accounts with the shared password `TrueCare-Local-2026`. Enter only fictional data. Account credentials are distributed in this developer guide.
 
 | Account | Workspace |
 | --- | --- |

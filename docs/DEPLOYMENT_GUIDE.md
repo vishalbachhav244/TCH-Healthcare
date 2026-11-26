@@ -4,7 +4,7 @@ Use Node 24.22.3 and the checked-in dependency lockfile. The CLI binds to `127.0
 
 | Command | Output and access |
 | --- | --- |
-| `npm start` | Development evaluation at http://127.0.0.1:4200 |
+| `npm start` | Development evaluation at http://127.0.0.1:4280 |
 | `npm run build:evaluation` | Optimised evaluation bundle at `dist/evaluation/browser`. Serve only on loopback. The Angular PWA worker caches asset files and has no API data groups. |
 | `npm run build` | Inactive release boundary at `dist/truecare/browser`. Local authentication, mock handlers and seed code are excluded. |
 
