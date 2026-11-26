@@ -38,7 +38,7 @@ export class SignIn {
     const { account, password } = this.form.getRawValue();
     try {
       await this.session.signIn(account, password);
-      await this.router.navigateByUrl('/work/' + this.session.initialRoute(), { replaceUrl: true });
+      await this.router.navigateByUrl(this.session.home(), { replaceUrl: true });
     } catch (error) {
       this.error.set(errorMessage(error));
     } finally {

@@ -53,6 +53,7 @@
           <thead>
             <tr>
               <th scope="col">Patient</th>
+              <th scope="col">Service</th>
               <th scope="col">Total</th>
               <th scope="col">Balance</th>
               <th scope="col">Status</th>
@@ -67,6 +68,7 @@
                   <strong>{{ row.patient.name }}</strong
                   ><small>{{ row.patient.id }}</small>
                 </td>
+                <td>{{ row.invoice.lines.at(0)?.description }}</td>
                 <td>{{ row.totalMinor | rupees }}</td>
                 <td>{{ row.balanceMinor | rupees }}</td>
                 <td>

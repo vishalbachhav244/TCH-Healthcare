@@ -58,7 +58,10 @@ export async function laboratoryCommand(
       typeof payload['encounterId'] === 'string'
         ? await db.encounters.get(payload['encounterId'])
         : undefined;
-    if (encounter?.facilityId !== facility.id || encounter.practitionerId !== facility.id + '-DR-1')
+    if (
+      encounter?.facilityId !== facility.id ||
+      encounter.practitionerId !== session.facilityAccess[facility.id].practitionerId
+    )
       throw new ApiError(404, 'Encounter not found.');
     if (encounter.signedAt) throw new ApiError(409, 'The encounter has already been signed.');
     const test = labCatalogue.find((value) => value === payload['test']);
@@ -92,8 +95,8 @@ export async function laboratoryCommand(
   if (!status) throw new ApiError(409, 'This order is already published.');
   if (
     ['Authorised', 'Published'].includes(status)
-      ? !session.writes.includes('laboratory/review')
-      : !session.writes.includes('laboratory')
+      ? !session.facilityAccess[facility.id].writes.includes('laboratory/review')
+      : !session.facilityAccess[facility.id].writes.includes('laboratory')
   ) {
     throw new ApiError(403, 'The current stage requires a different laboratory responsibility.');
   }

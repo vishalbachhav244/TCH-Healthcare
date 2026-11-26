@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Continuation, 26 November 2026
+
+- Added distinct subscription, platform operations, healthcare network and pharmacy workspaces.
+- Implemented facility activation and versioned per-facility roles with fresh authorization in commands. Added slot availability, appointment changes and queue recall, skip, requeue and transfer.
+- Connected clinical prescription signing to pharmacy stock and separate patient invoices.
+- See the [implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) for remaining work and the [test report](TEST_REPORT.md) for verification.
+
 ## 26 November 2026
 
 - Created the standalone Angular frontend from the latest attached brief. The project has a new `AGENTS.md` and its own Git history.

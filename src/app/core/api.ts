@@ -14,6 +14,10 @@ import type {
 import type { LabRow, LabStage } from '../domain/diagnostics';
 import type { PatientPortal } from '../domain/portal';
 import type { PlatformData } from '../domain/platform';
+import type { SubscriptionRow } from '../domain/platform';
+import type { NetworkFacilityMetrics } from '../domain/operations';
+import type { PharmacyData, Prescription } from '../domain/pharmacy';
+import type { PlatformOperationsData } from '../domain/platform-operations';
 
 interface CommandResult {
   id: string;
@@ -79,7 +83,29 @@ export class Api {
 
   platform(token: string) {
     return this.get('platform', token).pipe(
-      map((value) => objectShape<PlatformData>(value, ['organisations', 'facilities', 'activity'])),
+      map((value) =>
+        objectShape<PlatformData>(value, [
+          'organisations',
+          'facilities',
+          'activity',
+          'staff',
+          'memberships',
+          'practitioners',
+        ]),
+      ),
+    );
+  }
+
+  platformOperations(token: string) {
+    return this.get('platform-operations', token).pipe(
+      map((value) =>
+        objectShape<PlatformOperationsData>(value, [
+          'incidents',
+          'activeSessions',
+          'eventsToday',
+          'activity',
+        ]),
+      ),
     );
   }
 
@@ -97,6 +123,60 @@ export class Api {
     );
   }
 
+  subscriptions(token: string) {
+    return this.get('subscriptions', token).pipe(
+      map((value) =>
+        collection<SubscriptionRow>(value, [
+          'organisation',
+          'facilities',
+          'activeFacilities',
+          'inpatientFacilities',
+          'nextReview',
+        ]),
+      ),
+    );
+  }
+
+  network(token: string, facility: string, day: string) {
+    return this.get('network', token, facility, { day }).pipe(
+      map((value) =>
+        collection<NetworkFacilityMetrics>(value, ['facility', 'metrics', 'departments']),
+      ),
+    );
+  }
+
+  pharmacy(token: string, facility: string) {
+    return this.get('pharmacy', token, facility).pipe(
+      map((value) => objectShape<PharmacyData>(value, ['prescriptions', 'lots'])),
+    );
+  }
+
+  prescriptions(token: string, facility: string, encounterId: string) {
+    return this.get('clinical/prescriptions', token, facility, { encounterId }).pipe(
+      map((value) => collection<Prescription>(value, ['id', 'productId', 'quantity', 'status'])),
+    );
+  }
+
+  availableTimes(
+    token: string,
+    facility: string,
+    day: string,
+    practitionerId: string,
+    appointmentId: string,
+  ) {
+    return this.get('appointments/availability', token, facility, {
+      day,
+      practitionerId,
+      appointmentId,
+    }).pipe(
+      map((value) => {
+        if (!Array.isArray(value) || value.some((time) => typeof time !== 'string'))
+          throw new Error('The workspace returned invalid appointment times.');
+        return value as string[];
+      }),
+    );
+  }
+
   appointments(
     path: 'appointments' | 'queue' | 'clinical',
     token: string,
@@ -109,7 +189,7 @@ export class Api {
   }
 
   patients(
-    path: 'patients' | 'appointments/options' | 'admissions/options',
+    path: 'patients' | 'appointments/options' | 'admissions/options' | 'queue/options',
     token: string,
     facility: string,
     q: string,
@@ -217,6 +297,7 @@ export class Api {
       'workspaces',
       'writes',
       'facilityIds',
+      'facilityAccess',
       'expiresAt',
     ]);
   }

@@ -4,11 +4,11 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 
 | ID | Dashboard | Route | Status | Remaining requirements |
 | --- | --- | --- | --- | --- |
-| D01 | SaaS Super Admin | `/work/platform` | Partial | Plan authoring and changes, staff assignments, usage and other entitlement policies |
-| D02 | Customer Success & Subscriptions | — | Open | Account health, renewals and subscription changes |
-| D03 | Platform Operations | — | Open | Operational telemetry, service incidents and audit |
+| D01 | SaaS Super Admin | `/work/platform` | Partial | Department setup, account creation, and additional entitlement policies |
+| D02 | Customer Success & Subscriptions | `/work/subscriptions` | Partial | Renewals, plan authoring and billing integration |
+| D03 | Platform Operations | `/work/platform-operations` | Partial | Service health probes, alert ownership, escalation and audit exports |
 | D04 | Interoperability & Integration | — | Open | Scoped connectors, consented exchange and activity |
-| D05 | Healthcare Network Executive | — | Open | Network aggregates and cross-facility drill-down |
+| D05 | Healthcare Network Executive | `/work/network` | Partial | Trend comparisons, longer reporting periods and network exports |
 | D06 | Hospital Executive | `/work/overview` | Partial | Staff capacity, approvals and deeper analytics |
 | D07 | Medical Director | — | Open | Clinical governance, quality indicators and approvals |
 | D08 | Quality & Compliance | — | Open | Incidents, audit and corrective actions |
@@ -25,7 +25,7 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D19 | Admission, Bed & Discharge | `/work/beds` | Partial | Nursing, charges, discharge documents and financial linkage |
 | D20 | Laboratory / LIMS | `/work/laboratory` | Partial | Numeric panels, reporting files, corrections and richer audit |
 | D21 | Radiology & Imaging | — | Open | Imaging orders, modality schedule and release |
-| D22 | Pharmacy | — | Open | Signed prescriptions, medication batches and dispense ledger |
+| D22 | Pharmacy | `/work/pharmacy` | Partial | Catalogue authoring, receiving, returns, stock reconciliation and partial fills |
 | D23 | Blood Bank | — | Open | Authorised inventory, compatibility and issue worklist |
 | D24 | Patient Billing & Cashier | `/work/billing` | Partial | Deposits, taxes, discounts, receipts, refunds and invoice pagination |
 | D25 | Finance & Revenue | — | Open | Cash close, reports, accounting and reconciliation |

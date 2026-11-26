@@ -1,5 +1,8 @@
 export type Resource =
   | 'platform'
+  | 'subscriptions'
+  | 'platform-operations'
+  | 'network'
   | 'overview'
   | 'appointments'
   | 'patients'
@@ -8,6 +11,7 @@ export type Resource =
   | 'beds'
   | 'billing'
   | 'laboratory'
+  | 'pharmacy'
   | 'portal';
 
 interface Workspace {
@@ -27,10 +31,28 @@ export const workspaces: readonly Workspace[] = [
     icon: 'building',
     resource: 'platform',
   },
-  { id: 'D02', title: 'Customer Success & Subscriptions', group: 'Platform', icon: 'users' },
-  { id: 'D03', title: 'Platform Operations', group: 'Platform', icon: 'activity' },
+  {
+    id: 'D02',
+    title: 'Customer Success & Subscriptions',
+    group: 'Platform',
+    icon: 'wallet',
+    resource: 'subscriptions',
+  },
+  {
+    id: 'D03',
+    title: 'Platform Operations',
+    group: 'Platform',
+    icon: 'activity',
+    resource: 'platform-operations',
+  },
   { id: 'D04', title: 'Interoperability & Integration', group: 'Platform', icon: 'network' },
-  { id: 'D05', title: 'Healthcare Network Executive', group: 'Governance', icon: 'network' },
+  {
+    id: 'D05',
+    title: 'Healthcare Network Executive',
+    group: 'Governance',
+    icon: 'activity',
+    resource: 'network',
+  },
   {
     id: 'D06',
     title: 'Hospital Overview',
@@ -108,7 +130,7 @@ export const workspaces: readonly Workspace[] = [
     resource: 'laboratory',
   },
   { id: 'D21', title: 'Radiology & Imaging', group: 'Diagnostics', icon: 'monitor' },
-  { id: 'D22', title: 'Pharmacy', group: 'Diagnostics', icon: 'cross' },
+  { id: 'D22', title: 'Pharmacy', group: 'Diagnostics', icon: 'cross', resource: 'pharmacy' },
   { id: 'D23', title: 'Blood Bank', group: 'Diagnostics', icon: 'heart' },
   {
     id: 'D24',
@@ -133,6 +155,14 @@ export const workspaces: readonly Workspace[] = [
 
 export const navigation = [
   { title: 'Organizations', resource: 'platform', icon: 'building', workspace: 'D01' },
+  { title: 'Subscriptions', resource: 'subscriptions', icon: 'wallet', workspace: 'D02' },
+  {
+    title: 'Platform operations',
+    resource: 'platform-operations',
+    icon: 'activity',
+    workspace: 'D03',
+  },
+  { title: 'Network performance', resource: 'network', icon: 'activity', workspace: 'D05' },
   { title: 'Overview', resource: 'overview', icon: 'layout', workspace: 'D06' },
   { title: 'Appointments', resource: 'appointments', icon: 'calendar', workspace: 'D10' },
   { title: 'Patients', resource: 'patients', icon: 'users', workspace: 'D09' },
@@ -140,6 +170,13 @@ export const navigation = [
   { title: 'Clinical workspace', resource: 'clinical', icon: 'stethoscope', workspace: 'D13' },
   { title: 'Bed management', resource: 'beds', icon: 'bed', workspace: 'D19' },
   { title: 'Laboratory', resource: 'laboratory', icon: 'flask', workspace: 'D20' },
+  { title: 'Pharmacy', resource: 'pharmacy', icon: 'cross', workspace: 'D22' },
   { title: 'Revenue cycle', resource: 'billing', icon: 'wallet', workspace: 'D24' },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
 ] as const;
+
+export const platformResources: readonly string[] = [
+  'platform',
+  'subscriptions',
+  'platform-operations',
+];

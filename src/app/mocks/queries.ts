@@ -32,7 +32,7 @@ function dailyAppointments(facility: Facility, day: string) {
 export async function queueDisplay(facilityId: string | null): Promise<QueueDisplayData> {
   // Public signage is configured explicitly for these facilities.
   const facility = facilityId ? await db.facilities.get(facilityId) : undefined;
-  if (!facility?.publicQueue)
+  if (!facility?.publicQueue || facility.active === false)
     throw new ApiError(404, 'Queue display is unavailable at this facility.');
   const today = await dailyAppointments(facility, dayInIndia());
   const [tickets, practitioners] = await Promise.all([
@@ -48,7 +48,7 @@ export async function queueDisplay(facilityId: string | null): Promise<QueueDisp
     facility: facility.name,
     calling: tickets
       .filter((row) => row.status === 'Called')
-      .sort((a, b) => (b.calledAt ?? 0) - (a.calledAt ?? 0))
+      .sort((a, b) => (b.lastCalledAt ?? b.calledAt ?? 0) - (a.lastCalledAt ?? a.calledAt ?? 0))
       .slice(0, 6)
       .flatMap((row) => {
         const provider = providerByAppointment.get(row.appointmentId);
@@ -129,9 +129,10 @@ export async function dashboard(
   facility: Facility,
   day: string,
   range: number,
+  includeAppointmentActivity = true,
 ): Promise<DashboardData> {
   const slots = Array.from({ length: range }, (_, i) => shiftDay(day, i - range + 1));
-  const [forPeriod, prior, providers, beds, alerts, invoices] = await Promise.all([
+  const [forPeriod, prior, providers, beds, alerts, datedPayments] = await Promise.all([
     db.appointments
       .where('[facilityId+day]')
       .between([facility.id, slots[0]], [facility.id, day], true, true)
@@ -140,22 +141,22 @@ export async function dashboard(
     db.practitioners.where('facilityId').equals(facility.id).toArray(),
     facility.inpatient ? db.beds.where('facilityId').equals(facility.id).toArray() : [],
     db.alerts.where('facilityId').equals(facility.id).toArray(),
-    db.invoices
-      .where('[facilityId+day]')
-      .between([facility.id, shiftDay(day, -1)], [facility.id, day], true, true)
+    db.payments
+      .where('day')
+      .anyOf([shiftDay(day, -1), day])
       .toArray(),
   ]);
   const today = forPeriod.filter((item) => item.day === day);
-  const [tickets, payments] = await Promise.all([
+  const [tickets, paymentInvoices] = await Promise.all([
     db.tickets
       .where('appointmentId')
       .anyOf(today.map((item) => item.id))
       .toArray(),
-    db.payments
-      .where('invoiceId')
-      .anyOf(invoices.map((invoice) => invoice.id))
-      .toArray(),
+    db.invoices.bulkGet(datedPayments.map((payment) => payment.invoiceId)),
   ]);
+  const payments = datedPayments.filter(
+    (_, index) => paymentInvoices[index]?.facilityId === facility.id,
+  );
   const available = today.filter((appointment) => appointment.status !== 'Cancelled');
   const visits = tickets.filter((ticket) => ticket.calledAt !== undefined);
   const average = visits.length
@@ -201,10 +202,12 @@ export async function dashboard(
       };
     }),
     alerts,
-    appointments: await hydrate(
-      facility,
-      [...available].sort((a, b) => appointmentOrder(a) - appointmentOrder(b)).slice(0, 5),
-    ),
+    appointments: includeAppointmentActivity
+      ? await hydrate(
+          facility,
+          [...available].sort((a, b) => appointmentOrder(a) - appointmentOrder(b)).slice(0, 5),
+        )
+      : [],
   };
 }
 

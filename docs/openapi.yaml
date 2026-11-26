@@ -1101,6 +1101,784 @@ paths:
           $ref: '#/components/responses/Error422'
         '503':
           $ref: '#/components/responses/Error503'
+  /platform/activation:
+    patch:
+      operationId: configureFacilityActivation
+      summary: Set facility activation with an expected version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                facilityId:
+                  type: string
+                version:
+                  type: string
+                active:
+                  type: string
+                  enum:
+                    - 'true'
+                    - 'false'
+              required:
+                - facilityId
+                - version
+                - active
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform/membership:
+    patch:
+      operationId: configureStaffMembership
+      summary: Assign or revoke the role of a named staff account at a facility.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                facilityId:
+                  type: string
+                account:
+                  type: string
+                role:
+                  type: string
+                version:
+                  type: string
+                practitionerId:
+                  type: string
+                active:
+                  type: string
+                  enum:
+                    - 'true'
+                    - 'false'
+              required:
+                - facilityId
+                - account
+                - version
+                - active
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /subscriptions:
+    get:
+      operationId: getSubscriptions
+      summary: Read platform subscriptions and their review dates.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubscriptionRow'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateSubscription
+      summary: Assign a compatible plan or record review at the expected version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                organisationId: &a2
+                  type: string
+                version: *a2
+                plan: *a2
+                action:
+                  type: string
+                  enum:
+                    - plan
+                    - review
+              required:
+                - organisationId
+                - version
+                - action
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /network:
+    get:
+      operationId: getNetworkPerformance
+      summary: Compare active, individually authorized facilities within the selected
+        tenant.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+        - in: query
+          name: day
+          schema:
+            type: string
+            format: date
+          required: false
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NetworkFacilityMetrics'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/availability:
+    get:
+      operationId: getAppointmentAvailability
+      summary: List available times for the clinician and date.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+        - in: query
+          name: day
+          schema:
+            type: string
+            format: date
+          required: true
+        - in: query
+          name: practitionerId
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: appointmentId
+          schema:
+            type: string
+          required: false
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/reschedule:
+    patch:
+      operationId: rescheduleAppointment
+      summary: Move a booked appointment to an available slot and rotate its pass.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                version:
+                  type: string
+                time:
+                  type: string
+                practitionerId:
+                  type: string
+                day:
+                  type: string
+                  format: date
+              required:
+                - appointmentId
+                - version
+                - time
+                - practitionerId
+                - day
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /appointments/cancel:
+    patch:
+      operationId: cancelAppointment
+      summary: Cancel a booked appointment at the expected version and invalidate its
+        pass.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                version:
+                  type: string
+              required:
+                - appointmentId
+                - version
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /queue/options:
+    get:
+      operationId: getQueueTransferOptions
+      summary: Read same-facility clinicians for a queue transfer.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessOptions'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /queue/recall:
+    post:
+      operationId: recallQueueToken
+      summary: Recall a called token.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                expectedStatus:
+                  type: string
+              required:
+                - appointmentId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /queue/skip:
+    post:
+      operationId: skipQueueToken
+      summary: Skip a token awaiting consultation.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                expectedStatus:
+                  type: string
+              required:
+                - appointmentId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /queue/requeue:
+    post:
+      operationId: requeueQueueToken
+      summary: Return a skipped token to waiting.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                expectedStatus:
+                  type: string
+              required:
+                - appointmentId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /queue/transfer:
+    post:
+      operationId: transferQueueToken
+      summary: Transfer the token to another clinician in the facility.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appointmentId:
+                  type: string
+                expectedStatus:
+                  type: string
+                practitionerId:
+                  type: string
+                fromPractitionerId:
+                  type: string
+              required:
+                - appointmentId
+                - practitionerId
+                - fromPractitionerId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /clinical/prescriptions:
+    get:
+      operationId: getClinicalPrescriptions
+      summary: Read prescriptions for the assigned clinician and encounter.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+        - in: query
+          name: encounterId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PharmacyPrescription'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: draftPrescription
+      summary: Draft a catalogue prescription for the assigned consultation.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                encounterId: &a2
+                  type: string
+                productId: *a2
+                quantity: *a2
+              required:
+                - encounterId
+                - productId
+                - quantity
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /clinical/prescriptions/sign:
+    post:
+      operationId: signPrescription
+      summary: Sign the assigned clinician’s draft prescription.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prescriptionId:
+                  type: string
+              required:
+                - prescriptionId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /pharmacy:
+    get:
+      operationId: getPharmacyWorklist
+      summary: Read the facility dispensing worklist and stock lots.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PharmacyData'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /pharmacy/dispense:
+    post:
+      operationId: dispenseSignedPrescription
+      summary: Dispense once from a valid lot and post a separate medicine invoice.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prescriptionId:
+                  type: string
+                lotId:
+                  type: string
+              required:
+                - prescriptionId
+                - lotId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform-operations:
+    get:
+      operationId: getPlatformOperations
+      summary: Read incident records, current counts and recent event metadata.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformOperationsData'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform-operations/incidents:
+    post:
+      operationId: openPlatformIncident
+      summary: Open an incident for a workspace service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - service
+                - priority
+              properties:
+                title:
+                  type: string
+                service:
+                  type: string
+                priority:
+                  type: string
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: advancePlatformIncident
+      summary: Advance the incident lifecycle at the expected version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - version
+              properties:
+                id: &a4
+                  type: string
+                version: *a4
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
 components:
   securitySchemes:
     sessionToken:
@@ -1132,7 +1910,15 @@ components:
           format: 'uuid'
     Session:
       type: 'object'
-      required: ['token', 'account', 'name', 'workspaces', 'writes', 'facilityIds', 'expiresAt']
+      required:
+        - token
+        - account
+        - name
+        - workspaces
+        - writes
+        - facilityIds
+        - expiresAt
+        - facilityAccess
       properties:
         token:
           type: 'string'
@@ -1155,6 +1941,10 @@ components:
             type: 'string'
         expiresAt:
           type: 'integer'
+        facilityAccess:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/FacilityAccess'
     Facility:
       type: 'object'
       required: ['id', 'tenantId', 'name', 'city', 'inpatient']
@@ -1173,6 +1963,8 @@ components:
           type: boolean
         configurationVersion:
           type: integer
+        active:
+          type: boolean
     Patient:
       type: 'object'
       required: ['id', 'tenantId', 'name', 'initials', 'age']
@@ -1223,6 +2015,8 @@ components:
         status:
           type: 'string'
           enum: ['Booked', 'Checked in', 'In consultation', 'Completed', 'Cancelled']
+        version:
+          type: integer
     Ticket:
       type: 'object'
       required: ['id', 'facilityId', 'appointmentId', 'number', 'arrivedAt', 'status']
@@ -1242,6 +2036,8 @@ components:
           enum: ['Waiting', 'Called', 'In consultation', 'Completed', 'Skipped']
         calledAt:
           type: 'integer'
+        lastCalledAt:
+          type: integer
     Encounter:
       type: 'object'
       required: ['id', 'facilityId', 'appointmentId', 'patientId', 'practitionerId', 'startedAt']
@@ -1521,6 +2317,8 @@ components:
                 type: 'integer'
               quantity:
                 type: 'integer'
+        prescriptionId:
+          type: string
     InvoiceRow:
       type: 'object'
       required: ['invoice', 'patient', 'totalMinor', 'balanceMinor']
@@ -1631,6 +2429,11 @@ components:
             - Clinic
             - Hospital
             - Network
+        reviewedOn:
+          type: string
+          format: date
+        subscriptionVersion:
+          type: integer
     PlatformEvent:
       type: object
       required:
@@ -1652,6 +2455,9 @@ components:
         - organisations
         - facilities
         - activity
+        - staff
+        - memberships
+        - practitioners
       properties:
         organisations:
           type: array
@@ -1665,6 +2471,242 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlatformEvent'
+        staff:
+          type: array
+          items:
+            type: object
+            properties:
+              account: &a2
+                type: string
+              name: *a2
+            required:
+              - account
+              - name
+        memberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffMembership'
+        practitioners:
+          type: array
+          items:
+            $ref: '#/components/schemas/Practitioner'
+    FacilityAccess:
+      type: object
+      properties:
+        workspaces:
+          type: array
+          items: &a2
+            type: string
+        writes:
+          type: array
+          items: *a2
+        practitionerId: *a2
+      required:
+        - workspaces
+        - writes
+    StaffMembership:
+      type: object
+      properties:
+        id: &a2
+          type: string
+        account: *a2
+        facilityId: *a2
+        role: *a2
+        practitionerId: *a2
+        active:
+          type: boolean
+        version:
+          type: integer
+      required:
+        - id
+        - account
+        - facilityId
+        - role
+        - active
+        - version
+    SubscriptionRow:
+      type: object
+      properties:
+        organisation:
+          $ref: '#/components/schemas/Organisation'
+        facilities: &a2
+          type: integer
+        activeFacilities: *a2
+        inpatientFacilities: *a2
+        nextReview:
+          type: string
+          format: date
+      required:
+        - organisation
+        - facilities
+        - activeFacilities
+        - inpatientFacilities
+        - nextReview
+    NetworkFacilityMetrics:
+      type: object
+      properties:
+        facility:
+          type: object
+          properties:
+            id: &a2
+              type: string
+            name: *a2
+            city: *a2
+            inpatient:
+              type: boolean
+          required:
+            - id
+            - name
+            - city
+            - inpatient
+        metrics:
+          $ref: '#/components/schemas/Dashboard/properties/metrics'
+        departments:
+          $ref: '#/components/schemas/Dashboard/properties/departments'
+      required:
+        - facility
+        - metrics
+        - departments
+    PharmacyPrescription:
+      type: object
+      properties:
+        id: &a2
+          type: string
+        facilityId: *a2
+        encounterId: *a2
+        patientId: *a2
+        practitionerId: *a2
+        productId: *a2
+        signedBy: *a2
+        lotId: *a2
+        invoiceId: *a2
+        quantity: &a3
+          type: integer
+        status:
+          type: string
+          enum:
+            - Draft
+            - Signed
+            - Dispensed
+        createdAt: *a3
+        signedAt: *a3
+        dispensedAt: *a3
+      required:
+        - id
+        - facilityId
+        - encounterId
+        - patientId
+        - practitionerId
+        - productId
+        - quantity
+        - status
+        - createdAt
+    StockLot:
+      type: object
+      properties:
+        id: &a2
+          type: string
+        facilityId: *a2
+        productId: *a2
+        batch: *a2
+        expiresOn:
+          type: string
+          format: date
+        onHand:
+          type: integer
+      required:
+        - id
+        - facilityId
+        - productId
+        - batch
+        - expiresOn
+        - onHand
+    PharmacyData:
+      type: object
+      properties:
+        prescriptions:
+          type: array
+          items:
+            type: object
+            properties:
+              prescription:
+                $ref: '#/components/schemas/PharmacyPrescription'
+              patient:
+                type: object
+                properties:
+                  id: &a2
+                    type: string
+                  name: *a2
+                required:
+                  - id
+                  - name
+            required:
+              - prescription
+              - patient
+        lots:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockLot'
+      required:
+        - prescriptions
+        - lots
+    PlatformIncident:
+      type: object
+      required:
+        - id
+        - title
+        - service
+        - priority
+        - status
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id: &a4
+          type: string
+        title: *a4
+        service: *a4
+        priority: *a4
+        status:
+          type: string
+          enum:
+            - Open
+            - Investigating
+            - Resolved
+        version: &a5
+          type: integer
+        createdAt: *a5
+        updatedAt: *a5
+    PlatformOperationsData:
+      type: object
+      required:
+        - incidents
+        - activeSessions
+        - eventsToday
+        - activity
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformIncident'
+        activeSessions: &a4
+          type: integer
+        eventsToday: *a4
+        activity:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - type
+              - location
+              - occurredAt
+            properties:
+              id: &a5
+                type: string
+              type: *a5
+              location: *a5
+              occurredAt: *a4
   responses:
     Error401:
       description: 'Missing or expired session.'

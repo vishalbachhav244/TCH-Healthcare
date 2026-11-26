@@ -11,6 +11,7 @@ import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import { dayInIndia, observations, type AppointmentRow } from '../domain/operations';
 import { labCatalogue } from '../domain/diagnostics';
+import { ClinicalPrescriptions } from './clinical-prescriptions';
 
 const headings = {
   appointments: 'Appointments',
@@ -29,7 +30,7 @@ const states = {
 };
 
 @Component({
-  imports: [DatePipe, NgIcon, ReactiveFormsModule, RouterLink, StatusTone],
+  imports: [ClinicalPrescriptions, DatePipe, NgIcon, ReactiveFormsModule, RouterLink, StatusTone],
   templateUrl: './access-worklist.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -80,6 +81,10 @@ export class AccessWorklist {
   protected readonly selectedTest = this.fb.control('', Validators.required);
   protected readonly clinicalFeedback = signal('');
   protected readonly bookingOpen = signal(false);
+  protected readonly bookingTarget = signal<AppointmentRow | undefined>(undefined);
+  protected readonly cancellationTarget = signal<AppointmentRow | undefined>(undefined);
+  protected readonly transferTarget = signal<AppointmentRow | undefined>(undefined);
+  protected readonly destination = this.fb.control('', Validators.required);
   protected readonly displayEnabled = computed(() => !!this.store.facility()?.publicQueue);
   private readonly scope = computed(() => ({
     token: this.store.session()?.token ?? '',
@@ -106,15 +111,44 @@ export class AccessWorklist {
   protected readonly options = facilityQuery(this.choiceParams, ({ token, facility, q }) =>
     this.api.patients('appointments/options', token, facility, q),
   );
+  private readonly slotProvider = toSignal(this.booking.controls.practitionerId.valueChanges, {
+    initialValue: '',
+  });
+  private readonly slotDay = toSignal(this.booking.controls.day.valueChanges, {
+    initialValue: this.today,
+  });
+  private readonly slotParams = computed(() => ({
+    ...this.scope(),
+    facility:
+      this.bookingOpen() && this.slotProvider() && this.slotDay() ? this.scope().facility : '',
+    day: this.slotDay(),
+    practitionerId: this.slotProvider(),
+    appointmentId: this.bookingTarget()?.appointment.id ?? '',
+  }));
+  protected readonly slots = facilityQuery(
+    this.slotParams,
+    ({ token, facility, day, practitionerId, appointmentId }) =>
+      this.api.availableTimes(token, facility, day, practitionerId, appointmentId),
+  );
+  private readonly transferParams = computed(() => ({
+    ...this.scope(),
+    facility: this.transferTarget() ? this.scope().facility : '',
+  }));
+  protected readonly transferOptions = facilityQuery(this.transferParams, ({ token, facility }) =>
+    this.api.patients('queue/options', token, facility, ''),
+  );
 
-  protected openBooking(dialog: HTMLDialogElement) {
+  protected openBooking(dialog: HTMLDialogElement, row?: AppointmentRow) {
     this.pass.set('');
     this.qr.set('');
     this.dialogFailure.set('');
+    this.bookingTarget.set(row);
     this.booking.reset({
-      day: this.day() < this.today ? this.today : this.day(),
-      time: '14:00',
-      channel: 'Scheduled',
+      patientId: row?.appointment.patientId ?? '',
+      practitionerId: row?.appointment.practitionerId ?? '',
+      day: row?.appointment.day ?? (this.day() < this.today ? this.today : this.day()),
+      time: row?.appointment.time ?? '14:00',
+      channel: row?.appointment.channel ?? 'Scheduled',
     });
     this.patientSearch.reset();
     this.bookingOpen.set(true);
@@ -127,17 +161,71 @@ export class AccessWorklist {
       this.dialogFailure.set('Choose a patient, clinician and appointment time.');
       return;
     }
-    const result = await this.execute(
-      'appointments',
-      this.booking.getRawValue(),
-      'Appointment booked.',
-      true,
-    );
+    const slot = this.booking.getRawValue();
+    const current = this.bookingTarget()?.appointment;
+    const result = current
+      ? await this.execute(
+          'appointments/reschedule',
+          { ...slot, appointmentId: current.id, version: String(current.version ?? 0) },
+          'Appointment rescheduled.',
+          true,
+          'PATCH',
+        )
+      : await this.execute('appointments', slot, 'Appointment booked.', true);
     if (result?.pass) {
+      this.day.set(slot.day);
+      this.offset.set(0);
       this.pass.set(result.pass);
       const { toDataURL } = await import('qrcode');
       this.qr.set(await toDataURL(result.pass, { margin: 2, width: 192 }).catch(() => ''));
     }
+  }
+
+  protected offerCancellation(row: AppointmentRow, dialog: HTMLDialogElement) {
+    this.cancellationTarget.set(row);
+    this.dialogFailure.set('');
+    dialog.showModal();
+  }
+
+  protected async cancelAppointment(dialog: HTMLDialogElement) {
+    const current = this.cancellationTarget()?.appointment;
+    if (!current) return;
+    if (
+      await this.execute(
+        'appointments/cancel',
+        { appointmentId: current.id, version: String(current.version ?? 0) },
+        'Appointment cancelled.',
+        true,
+        'PATCH',
+      )
+    )
+      dialog.close();
+  }
+
+  protected openTransfer(row: AppointmentRow, dialog: HTMLDialogElement) {
+    this.transferTarget.set(row);
+    this.destination.reset();
+    this.dialogFailure.set('');
+    dialog.showModal();
+  }
+
+  protected async transfer(dialog: HTMLDialogElement) {
+    const row = this.transferTarget();
+    if (!row || this.destination.invalid) return;
+    if (
+      await this.execute(
+        'queue/transfer',
+        {
+          appointmentId: row.appointment.id,
+          practitionerId: this.destination.value,
+          fromPractitionerId: row.practitioner.id,
+          expectedStatus: row.ticket?.status ?? '',
+        },
+        'Token transferred and returned to the waiting queue.',
+        true,
+      )
+    )
+      dialog.close();
   }
 
   protected async verify(dialog: HTMLDialogElement) {
@@ -236,10 +324,17 @@ export class AccessWorklist {
   }
 
   protected action(path: string, row: AppointmentRow) {
+    const messages: Record<string, string> = {
+      'queue/call': 'Token called.',
+      'queue/recall': 'Token recalled.',
+      'queue/skip': 'Token skipped.',
+      'queue/requeue': 'Token returned to the waiting queue.',
+      'clinical/start': 'Consultation started.',
+    };
     return this.execute(
       path,
-      { appointmentId: row.appointment.id },
-      path === 'queue/call' ? 'Token called.' : 'Consultation started.',
+      { appointmentId: row.appointment.id, expectedStatus: row.ticket?.status ?? '' },
+      messages[path],
       false,
     );
   }
@@ -249,6 +344,7 @@ export class AccessWorklist {
     body: Record<string, string>,
     message: string,
     inDialog: boolean,
+    method: 'POST' | 'PATCH' = 'POST',
   ) {
     if (this.busy()) return;
     const { token, facility } = this.scope();
@@ -257,7 +353,7 @@ export class AccessWorklist {
     this.dialogFailure.set('');
     this.message.set('');
     try {
-      const result = await this.api.execute(path, token, facility, body);
+      const result = await this.api.execute(path, token, facility, body, method);
       this.message.set(message);
       return result;
     } catch (error) {

@@ -8,17 +8,24 @@ import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import type { DomainEvent, Facility } from '../domain/operations';
 import { plans } from '../domain/platform';
+import { staffRoles, type StaffMembership } from '../domain/access';
 
 const actions = {
   organizations: 'Create organization',
   facilities: 'Add facility',
   entitlements: 'Edit inpatient entitlement',
+  activation: 'Edit facility status',
+  membership: 'Manage staff access',
 } as const;
 
 const eventLabels: Partial<Record<DomainEvent['type'], string>> = {
   OrganisationCreated: 'Organization created',
   FacilityCreated: 'Facility added',
   ModuleConfigurationChanged: 'Inpatient entitlement updated',
+  FacilityActivationChanged: 'Facility status updated',
+  StaffAccessChanged: 'Staff access updated',
+  SubscriptionReviewed: 'Subscription reviewed',
+  SubscriptionPlanChanged: 'Subscription plan changed',
 };
 
 @Component({
@@ -48,6 +55,25 @@ export class Platform {
     city: ['', Validators.required],
   });
   protected readonly inpatient = this.fb.control('false');
+  protected readonly facilityActive = this.fb.control('true');
+  protected readonly staffRoleOptions = Object.entries(staffRoles);
+  protected readonly staffForm = this.fb.group({
+    account: ['', Validators.required],
+    role: ['reception'],
+    practitionerId: [''],
+  });
+  protected readonly currentMembership = signal<StaffMembership | undefined>(undefined);
+  protected readonly selectedRole = signal('reception');
+  protected readonly staffAccounts = computed(() => {
+    const state = this.data();
+    return state.state === 'ready' ? state.data.staff : [];
+  });
+  protected readonly availablePractitioners = computed(() => {
+    const state = this.data();
+    return state.state === 'ready'
+      ? state.data.practitioners.filter((item) => item.facilityId === this.activeFacility()?.id)
+      : [];
+  });
   private readonly scope = computed(() => ({
     token: this.store.session()?.token ?? '',
     facility: 'platform',
@@ -90,10 +116,30 @@ export class Platform {
     this.facilityForm.reset();
     this.activeFacility.set(facility);
     this.inpatient.setValue(String(!!facility?.inpatient));
+    this.facilityActive.setValue(String(facility?.active !== false));
+    this.staffForm.reset({ role: 'reception' });
+    this.selectedRole.set('reception');
+    this.currentMembership.set(undefined);
     dialog.showModal();
   }
 
-  protected async save(dialog: HTMLDialogElement) {
+  protected chooseStaff(account: string) {
+    const state = this.data();
+    const grant =
+      state.state === 'ready'
+        ? state.data.memberships.find(
+            (item) => item.account === account && item.facilityId === this.activeFacility()?.id,
+          )
+        : undefined;
+    this.currentMembership.set(grant);
+    this.staffForm.patchValue({
+      role: grant?.role ?? 'reception',
+      practitionerId: grant?.practitionerId ?? '',
+    });
+    this.selectedRole.set(this.staffForm.controls.role.value);
+  }
+
+  protected async save(dialog: HTMLDialogElement, revoke = false) {
     if (this.busy()) return;
     const task = this.task();
     const tenantId = this.current()?.id;
@@ -105,12 +151,22 @@ export class Platform {
     } else if (task === 'facilities') {
       if (this.facilityForm.invalid || !tenantId) return;
       payload = { ...this.facilityForm.getRawValue(), tenantId };
+    } else if (task === 'membership') {
+      if (!facility || this.staffForm.invalid) return;
+      payload = {
+        ...this.staffForm.getRawValue(),
+        facilityId: facility.id,
+        version: String(this.currentMembership()?.version ?? 0),
+        active: String(!revoke),
+      };
     } else {
       if (!facility) return;
       payload = {
         facilityId: facility.id,
         version: String(facility.configurationVersion),
-        inpatient: this.inpatient.value,
+        ...(task === 'activation'
+          ? { active: this.facilityActive.value }
+          : { inpatient: this.inpatient.value }),
       };
     }
     this.busy.set(true);
@@ -122,7 +178,7 @@ export class Platform {
         this.scope().token,
         '',
         payload,
-        task === 'entitlements' ? 'PATCH' : 'POST',
+        task === 'organizations' || task === 'facilities' ? 'POST' : 'PATCH',
       );
       if (task === 'organizations') this.active.set(id);
       this.feedback.set(
@@ -130,7 +186,13 @@ export class Platform {
           ? 'Organization created.'
           : task === 'facilities'
             ? 'Facility added.'
-            : 'Inpatient entitlement updated.',
+            : task === 'activation'
+              ? 'Facility status updated.'
+              : task === 'membership'
+                ? revoke
+                  ? 'Staff access revoked.'
+                  : 'Staff access saved.'
+                : 'Inpatient entitlement updated.',
       );
       this.reload.update((number) => number + 1);
       dialog.close();

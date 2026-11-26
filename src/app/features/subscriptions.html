@@ -1,0 +1,166 @@
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> CUSTOMER SUCCESS</p>
+    <h1>Subscriptions</h1>
+    <p>Review organization accounts and manage the plans that govern facility access.</p>
+  </div>
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading subscriptions…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="building" /></span>
+      </div>
+      <p>Organizations</p>
+      <strong>{{ rows().length }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon violet"><ng-icon name="activity" /></span>
+      </div>
+      <p>Active facilities</p>
+      <strong>{{ activeFacilities() }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="calendar" /></span>
+      </div>
+      <p>Reviews due</p>
+      <strong>{{ due() }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-labelledby="subscription-heading">
+    <div class="panel-heading">
+      <div>
+        <h2 id="subscription-heading">Account worklist</h2>
+        <p>{{ visible().length }} organizations</p>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <label class="search-field"
+        ><ng-icon name="search" /><span class="sr-only">Find organization</span
+        ><input
+          type="search"
+          #search
+          (input)="query.set(search.value)"
+          placeholder="Find organization"
+      /></label>
+      <label class="select-control"
+        ><span class="sr-only">Filter by subscription plan</span
+        ><select #filter (change)="selectedPlan.set(filter.value)">
+          <option value="">All plans</option>
+          @for (item of plans; track item) {
+            <option>{{ item }}</option>
+          }
+        </select></label
+      >
+      <button
+        class="button secondary"
+        type="button"
+        [attr.aria-pressed]="dueOnly()"
+        (click)="dueOnly.set(!dueOnly())"
+      >
+        Reviews due
+      </button>
+    </div>
+    @if (visible().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Subscription worklist">
+        <table>
+          <caption class="sr-only">
+            Organization use and review dates
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Organization</th>
+              <th scope="col">Plan</th>
+              <th scope="col">Active facilities</th>
+              <th scope="col">Next review</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of visible(); track row.organisation.id) {
+              <tr>
+                <td>
+                  <strong>{{ row.organisation.name }}</strong>
+                </td>
+                <td>{{ row.organisation.plan }}</td>
+                <td>{{ row.activeFacilities }} of {{ row.facilities }}</td>
+                <td>
+                  {{ row.nextReview + 'T12:00:00Z' | date: 'd MMM yyyy' : 'UTC' }}
+                  @if (row.nextReview <= today) {
+                    <span class="status warning">Due</span>
+                  }
+                </td>
+                <td>
+                  <button class="text-button" type="button" (click)="manage(row, editor)">
+                    Manage subscription
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No organizations match the selected filters.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="subscription-editor">
+  <div class="dialog-head">
+    <h2 id="subscription-editor">Manage subscription</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as row) {
+    <form class="dialog-body fields" (submit)="$event.preventDefault(); save('plan', editor)">
+      <p>
+        <strong>{{ row.organisation.name }}</strong> · {{ row.activeFacilities }} active facilities
+      </p>
+      <label for="subscription-plan">Subscription plan</label>
+      <select id="subscription-plan" [formControl]="plan">
+        @for (item of plans; track item) {
+          <option>{{ item }}</option>
+        }
+      </select>
+      @if (row.inpatientFacilities) {
+        <p class="subtle">
+          Inpatient operations are enabled at {{ row.inpatientFacilities }} facilities.
+        </p>
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <div class="page-actions">
+        <button
+          class="button primary"
+          type="submit"
+          [disabled]="busy() || plan.value === row.organisation.plan"
+        >
+          Save plan
+        </button>
+        <button
+          class="button secondary"
+          type="button"
+          [disabled]="busy()"
+          (click)="save('review', editor)"
+        >
+          Mark reviewed
+        </button>
+      </div>
+    </form>
+  }
+</dialog>

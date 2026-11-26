@@ -83,6 +83,7 @@
                     <td>
                       <strong>{{ facility.name }}</strong
                       ><small>{{ facility.city }}</small>
+                      <small>{{ facility.active === false ? 'Setup pending' : 'Active' }}</small>
                     </td>
                     <td>
                       <span [class]="(facility.inpatient ? 'Enabled' : 'Disabled') | statusTone">{{
@@ -96,6 +97,20 @@
                         (click)="open('entitlements', editor, facility)"
                       >
                         Edit entitlement
+                      </button>
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open('activation', editor, facility)"
+                      >
+                        Edit status
+                      </button>
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open('membership', editor, facility)"
+                      >
+                        Staff access
                       </button>
                     </td>
                   </tr>
@@ -194,6 +209,82 @@
           <p class="field-error" role="alert">{{ error() }}</p>
         }
         <button class="button primary" type="submit" [disabled]="busy()">Save entitlement</button>
+      </form>
+    }
+    @case ('activation') {
+      <form class="dialog-body fields" (submit)="$event.preventDefault(); save(editor)">
+        <p>{{ activeFacility()?.name }}</p>
+        <label for="facility-status">Facility status</label>
+        <select id="facility-status" [formControl]="facilityActive">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+        <p class="subtle">Only active facilities are available to assigned staff.</p>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">Save status</button>
+      </form>
+    }
+    @case ('membership') {
+      <form class="dialog-body fields" [formGroup]="staffForm" (ngSubmit)="save(editor)">
+        <p>{{ activeFacility()?.name }}</p>
+        <label for="staff-account">Staff account</label>
+        <select
+          id="staff-account"
+          formControlName="account"
+          #account
+          (change)="chooseStaff(account.value)"
+          required
+        >
+          <option value="">Select an account</option>
+          @for (item of staffAccounts(); track item.account) {
+            <option [value]="item.account">{{ item.name }} · {{ item.account }}</option>
+          }
+        </select>
+        @if (staffForm.controls.account.value) {
+          <p class="subtle">
+            Current access · {{ currentMembership()?.active ? 'Assigned' : 'Unassigned' }}
+          </p>
+          <label for="staff-role">Facility role</label>
+          <select
+            id="staff-role"
+            formControlName="role"
+            #role
+            (change)="selectedRole.set(role.value)"
+          >
+            @for (option of staffRoleOptions; track option[0]) {
+              <option [value]="option[0]">{{ option[1].label }}</option>
+            }
+          </select>
+          @if (selectedRole() === 'clinician') {
+            <label for="staff-practitioner">Assigned practitioner</label>
+            <select id="staff-practitioner" formControlName="practitionerId" required>
+              <option value="">Select a practitioner</option>
+              @for (item of availablePractitioners(); track item.id) {
+                <option [value]="item.id">{{ item.name }} · {{ item.specialty }}</option>
+              }
+            </select>
+          }
+          @if (error()) {
+            <p class="field-error" role="alert">{{ error() }}</p>
+          }
+          <div class="page-actions">
+            <button class="button primary" type="submit" [disabled]="busy()">
+              Save staff access
+            </button>
+            @if (currentMembership()?.active) {
+              <button
+                class="button secondary"
+                type="button"
+                [disabled]="busy()"
+                (click)="save(editor, true)"
+              >
+                Revoke access
+              </button>
+            }
+          </div>
+        }
       </form>
     }
   }

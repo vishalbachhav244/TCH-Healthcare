@@ -2,19 +2,18 @@ import {
   dayInIndia,
   invoiceTotal,
   observations,
-  shiftDay,
   type Appointment,
   type DomainEvent,
   type Facility,
   type Observation,
-  type Session,
 } from '../domain/operations';
-import { ApiError, patientSubject, scope } from './access';
+import { ApiError, patientSubject, requireSession, scope } from './access';
 import { db } from './database';
-import { checkedDay } from './queries';
+import { assertAvailable, bookingDay, facilityPractitioner } from './scheduling';
 import { createPatient } from './seed';
 import { inpatientCommand } from './inpatient';
 import { laboratoryCommand } from './laboratory';
+import { pharmacyCommand } from './pharmacy';
 
 export const services = [
   { description: 'Outpatient consultation', unitMinor: 75000 },
@@ -47,7 +46,7 @@ async function appointmentAt(facility: Facility, id: string) {
 export async function command(
   path: string,
   body: unknown,
-  session: Session,
+  token: string,
   facilityId: string | null,
 ) {
   const payload = input(body);
@@ -67,8 +66,14 @@ export async function command(
       db.admissions,
       db.labOrders,
       db.facilities,
+      db.memberships,
+      db.sessions,
+      db.prescriptions,
+      db.stockLots,
+      db.stockMovements,
     ],
     async () => {
+      const session = await requireSession(token);
       const facilityRecord = facilityId ? await db.facilities.get(facilityId) : undefined;
       let changed: DomainEvent;
       let pass: string | undefined;
@@ -94,34 +99,9 @@ export async function command(
             : scope(session, facilityRecord, 'D10', 'appointments');
           const patientId = selfService ? patientSubject(session) : field(payload, 'patientId');
           const practitionerId = field(payload, 'practitionerId');
-          const day = checkedDay(field(payload, 'day'));
+          const day = bookingDay(field(payload, 'day'));
           const time = field(payload, 'time');
-          const now = dayInIndia();
-          if (day < now || day > shiftDay(now, 90) || !/^(?:09|1[0-6]):(?:00|15|30|45)$/.test(time))
-            throw new ApiError(422, 'Choose an available 15-minute slot within the next 90 days.');
-          const [patient, practitioner] = await Promise.all([
-            db.patients.get(patientId),
-            db.practitioners.get(practitionerId),
-          ]);
-          if (patient?.tenantId !== facility.tenantId || practitioner?.facilityId !== facility.id)
-            throw new ApiError(404, 'Patient or clinician is unavailable.');
-          const occupied = await db.appointments
-            .where('[facilityId+practitionerId+day+time]')
-            .equals([facility.id, practitionerId, day, time])
-            .filter((item) => item.status !== 'Cancelled')
-            .first();
-          if (occupied)
-            throw new ApiError(409, 'The clinician already has an appointment at this time.');
-          const existing = await db.appointments
-            .where('[facilityId+day]')
-            .equals([facility.id, day])
-            .filter(
-              (item) =>
-                item.patientId === patientId && item.time === time && item.status !== 'Cancelled',
-            )
-            .first();
-          if (existing)
-            throw new ApiError(409, 'This patient already has an appointment at this time.');
+          await assertAvailable(facility, patientId, practitionerId, day, time);
           pass = crypto.randomUUID();
           const appointment: Appointment = {
             id: crypto.randomUUID(),
@@ -136,6 +116,54 @@ export async function command(
           };
           await db.appointments.add(appointment);
           changed = event(facility, 'AppointmentBooked', appointment.id);
+          break;
+        }
+        case 'appointments/reschedule':
+        case 'appointments/cancel': {
+          const facility = scope(session, facilityRecord, 'D10', 'appointments');
+          const appointment = await appointmentAt(facility, field(payload, 'appointmentId'));
+          if (appointment.status !== 'Booked' || appointment.day < dayInIndia()) {
+            throw new ApiError(409, 'Only upcoming booked appointments can be changed.');
+          }
+          const version = appointment.version ?? 0;
+          if (field(payload, 'version') !== String(version))
+            throw new ApiError(409, 'This appointment has changed. Refresh and try again.');
+          if (path.endsWith('/cancel')) {
+            await db.appointments.update(appointment.id, {
+              status: 'Cancelled',
+              pass: undefined,
+              version: version + 1,
+            });
+            changed = event(facility, 'AppointmentCancelled', appointment.id);
+          } else {
+            const day = bookingDay(field(payload, 'day'));
+            const time = field(payload, 'time');
+            const practitionerId = field(payload, 'practitionerId');
+            if (
+              day === appointment.day &&
+              time === appointment.time &&
+              practitionerId === appointment.practitionerId
+            ) {
+              throw new ApiError(409, 'Choose a different appointment slot or clinician.');
+            }
+            await assertAvailable(
+              facility,
+              appointment.patientId,
+              practitionerId,
+              day,
+              time,
+              appointment.id,
+            );
+            pass = crypto.randomUUID();
+            await db.appointments.update(appointment.id, {
+              day,
+              time,
+              practitionerId,
+              pass,
+              version: version + 1,
+            });
+            changed = event(facility, 'AppointmentRescheduled', appointment.id);
+          }
           break;
         }
         case 'queue/check-in': {
@@ -184,23 +212,78 @@ export async function command(
           changed = event(facility, 'AppointmentPassIssued', appointment.id);
           break;
         }
-        case 'queue/call': {
+        case 'queue/call':
+        case 'queue/recall':
+        case 'queue/skip':
+        case 'queue/requeue':
+        case 'queue/transfer': {
           const facility = scope(session, facilityRecord, 'D11', 'queue');
           const appointment = await appointmentAt(facility, field(payload, 'appointmentId'));
           const ticket = await db.tickets.where('appointmentId').equals(appointment.id).first();
-          if (!ticket || ticket.status !== 'Waiting')
-            throw new ApiError(409, 'Only a waiting token can be called.');
           if (appointment.day !== dayInIndia())
-            throw new ApiError(422, 'Only today’s tokens can be called.');
-          await db.tickets.update(ticket.id, { status: 'Called', calledAt: Date.now() });
-          changed = event(facility, 'QueueTicketCalled', ticket.id);
+            throw new ApiError(422, 'Only today’s tokens can be updated.');
+          if (
+            !ticket ||
+            (payload['expectedStatus'] && payload['expectedStatus'] !== ticket.status)
+          ) {
+            throw new ApiError(409, 'This token has changed. Refresh and try again.');
+          }
+          if (path === 'queue/call' || path === 'queue/recall') {
+            const recall = path === 'queue/recall';
+            if (ticket.status !== (recall ? 'Called' : 'Waiting')) {
+              throw new ApiError(
+                409,
+                recall
+                  ? 'Only a called token can be recalled.'
+                  : 'Only a waiting token can be called.',
+              );
+            }
+            const now = Date.now();
+            await db.tickets.update(ticket.id, {
+              status: 'Called',
+              calledAt: ticket.calledAt ?? now,
+              lastCalledAt: now,
+            });
+            changed = event(
+              facility,
+              recall ? 'QueueTicketRecalled' : 'QueueTicketCalled',
+              ticket.id,
+            );
+          } else if (path === 'queue/skip' || path === 'queue/requeue') {
+            const requeue = path === 'queue/requeue';
+            if (
+              requeue ? ticket.status !== 'Skipped' : !['Called', 'Waiting'].includes(ticket.status)
+            ) {
+              throw new ApiError(409, 'This token is not eligible for the requested queue action.');
+            }
+            await db.tickets.update(ticket.id, { status: requeue ? 'Waiting' : 'Skipped' });
+            changed = event(
+              facility,
+              requeue ? 'QueueTicketRequeued' : 'QueueTicketSkipped',
+              ticket.id,
+            );
+          } else {
+            if (!['Called', 'Waiting', 'Skipped'].includes(ticket.status))
+              throw new ApiError(409, 'Only tokens awaiting consultation can be transferred.');
+            if (payload['fromPractitionerId'] !== appointment.practitionerId)
+              throw new ApiError(409, 'This token’s clinician has changed. Refresh and try again.');
+            const practitioner = await facilityPractitioner(
+              facility,
+              field(payload, 'practitionerId'),
+            );
+            if (practitioner.id === appointment.practitionerId)
+              throw new ApiError(409, 'Choose a different clinician.');
+            await db.appointments.update(appointment.id, { practitionerId: practitioner.id });
+            await db.tickets.update(ticket.id, { status: 'Waiting' });
+            changed = event(facility, 'QueueTicketTransferred', ticket.id);
+          }
           break;
         }
         case 'clinical/start':
         case 'clinical/complete': {
           const facility = scope(session, facilityRecord, 'D13', 'clinical');
           const appointment = await appointmentAt(facility, field(payload, 'appointmentId'));
-          if (appointment.practitionerId !== facility.id + '-DR-1')
+          if (appointment.practitionerId !== session.facilityAccess[facility.id].practitionerId)
             throw new ApiError(403, 'Only the assigned clinician can update this encounter.');
           const ticket = await db.tickets.where('appointmentId').equals(appointment.id).first();
           if (!ticket || appointment.day !== dayInIndia())
@@ -245,7 +328,13 @@ export async function command(
           const encounter = await db.encounters.get(field(payload, 'encounterId'));
           if (encounter?.facilityId !== facility.id || !encounter.signedAt)
             throw new ApiError(404, 'No signed encounter is available for billing.');
-          if (await db.invoices.where('encounterId').equals(encounter.id).first())
+          if (
+            await db.invoices
+              .where('encounterId')
+              .equals(encounter.id)
+              .filter((invoice) => !invoice.prescriptionId)
+              .first()
+          )
             throw new ApiError(409, 'This encounter already has an invoice.');
           const line = services.find((service) => service.description === payload['service']);
           if (!line) throw new ApiError(422, 'Select a listed service.');
@@ -300,6 +389,23 @@ export async function command(
             scope(session, facilityRecord, 'D13', 'clinical'),
             payload,
             session,
+          );
+          break;
+        case 'clinical/prescriptions':
+        case 'clinical/prescriptions/sign':
+          changed = await pharmacyCommand(
+            path,
+            scope(session, facilityRecord, 'D13', 'clinical'),
+            session,
+            payload,
+          );
+          break;
+        case 'pharmacy/dispense':
+          changed = await pharmacyCommand(
+            path,
+            scope(session, facilityRecord, 'D22', 'pharmacy'),
+            session,
+            payload,
           );
           break;
         case 'laboratory/advance':

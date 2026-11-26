@@ -1,0 +1,201 @@
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> MEDICATION SERVICES</p>
+    <h1>Pharmacy</h1>
+    <p>Fill signed prescriptions and monitor the stock lots available for dispensing.</p>
+  </div>
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@let state = data();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading pharmacy records…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="cross" /></span>
+      </div>
+      <p>Awaiting dispensing</p>
+      <strong>{{ pending() }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon violet"><ng-icon name="list" /></span>
+      </div>
+      <p>Stock lots</p>
+      <strong>{{ lots().length }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="calendar" /></span>
+      </div>
+      <p>Expired lots</p>
+      <strong>{{ expired() }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-label="Pharmacy worklist">
+    <div class="filter-bar">
+      <button
+        type="button"
+        class="button secondary"
+        [attr.aria-pressed]="tab() === 'orders'"
+        (click)="tab.set('orders')"
+      >
+        Prescriptions
+      </button>
+      <button
+        type="button"
+        class="button secondary"
+        [attr.aria-pressed]="tab() === 'stock'"
+        (click)="tab.set('stock')"
+      >
+        Stock lots
+      </button>
+      @if (tab() === 'orders') {
+        <label class="search-field"
+          ><ng-icon name="search" /><span class="sr-only">Search prescriptions</span
+          ><input
+            type="search"
+            #search
+            placeholder="Patient or medication"
+            [value]="query()"
+            (input)="query.set(search.value)"
+        /></label>
+      }
+    </div>
+    @if (tab() === 'orders') {
+      @if (visible().length) {
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Dispensing worklist">
+          <table>
+            <caption class="sr-only">
+              Dispensing worklist
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Patient</th>
+                <th scope="col">Medication</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Status</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of visible(); track row.prescription.id) {
+                <tr>
+                  <td>
+                    <strong>{{ row.patient.name }}</strong
+                    ><small>{{ row.patient.id }}</small>
+                  </td>
+                  <td>{{ product(row.prescription.productId)?.name }}</td>
+                  <td>{{ row.prescription.quantity }}</td>
+                  <td>
+                    <span
+                      [class]="
+                        'status ' +
+                        (row.prescription.status === 'Dispensed' ? 'positive' : 'information')
+                      "
+                      >{{ row.prescription.status }}</span
+                    >
+                  </td>
+                  <td>
+                    @if (row.prescription.status === 'Signed') {
+                      <button class="text-button" type="button" (click)="open(row, editor)">
+                        Dispense
+                      </button>
+                    } @else {
+                      <span aria-label="Charge posted">Charge posted</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="state-panel">No signed prescriptions match the worklist.</p>
+      }
+    } @else if (lots().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Medication stock lots">
+        <table>
+          <caption class="sr-only">
+            Medication stock lots
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Medication</th>
+              <th scope="col">Batch</th>
+              <th scope="col">Expiry</th>
+              <th scope="col">On hand</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lot of lots(); track lot.id) {
+              <tr>
+                <td>{{ product(lot.productId)?.name }}</td>
+                <td>{{ lot.batch }}</td>
+                <td>{{ lot.expiresOn + 'T12:00:00Z' | date: 'd MMM yyyy' : 'UTC' }}</td>
+                <td>{{ lot.onHand }}</td>
+                <td>
+                  <span [class]="'status ' + (lot.expiresOn < today ? 'attention' : 'positive')">{{
+                    lot.expiresOn < today ? 'Expired' : 'Current'
+                  }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">This facility has no recorded stock lots.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="dispensing-title">
+  <div class="dialog-head">
+    <h2 id="dispensing-title">Dispense medication</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as row) {
+    <form class="dialog-body fields" (submit)="$event.preventDefault(); dispense(editor)">
+      <p>
+        <strong>{{ row.patient.name }}</strong> · {{ product(row.prescription.productId)?.name }} ×
+        {{ row.prescription.quantity }}
+      </p>
+      <label for="dispensing-lot">Eligible stock lot</label>
+      <select id="dispensing-lot" [formControl]="lot" required>
+        <option value="">Select a lot</option>
+        @for (item of eligibleLots(); track item.id) {
+          <option [value]="item.id">
+            {{ item.batch }} · {{ item.onHand }} on hand · expires {{ item.expiresOn }}
+          </option>
+        }
+      </select>
+      @if (!eligibleLots().length) {
+        <p class="subtle">No unexpired lot has the quantity required for this prescription.</p>
+      }
+      <p>
+        Charge
+        {{
+          (product(row.prescription.productId)?.unitMinor ?? 0) * row.prescription.quantity | rupees
+        }}
+        to the patient account.
+      </p>
+      @if (failure()) {
+        <p class="field-error" role="alert">{{ failure() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="lot.invalid || saving()">
+        Confirm dispensing
+      </button>
+    </form>
+  }
+</dialog>

@@ -3,7 +3,8 @@ import { Api } from './api';
 import { evaluationAvailable } from './evaluation';
 import { configurationChanges } from './events';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { navigation, type Resource } from '../domain/workspaces';
+import { catchError, EMPTY, from, switchMap } from 'rxjs';
+import { navigation, platformResources, type Resource } from '../domain/workspaces';
 import type { Facility, Session } from '../domain/operations';
 
 @Injectable({ providedIn: 'root' })
@@ -20,20 +21,32 @@ export class SessionStore {
     this.facilities().find((facility) => facility.id === this.facilityId()),
   );
   readonly entries = computed(() => navigation.filter((entry) => this.allowed(entry.resource)));
-  readonly initialRoute = computed(() => this.entries()[0]?.resource ?? 'denied');
+  readonly initialRoute = computed<Resource | 'denied'>(
+    () => this.entries().at(0)?.resource ?? 'denied',
+  );
+  readonly home = computed(() =>
+    this.initialRoute() === 'denied' ? '/denied' : '/work/' + this.initialRoute(),
+  );
+  private readonly access = computed(
+    () => this.session()?.facilityAccess[this.facility()?.id ?? ''],
+  );
 
   constructor() {
-    configurationChanges.pipe(takeUntilDestroyed()).subscribe((facilityId) => {
-      const session = this.session();
-      if (session?.facilityIds.includes(facilityId)) {
-        void this.api
-          .facilities(session.token)
-          .then((facilities) => {
-            if (this.session()?.token === session.token) this.allowedFacilities.set(facilities);
-          })
-          .catch(() => undefined);
-      }
-    });
+    configurationChanges
+      .pipe(
+        switchMap(() => {
+          const token = this.session()?.token;
+          return token
+            ? from(Promise.all([this.api.session(token), this.api.facilities(token)])).pipe(
+                catchError(() => EMPTY),
+              )
+            : EMPTY;
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe(([session, facilities]) => {
+        if (this.session()?.token === session.token) this.applyAccess(session, facilities);
+      });
   }
 
   restore() {
@@ -64,14 +77,21 @@ export class SessionStore {
     const entry = navigation.find((item) => item.resource === resource);
     return (
       !!entry &&
-      !!this.session()?.workspaces.includes(entry.workspace) &&
-      (resource === 'platform' || !!this.facility()) &&
+      (platformResources.includes(resource)
+        ? !!this.session()?.workspaces.includes(entry.workspace)
+        : !!this.access()?.workspaces.includes(entry.workspace)) &&
       (resource !== 'beds' || !!this.facility()?.inpatient)
     );
   }
 
   writeAllowed(resource: Resource) {
-    return this.allowed(resource) && !!this.session()?.writes.includes(resource);
+    return this.allowed(resource) && this.canPerform(resource);
+  }
+
+  canPerform(action: string) {
+    return platformResources.includes(action)
+      ? !!this.session()?.writes.includes(action)
+      : !!this.access()?.writes.includes(action);
   }
 
   selectFacility(id: string) {
@@ -81,17 +101,25 @@ export class SessionStore {
   }
 
   private async accept(session: Session) {
-    this.allowedFacilities.set(await this.api.facilities(session.token));
-    const storedFacility = sessionStorage.getItem('truecare-facility');
-    this.selectFacility(
-      this.facilities().find((facility) => facility.id === storedFacility)?.id ??
-        this.facilities()[0]?.id ??
-        '',
-    );
+    this.applyAccess(session, await this.api.facilities(session.token));
     sessionStorage.setItem('truecare-session', session.token);
-    this.identity.set(session);
     clearTimeout(this.expiry);
     this.expiry = setTimeout(() => this.clear(), Math.max(0, session.expiresAt - Date.now()));
+  }
+
+  private applyAccess(session: Session, facilities: Facility[]) {
+    this.allowedFacilities.set(
+      facilities.filter((facility) => !!session.facilityAccess[facility.id]),
+    );
+    const storedFacility = sessionStorage.getItem('truecare-facility');
+    const selected =
+      this.facilities().find((facility) => facility.id === storedFacility) ?? this.facilities()[0];
+    if (selected) this.selectFacility(selected.id);
+    else {
+      this.facilityId.set('');
+      sessionStorage.removeItem('truecare-facility');
+    }
+    this.identity.set(session);
   }
 
   private clear() {

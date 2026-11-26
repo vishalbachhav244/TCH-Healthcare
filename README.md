@@ -15,10 +15,14 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 
 | Account | Workspace |
 | --- | --- |
-| `platform` | Organization provisioning, facility setup and versioned inpatient entitlements |
+| `platform` | Organization provisioning, facility activation, staff roles and inpatient entitlements |
+| `success` | Subscription reviews and plan management |
+| `operations` | Platform activity and incident handling |
+| `network` | Comparison and department drill-down across assigned Meridian facilities |
 | `executive` | Hospital overview, appointments, queue and beds, with two facilities |
 | `reception` | Patient registration, scheduling, arrival verification and queue |
-| `clinician` | Assigned consultations, laboratory orders and signed observations |
+| `clinician` | Assigned consultations, laboratory orders, and prescription drafting and signing |
+| `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
 | `admissions` | Admission requests, bed allocation, transfer and release |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |

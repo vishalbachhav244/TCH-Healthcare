@@ -1,0 +1,154 @@
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> NETWORK GOVERNANCE</p>
+    <h1>Network Performance</h1>
+    <p>Compare activity, inpatient capacity and collections across your facilities.</p>
+  </div>
+  <label class="select-control"
+    ><span class="sr-only">Reporting date</span
+    ><input type="date" #date [value]="day()" (change)="date.value && day.set(date.value)"
+  /></label>
+</section>
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading network performance…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  @let total = totals();
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="calendar" /></span>
+      </div>
+      <p>Appointments</p>
+      <strong>{{ total.appointments }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon violet"><ng-icon name="list" /></span>
+      </div>
+      <p>Active queue</p>
+      <strong>{{ total.activeQueue }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="wallet" /></span>
+      </div>
+      <p>Collections</p>
+      <strong>{{ total.collections | rupees: false }}</strong>
+    </article>
+    @if (total.beds) {
+      <article class="panel metric">
+        <div class="metric-top">
+          <span class="square-icon blue"><ng-icon name="bed" /></span>
+        </div>
+        <p>Occupied beds</p>
+        <strong>{{ total.occupied }} / {{ total.beds }}</strong>
+      </article>
+    }
+  </div>
+  <section class="panel table-panel" aria-labelledby="comparison-heading">
+    <div class="panel-heading">
+      <div>
+        <h2 id="comparison-heading">Facility comparison</h2>
+        <p>{{ rows().length }} assigned facilities</p>
+      </div>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Facility comparison">
+      <table>
+        <caption class="sr-only">
+          Metrics by facility
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Facility</th>
+            <th scope="col">Appointments</th>
+            <th scope="col">Average wait</th>
+            <th scope="col">Bed occupancy</th>
+            <th scope="col">Collections</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.facility.id) {
+            <tr>
+              <td>
+                <strong>{{ row.facility.name }}</strong
+                ><small>{{ row.facility.city }}</small>
+              </td>
+              <td>{{ row.metrics.appointments }}</td>
+              <td>{{ row.metrics.appointments ? row.metrics.averageWait + ' min' : '—' }}</td>
+              <td>
+                {{
+                  row.facility.inpatient
+                    ? row.metrics.bedsOccupied + ' / ' + row.metrics.bedCapacity
+                    : 'Outpatient facility'
+                }}
+              </td>
+              <td>{{ row.metrics.revenueMinor | rupees: false }}</td>
+              <td>
+                <button
+                  class="text-button"
+                  type="button"
+                  [attr.aria-pressed]="branch()?.facility?.id === row.facility.id"
+                  (click)="focused.set(row.facility.id)"
+                >
+                  View departments
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+  @if (branch(); as row) {
+    <section
+      class="panel table-panel"
+      aria-labelledby="department-comparison-heading"
+      style="margin-block-start: 1rem"
+    >
+      <div class="panel-heading">
+        <div>
+          <h2 id="department-comparison-heading">Departments · {{ row.facility.name }}</h2>
+          <p>Completed consultations for the reporting date</p>
+        </div>
+        <a
+          class="button secondary"
+          routerLink="/work/overview"
+          (click)="store.selectFacility(row.facility.id)"
+          >Open hospital overview</a
+        >
+      </div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Department activity">
+        <table>
+          <caption class="sr-only">
+            Department activity
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Department</th>
+              <th scope="col">Booked</th>
+              <th scope="col">Completed</th>
+              <th scope="col">Waiting</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of row.departments; track item.name) {
+              <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.appointments }}</td>
+                <td>{{ item.completed }}</td>
+                <td>{{ item.waiting }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+}

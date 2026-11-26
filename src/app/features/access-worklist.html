@@ -87,7 +87,7 @@
             <th scope="col">Clinician</th>
             <th scope="col">{{ kind === 'appointments' ? 'Time' : 'Token' }}</th>
             <th scope="col">Status</th>
-            @if (store.writeAllowed(kind) && kind !== 'appointments') {
+            @if (store.writeAllowed(kind)) {
               <th scope="col">Action</th>
             }
           </tr>
@@ -116,16 +116,78 @@
               <td>
                 <span [class]="status | statusTone">{{ status }}</span>
               </td>
-              @if (store.writeAllowed(kind) && kind !== 'appointments') {
+              @if (store.writeAllowed(kind)) {
                 <td>
-                  @if (kind === 'queue' && row.ticket?.status === 'Waiting') {
+                  @if (
+                    kind === 'appointments' &&
+                    row.appointment.status === 'Booked' &&
+                    row.appointment.day >= today
+                  ) {
                     <button
-                      class="text-button"
                       type="button"
-                      [disabled]="busy()"
-                      (click)="action('queue/call', row)"
+                      class="text-button"
+                      (click)="openBooking(bookingDialog, row)"
                     >
-                      Call token
+                      Reschedule
+                    </button>
+                    <button
+                      type="button"
+                      class="text-button"
+                      (click)="offerCancellation(row, cancelDialog)"
+                    >
+                      Cancel
+                    </button>
+                  } @else if (
+                    kind === 'queue' &&
+                    row.ticket &&
+                    ['Waiting', 'Called', 'Skipped'].includes(row.ticket.status) &&
+                    row.appointment.day === today
+                  ) {
+                    @if (row.ticket.status === 'Waiting') {
+                      <button
+                        class="text-button"
+                        type="button"
+                        [disabled]="busy()"
+                        (click)="action('queue/call', row)"
+                      >
+                        Call token
+                      </button>
+                    } @else if (row.ticket.status === 'Called') {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="busy()"
+                        (click)="action('queue/recall', row)"
+                      >
+                        Recall
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="busy()"
+                        (click)="action('queue/requeue', row)"
+                      >
+                        Requeue
+                      </button>
+                    }
+                    @if (row.ticket.status !== 'Skipped') {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="busy()"
+                        (click)="action('queue/skip', row)"
+                      >
+                        Skip
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="text-button"
+                      [disabled]="busy()"
+                      (click)="openTransfer(row, transferDialog)"
+                    >
+                      Transfer
                     </button>
                   } @else if (kind === 'clinical' && row.ticket?.status === 'Called') {
                     <button
@@ -184,7 +246,11 @@
 
 <dialog #bookingDialog aria-labelledby="booking-heading" (close)="bookingOpen.set(false)">
   <div class="dialog-head">
-    <h2 id="booking-heading">{{ pass() ? 'Appointment pass' : 'New appointment' }}</h2>
+    <h2 id="booking-heading">
+      {{
+        pass() ? 'Appointment pass' : bookingTarget() ? 'Reschedule appointment' : 'New appointment'
+      }}
+    </h2>
     <button class="icon-button" aria-label="Close" type="button" (click)="bookingDialog.close()">
       <ng-icon name="close" />
     </button>
@@ -205,23 +271,29 @@
     </div>
   } @else {
     <form class="dialog-body fields" [formGroup]="booking" (ngSubmit)="saveBooking()">
-      <label for="find">Find patient</label
-      ><input
-        id="find"
-        type="search"
-        [formControl]="patientSearch"
-        placeholder="Search by name or patient ID"
-      />
       @let choices = options();
-      <label for="patient">Patient</label>
-      <select id="patient" formControlName="patientId" required>
-        <option value="">Select a patient</option>
-        @if (choices.state === 'ready') {
-          @for (patient of choices.data.patients; track patient.id) {
-            <option [value]="patient.id">{{ patient.name }} · {{ patient.id }}</option>
+      @if (bookingTarget(); as row) {
+        <p>
+          <strong>{{ row.patient.name }}</strong> · {{ row.patient.id }}
+        </p>
+      } @else {
+        <label for="find">Find patient</label
+        ><input
+          id="find"
+          type="search"
+          [formControl]="patientSearch"
+          placeholder="Search by name or patient ID"
+        />
+        <label for="patient">Patient</label>
+        <select id="patient" formControlName="patientId" required>
+          <option value="">Select a patient</option>
+          @if (choices.state === 'ready') {
+            @for (patient of choices.data.patients; track patient.id) {
+              <option [value]="patient.id">{{ patient.name }} · {{ patient.id }}</option>
+            }
           }
-        }
-      </select>
+        </select>
+      }
       @if (choices.state === 'error') {
         <p class="field-error" role="alert">{{ choices.message }}</p>
       }
@@ -236,27 +308,120 @@
           }
         }
       </select>
+      @let availability = slots();
       <div class="field-pair">
         <label>Date<input type="date" formControlName="day" [min]="today" required /></label>
-        <label
-          >Time<input
-            type="time"
-            formControlName="time"
-            min="09:00"
-            max="16:45"
-            step="900"
-            required
-        /></label>
+        <div>
+          <label for="appointment-time">Time</label>
+          <select id="appointment-time" formControlName="time" required>
+            <option value="">Choose an available time</option>
+            @if (availability.state === 'ready') {
+              @for (time of availability.data; track time) {
+                <option [value]="time">{{ time }} IST</option>
+              }
+            }
+          </select>
+        </div>
       </div>
-      <label for="channel">Booking type</label
-      ><select id="channel" formControlName="channel">
-        <option>Scheduled</option>
-        <option>Walk-in</option>
-      </select>
+      @if (availability.state === 'error') {
+        <p class="field-error" role="alert">{{ availability.message }}</p>
+      }
+      @if (availability.state === 'ready' && !availability.data.length) {
+        <p class="subtle">No times are available for this clinician on the selected date.</p>
+      }
+      @if (!bookingTarget()) {
+        <label for="channel">Booking type</label
+        ><select id="channel" formControlName="channel">
+          <option>Scheduled</option>
+          <option>Walk-in</option>
+        </select>
+      }
       @if (dialogFailure()) {
         <p class="field-error" role="alert">{{ dialogFailure() }}</p>
       }
-      <button class="button primary" type="submit" [disabled]="busy()">Book appointment</button>
+      <button
+        class="button primary"
+        type="submit"
+        [disabled]="
+          busy() ||
+          availability.state !== 'ready' ||
+          !availability.data.includes(booking.controls.time.value)
+        "
+      >
+        {{ bookingTarget() ? 'Save appointment' : 'Book appointment' }}
+      </button>
+    </form>
+  }
+</dialog>
+
+<dialog #cancelDialog aria-labelledby="cancel-heading">
+  <div class="dialog-head">
+    <h2 id="cancel-heading">Cancel appointment</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="cancelDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (cancellationTarget(); as row) {
+    <div class="dialog-body fields">
+      <p>
+        <strong>{{ row.patient.name }}</strong> · {{ row.appointment.day }} at
+        {{ row.appointment.time }} IST
+      </p>
+      <p>The appointment pass will expire and the time will become available again.</p>
+      @if (dialogFailure()) {
+        <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+      }
+      <div class="page-actions">
+        <button type="button" class="button secondary" (click)="cancelDialog.close()">
+          Keep appointment</button
+        ><button
+          type="button"
+          class="button primary"
+          [disabled]="busy()"
+          (click)="cancelAppointment(cancelDialog)"
+        >
+          Confirm cancellation
+        </button>
+      </div>
+    </div>
+  }
+</dialog>
+
+<dialog #transferDialog aria-labelledby="transfer-heading" (close)="transferTarget.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="transfer-heading">Transfer token</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="transferDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (transferTarget(); as row) {
+    <form class="dialog-body fields" (submit)="$event.preventDefault(); transfer(transferDialog)">
+      <p>
+        Token <strong>{{ row.ticket?.number }}</strong> · {{ row.patient.name }}
+      </p>
+      <label for="transfer-practitioner">Destination clinician</label>
+      @let available = transferOptions();
+      <select id="transfer-practitioner" [formControl]="destination" required>
+        <option value="">Select a clinician</option>
+        @if (available.state === 'ready') {
+          @for (clinician of available.data.practitioners; track clinician.id) {
+            @if (clinician.id !== row.practitioner.id) {
+              <option [value]="clinician.id">
+                {{ clinician.name }} · {{ clinician.specialty }}
+              </option>
+            }
+          }
+        }
+      </select>
+      @if (available.state === 'error') {
+        <p class="field-error" role="alert">{{ available.message }}</p>
+      }
+      @if (dialogFailure()) {
+        <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="busy() || destination.invalid">
+        Transfer token
+      </button>
     </form>
   }
 </dialog>
@@ -285,7 +450,7 @@
   </form>
 </dialog>
 
-<dialog #consultationDialog aria-labelledby="consultation-heading">
+<dialog #consultationDialog aria-labelledby="consultation-heading" (close)="active.set(undefined)">
   <div class="dialog-head">
     <h2 id="consultation-heading">Consultation</h2>
     <button
@@ -306,6 +471,9 @@
           ><small>{{ row.patient.id }} · Age {{ row.patient.age }}</small>
         </div>
       </div>
+      @if (row.encounter; as encounter) {
+        <div class="clinical-orders"><tc-clinical-prescriptions [encounter]="encounter" /></div>
+      }
       @if (row.encounter?.signedAt; as signed) {
         <p>{{ row.encounter?.observation }}</p>
         <small>Signed {{ signed | date: 'd MMM y, HH:mm' : '+0530' }} IST</small>

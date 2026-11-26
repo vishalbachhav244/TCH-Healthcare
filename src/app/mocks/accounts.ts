@@ -1,0 +1,50 @@
+import type { StaffMembership, StaffRole } from '../domain/access';
+
+export const platformAccount = 'platform';
+export const subscriptionAccount = 'success';
+export const operationsAccount = 'operations';
+export const patientAccount = 'patient';
+export const patientFacility = 'mer-central';
+export const staff = {
+  pharmacy: { name: 'Reena Mathew', role: 'pharmacist', facilities: ['mer-central'] },
+  network: {
+    name: 'Nalini Verma',
+    role: 'networkExecutive',
+    facilities: ['mer-central', 'mer-north'],
+  },
+  executive: { name: 'Aditi Mehra', role: 'executive', facilities: ['mer-central', 'mer-north'] },
+  reception: { name: 'Meera Shah', role: 'reception', facilities: ['mer-central'] },
+  clinician: { name: 'Dr. Nandita Rao', role: 'clinician', facilities: ['mer-central'] },
+  cashier: { name: 'Rohan Nair', role: 'cashier', facilities: ['mer-central'] },
+  admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
+  lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },
+  labreview: { name: 'Dr. Ajay Iyer', role: 'labReviewer', facilities: ['mer-central'] },
+  sunrise: { name: 'Ishita Rao', role: 'clinicOperator', facilities: ['sunrise'] },
+} satisfies Record<string, { name: string; role: StaffRole; facilities: string[] }>;
+
+export const accountNames: Readonly<Record<string, string>> = {
+  [platformAccount]: 'Devika Iyer',
+  [subscriptionAccount]: 'Priya Desai',
+  [operationsAccount]: 'Aniket Shah',
+  [patientAccount]: 'Ananya Sharma',
+  ...Object.fromEntries(Object.entries(staff).map(([key, value]) => [key, value.name])),
+};
+
+export const globalAccess: Readonly<Record<string, { workspaces: string[]; writes: string[] }>> = {
+  [platformAccount]: { workspaces: ['D01'], writes: ['platform'] },
+  [subscriptionAccount]: { workspaces: ['D02'], writes: ['subscriptions'] },
+  [operationsAccount]: { workspaces: ['D03'], writes: ['platform-operations'] },
+};
+
+export const membershipId = (account: string, facilityId: string) => account + ':' + facilityId;
+export const initialStaff: StaffMembership[] = Object.entries(staff).flatMap(([account, staff]) =>
+  staff.facilities.map((facilityId) => ({
+    id: membershipId(account, facilityId),
+    account,
+    facilityId,
+    role: staff.role,
+    active: true,
+    version: 1,
+    practitionerId: staff.role === 'clinician' ? facilityId + '-DR-1' : undefined,
+  })),
+);

@@ -1,3 +1,5 @@
+import type { FacilityAccess } from './access';
+
 export const specialties = [
   'General Medicine',
   'Cardiology',
@@ -16,6 +18,7 @@ export interface Facility {
   inpatient: boolean;
   publicQueue?: boolean;
   configurationVersion?: number;
+  active?: boolean;
 }
 
 export interface Patient {
@@ -43,6 +46,7 @@ export interface Appointment {
   channel: 'Scheduled' | 'Walk-in';
   status: 'Booked' | 'Checked in' | 'In consultation' | 'Completed' | 'Cancelled';
   pass?: string;
+  version?: number;
 }
 
 export interface Ticket {
@@ -52,6 +56,7 @@ export interface Ticket {
   number: number;
   arrivedAt: number;
   calledAt?: number;
+  lastCalledAt?: number;
   status: 'Waiting' | 'Called' | 'In consultation' | 'Completed' | 'Skipped';
 }
 
@@ -84,6 +89,7 @@ export interface Invoice {
   facilityId: string;
   patientId: string;
   encounterId: string;
+  prescriptionId?: string;
   day: string;
   lines: { description: string; unitMinor: number; quantity: number }[];
 }
@@ -137,6 +143,7 @@ export interface Session {
   workspaces: string[];
   writes: string[];
   facilityIds: string[];
+  facilityAccess: Record<string, FacilityAccess>;
   expiresAt: number;
 }
 
@@ -165,6 +172,12 @@ export interface DashboardData {
   appointments: AppointmentRow[];
 }
 
+export interface NetworkFacilityMetrics {
+  facility: Pick<Facility, 'id' | 'name' | 'city' | 'inpatient'>;
+  metrics: DashboardData['metrics'];
+  departments: DashboardData['departments'];
+}
+
 export interface AppointmentPage {
   items: AppointmentRow[];
   total: number;
@@ -185,8 +198,14 @@ export interface InvoiceRow {
 export type EventType =
   | 'PatientRegistered'
   | 'AppointmentBooked'
+  | 'AppointmentRescheduled'
+  | 'AppointmentCancelled'
   | 'PatientCheckedIn'
   | 'QueueTicketCalled'
+  | 'QueueTicketRecalled'
+  | 'QueueTicketSkipped'
+  | 'QueueTicketRequeued'
+  | 'QueueTicketTransferred'
   | 'EncounterStarted'
   | 'EncounterCompleted'
   | 'InvoiceCreated'
@@ -204,7 +223,17 @@ export type EventType =
   | 'AppointmentPassIssued'
   | 'OrganisationCreated'
   | 'FacilityCreated'
-  | 'ModuleConfigurationChanged';
+  | 'ModuleConfigurationChanged'
+  | 'FacilityActivationChanged'
+  | 'StaffAccessChanged'
+  | 'SubscriptionPlanChanged'
+  | 'SubscriptionReviewed'
+  | 'PrescriptionDrafted'
+  | 'PrescriptionSigned'
+  | 'PrescriptionDispensed'
+  | 'IncidentOpened'
+  | 'IncidentInvestigating'
+  | 'IncidentResolved';
 
 export interface DomainEvent {
   type: EventType;

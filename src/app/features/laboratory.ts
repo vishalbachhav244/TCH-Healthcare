@@ -52,7 +52,7 @@ export class Laboratory {
   );
 
   protected action(status: LabStage) {
-    const canReview = this.store.session()?.writes.includes('laboratory/review');
+    const canReview = this.store.canPerform('laboratory/review');
     if (status === 'Entered' || status === 'Authorised')
       return canReview ? actions[status] : undefined;
     return this.store.writeAllowed('laboratory') ? actions[status] : undefined;

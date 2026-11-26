@@ -4,7 +4,11 @@
 
 | Responsibility | Scope |
 | --- | --- |
-| SaaS platform administrator | May read and configure organizations, facilities, plan selection at creation and inpatient entitlements. Receives no clinical workspaces or data. |
+| SaaS platform administrator | Creates organizations, activates facilities, configures inpatient entitlements and grants or revokes named facility roles. |
+| Customer success | Reviews subscriptions and changes compatible plans. |
+| Platform operations | Tracks incidents and views activity metadata and counts. |
+| Network executive | Compares active, assigned facilities within the selected tenant and drills into their overviews. |
+| Pharmacist | Views signed facility prescriptions and stock. Dispensing writes a stock movement and a medicine invoice. |
 | Executive | Meridian facilities. Overview and alert acknowledgement. Read-only appointment, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointments and queue commands. |
 | Clinician | Assigned appointments and encounters only. Starts or signs consultations and orders laboratory tests. |

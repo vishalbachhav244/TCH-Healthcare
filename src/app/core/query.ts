@@ -12,6 +12,7 @@ export type QueryState<T> =
 export function facilityQuery<T, P extends { facility: string; token: string }>(
   params: Signal<P>,
   request: (params: P) => Observable<T>,
+  affected: (id: string, params: P) => boolean = (id, params) => id === params.facility,
 ) {
   return toSignal(
     toObservable(params).pipe(
@@ -19,7 +20,7 @@ export function facilityQuery<T, P extends { facility: string; token: string }>(
         if (!value.facility || !value.token) return of<QueryState<T>>({ state: 'loading' });
         return merge(
           of(value.facility),
-          facilityChanges.pipe(filter((id) => id === value.facility)),
+          facilityChanges.pipe(filter((id) => affected(id, value))),
         ).pipe(
           switchMap(() =>
             request(value).pipe(

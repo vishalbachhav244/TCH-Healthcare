@@ -35,6 +35,34 @@ test('platform provisions organizations and facilities and revokes an active bed
   await page.getByRole('button', { name: /Cove Healthcare/ }).click();
   await expect(page.getByRole('row', { name: /Cove North Hospital.*Disabled/ })).toBeVisible();
   await signIn(staff, 'executive');
+  const cove = page.getByRole('row', { name: /Cove North Hospital/ });
+  await cove.getByRole('button', { name: 'Staff access' }).click();
+  const membership = page.getByRole('dialog', { name: 'Manage staff access' });
+  await membership.getByLabel('Staff account').selectOption('executive');
+  await membership.getByLabel('Facility role').selectOption('cashier');
+  await membership.getByRole('button', { name: 'Save staff access' }).click();
+  await expect(page.getByText('Staff access saved.', { exact: true })).toBeVisible();
+  await expect(
+    staff
+      .getByLabel('Facility', { exact: true })
+      .locator('option', { hasText: 'Cove North Hospital' }),
+  ).toHaveCount(0);
+  await cove.getByRole('button', { name: 'Edit status' }).click();
+  const activation = page.getByRole('dialog', { name: 'Edit facility status' });
+  await activation.getByLabel('Facility status').selectOption('true');
+  await activation.getByRole('button', { name: 'Save status' }).click();
+  await expect(page.getByText('Facility status updated.', { exact: true })).toBeVisible();
+  await staff
+    .getByLabel('Facility', { exact: true })
+    .selectOption({ label: 'Cove North Hospital' });
+  await expect(staff.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await staff.getByRole('link', { name: 'Return to workspace' }).click();
+  await expect(staff.getByRole('heading', { name: 'Revenue Cycle' })).toBeVisible();
+  await cove.getByRole('button', { name: 'Staff access' }).click();
+  await membership.getByLabel('Staff account').selectOption('executive');
+  await membership.getByRole('button', { name: 'Revoke access' }).click();
+  await expect(staff.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await staff.getByRole('link', { name: 'Return to workspace' }).click();
   await staff.getByRole('link', { name: 'Bed management' }).click();
   await expect(staff.getByRole('heading', { name: 'Bed Management' })).toBeVisible();
   await page.getByRole('button', { name: /Meridian Healthcare Network/ }).click();
@@ -131,6 +159,83 @@ test('clinic omits inpatient metrics and rejects a direct bed route', async ({ p
   await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
 });
 
+test('reviews a subscription and drills into assigned network branches', async ({
+  page,
+}, testInfo) => {
+  await signIn(page, 'success');
+  await expect(page.getByRole('heading', { name: 'Subscriptions' })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Find organization' }).fill('Meridian');
+  await expect(page.getByRole('row', { name: /CityCare/ })).toHaveCount(0);
+  await page
+    .getByRole('row', { name: /Meridian/ })
+    .getByRole('button', { name: 'Manage subscription' })
+    .click();
+  const subscription = page.getByRole('dialog', { name: 'Manage subscription' });
+  await subscription.getByLabel('Subscription plan').selectOption('Clinic');
+  await subscription.getByRole('button', { name: 'Save plan' }).click();
+  await expect(subscription.getByRole('alert')).toContainText('Disable inpatient operations');
+  await subscription.getByRole('button', { name: 'Mark reviewed' }).click();
+  await expect(page.getByText('Account review recorded.')).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('subscriptions-desktop.png'),
+    animations: 'disabled',
+  });
+  await signOut(page);
+  await signIn(page, 'network');
+  await expect(page.getByRole('heading', { name: 'Network Performance' })).toBeVisible();
+  await page
+    .getByRole('row', { name: /Meridian North Hospital/ })
+    .getByRole('button', { name: 'View departments' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: /Departments · Meridian North Hospital/ }),
+  ).toBeVisible();
+  await expect(page.getByRole('row', { name: /Sunrise Clinic/ })).toHaveCount(0);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('network-desktop.png'),
+    animations: 'disabled',
+  });
+  await page.getByRole('link', { name: 'Open hospital overview' }).click();
+  await expect(page.getByRole('heading', { name: 'Hospital Overview' })).toBeVisible();
+  await expect(page.getByLabel('Facility', { exact: true })).toHaveValue('mer-north');
+});
+
+test('opens, investigates, resolves and reloads a platform incident', async ({
+  page,
+}, testInfo) => {
+  await signIn(page, 'operations');
+  await page.getByRole('button', { name: 'Open incident', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Open incident' });
+  await editor.getByLabel('Incident title').fill('Review queue display updates');
+  await editor.getByLabel('Affected service').selectOption('Queue display');
+  await editor.getByLabel('Priority').selectOption('High');
+  await editor.getByRole('button', { name: 'Create incident' }).click();
+  const entry = page.getByRole('row', { name: /Review queue display updates/ });
+  await entry.getByRole('button', { name: 'Start investigation' }).click();
+  await entry.getByRole('button', { name: 'Resolve incident' }).click();
+  await expect(page.getByText('Incident resolved.', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Include resolved' }).click();
+  await expect(entry).toContainText('Resolved');
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('platform-operations-desktop.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+});
+
 test('registers, books, checks in, completes a consultation, and settles an invoice', async ({
   page,
 }) => {
@@ -158,8 +263,19 @@ test('registers, books, checks in, completes a consultation, and settles an invo
   await booking.getByLabel('Clinician').selectOption('mer-central-DR-1');
   await booking.getByRole('button', { name: 'Book appointment' }).click();
   const passDialog = page.getByRole('dialog', { name: 'Appointment pass' });
+  const originalPass = await passDialog.locator('code').innerText();
+  await passDialog.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('searchbox', { name: 'Search appointments' }).fill(id);
+  await page
+    .getByRole('row', { name: new RegExp(id) })
+    .getByRole('button', { name: 'Reschedule' })
+    .click();
+  const reschedule = page.getByRole('dialog', { name: 'Reschedule appointment' });
+  await reschedule.getByLabel('Time', { exact: true }).selectOption('14:15');
+  await reschedule.getByRole('button', { name: 'Save appointment' }).click();
   const pass = await passDialog.locator('code').innerText();
   expect(pass).toMatch(/^[\da-f-]{36}$/i);
+  expect(pass).not.toBe(originalPass);
   await expect(passDialog.getByRole('img')).toBeVisible();
   const qr = await passDialog.getByRole('img').getAttribute('src');
   await passDialog.getByRole('button', { name: 'Done' }).click();
@@ -197,6 +313,21 @@ test('registers, books, checks in, completes a consultation, and settles an invo
   await expect(displayed).toHaveCount(prior + 1);
   await expect(display.locator('main')).not.toContainText(id);
   await display.close();
+  const token = page.getByRole('row', { name: new RegExp(id) });
+  await token.getByRole('button', { name: 'Recall', exact: true }).click();
+  await token.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expect(token).toContainText('Skipped');
+  await token.getByRole('button', { name: 'Requeue', exact: true }).click();
+  await expect(token).toContainText('Waiting');
+  for (const destination of ['mer-central-DR-2', 'mer-central-DR-1']) {
+    await token.getByRole('button', { name: 'Transfer', exact: true }).click();
+    const transfer = page.getByRole('dialog', { name: 'Transfer token' });
+    await transfer.getByLabel('Destination clinician').selectOption(destination);
+    await transfer.getByRole('button', { name: 'Transfer token' }).click();
+    await expect(transfer).not.toBeVisible();
+  }
+  await token.getByRole('button', { name: 'Call token' }).click();
+  await expect(token).toContainText('Called');
   await signOut(page);
 
   await signIn(page, 'clinician');
@@ -204,6 +335,10 @@ test('registers, books, checks in, completes a consultation, and settles an invo
   await page.getByRole('button', { name: 'Start consultation' }).click();
   await page.getByRole('button', { name: 'Review consultation' }).click();
   const visit = page.getByRole('dialog', { name: 'Consultation' });
+  await visit.getByLabel('Medication', { exact: true }).selectOption('saline');
+  await visit.getByRole('button', { name: 'Save prescription draft' }).click();
+  await visit.getByRole('button', { name: 'Sign prescription' }).click();
+  await expect(visit.getByText('Prescription signed and sent to pharmacy.')).toBeVisible();
   await visit.getByLabel('Laboratory order').selectOption('Complete blood count');
   await visit.getByRole('button', { name: 'Order test' }).click();
   await expect(visit.getByText('Laboratory order created.')).toBeVisible();
@@ -227,6 +362,39 @@ test('registers, books, checks in, completes a consultation, and settles an invo
   await expect(page.getByRole('row', { name: new RegExp(id) })).toContainText('Paid');
   await page.reload();
   await expect(page.getByRole('row', { name: new RegExp(id) })).toContainText('Paid');
+});
+
+test('dispenses from a current stock lot and posts the medication to billing', async ({
+  page,
+}, testInfo) => {
+  await signIn(page, 'pharmacy');
+  await expect(page.getByRole('heading', { name: 'Pharmacy' })).toBeVisible();
+  const row = page.getByRole('row', { name: /Oral hydration sachets/ });
+  await row.getByRole('button', { name: 'Dispense', exact: true }).click();
+  const dispense = page.getByRole('dialog', { name: 'Dispense medication' });
+  const lots = dispense.getByLabel('Eligible stock lot');
+  await expect(lots.locator('option', { hasText: 'HC-1824' })).toHaveCount(0);
+  await lots.selectOption('mer-central-hydration-1');
+  await dispense.getByRole('button', { name: 'Confirm dispensing' }).click();
+  await expect(page.getByText('Medication dispensed and charge posted.')).toBeVisible();
+  await expect(row).toContainText('Dispensed');
+  await page.getByRole('button', { name: 'Stock lots', exact: true }).click();
+  await expect(page.getByRole('row', { name: /Oral hydration sachets.*HC-2320/ })).toContainText(
+    '36',
+  );
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('pharmacy-desktop.png'),
+    animations: 'disabled',
+  });
+  await signOut(page);
+  await signIn(page, 'cashier');
+  await expect(page.getByRole('row', { name: /Oral hydration sachets/ })).toContainText(
+    'Outstanding',
+  );
 });
 
 test('moves a patient from admission request through cleaning and bed release', async ({

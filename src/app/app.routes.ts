@@ -20,7 +20,7 @@ const entry: CanActivateFn = async () => {
   const store = inject(SessionStore);
   if (!evaluationAvailable) return router.parseUrl('/unavailable');
   await store.restore();
-  return router.parseUrl(store.session() ? '/work/' + store.initialRoute() : '/sign-in');
+  return router.parseUrl(store.session() ? store.home() : '/sign-in');
 };
 
 export const routes: Routes = [
@@ -67,6 +67,28 @@ export const routes: Routes = [
         title: 'Hospital Overview · TrueCare',
       },
       {
+        path: 'subscriptions',
+        data: { resource: 'subscriptions' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/subscriptions').then((m) => m.Subscriptions),
+        title: 'Subscriptions · TrueCare',
+      },
+      {
+        path: 'platform-operations',
+        data: { resource: 'platform-operations' },
+        canActivate: [workspaceAccess],
+        loadComponent: () =>
+          import('./features/platform-operations').then((m) => m.PlatformOperations),
+        title: 'Platform Operations · TrueCare',
+      },
+      {
+        path: 'network',
+        data: { resource: 'network' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/network').then((m) => m.Network),
+        title: 'Network Performance · TrueCare',
+      },
+      {
         path: 'appointments',
         data: { resource: 'appointments' },
         canActivate: [workspaceAccess],
@@ -107,6 +129,13 @@ export const routes: Routes = [
         canActivate: [workspaceAccess],
         loadComponent: () => import('./features/laboratory').then((m) => m.Laboratory),
         title: 'Laboratory · TrueCare',
+      },
+      {
+        path: 'pharmacy',
+        data: { resource: 'pharmacy' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/pharmacy').then((m) => m.Pharmacy),
+        title: 'Pharmacy · TrueCare',
       },
       {
         path: 'portal',

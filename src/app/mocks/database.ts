@@ -18,6 +18,11 @@ import {
 import { facilities, organisations, seed } from './seed';
 import { labFixtures, type LabOrder } from '../domain/diagnostics';
 import type { Organisation } from '../domain/platform';
+import type { StaffMembership } from '../domain/access';
+import { initialStaff } from './accounts';
+import type { Prescription, StockLot, StockMovement } from '../domain/pharmacy';
+import { pharmacyFixtures } from './pharmacy-seed';
+import type { PlatformIncident } from '../domain/platform-operations';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -29,6 +34,11 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   admissions: EntityTable<Admission, 'id'>;
   labOrders: EntityTable<LabOrder, 'id'>;
   facilities: EntityTable<Facility, 'id'>;
+  memberships: EntityTable<StaffMembership, 'id'>;
+  prescriptions: EntityTable<Prescription, 'id'>;
+  stockLots: EntityTable<StockLot, 'id'>;
+  stockMovements: EntityTable<StockMovement, 'id'>;
+  platformIncidents: EntityTable<PlatformIncident, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -107,6 +117,76 @@ db.version(5)
       .modify({ finding: 'Result within reference range' });
   });
 
+db.version(6)
+  .stores({ memberships: 'id, account, facilityId' })
+  .upgrade((transaction) => transaction.table('memberships').bulkAdd(initialStaff));
+
+db.version(7)
+  .stores({})
+  .upgrade(async (transaction) => {
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    for (const grant of initialStaff.filter((row) => row.account === 'network')) {
+      if (!(await memberships.get(grant.id))) await memberships.add(grant);
+    }
+  });
+
+db.version(8)
+  .stores({
+    prescriptions: 'id, facilityId, encounterId',
+    stockLots: 'id, facilityId',
+    stockMovements: 'id, facilityId, &prescriptionId',
+    invoices: 'id, facilityId, [facilityId+day], encounterId, &prescriptionId',
+  })
+  .upgrade(async (transaction) => {
+    const date = await transaction
+      .table<{ key: string; value: string }, string>('metadata')
+      .get('referenceDay');
+    if (!date) return;
+    const encounters = await transaction.table<Encounter, string>('encounters').toArray();
+    const pharmacy = pharmacyFixtures(initialFacilities, encounters, date.value);
+    await transaction.table('stockLots').bulkAdd(pharmacy.lots);
+    await transaction.table('prescriptions').bulkAdd(pharmacy.prescriptions);
+    const membership = initialStaff.find((item) => item.account === 'pharmacy');
+    if (membership && !(await transaction.table('memberships').get(membership.id))) {
+      await transaction.table('memberships').add(membership);
+    }
+  });
+
+function initialIncidents(day: string): PlatformIncident[] {
+  const time = Date.parse(day + 'T08:15:00+05:30');
+  return [
+    {
+      id: 'ops-queue-sync',
+      title: 'Queue display update delayed',
+      service: 'Queue display',
+      priority: 'High',
+      status: 'Open',
+      version: 1,
+      createdAt: time,
+      updatedAt: time,
+    },
+    {
+      id: 'ops-facility-review',
+      title: 'Review facility activation history',
+      service: 'Facility configuration',
+      priority: 'Normal',
+      status: 'Investigating',
+      version: 2,
+      createdAt: time - 86_400_000,
+      updatedAt: time - 1_800_000,
+    },
+  ];
+}
+
+db.version(9)
+  .stores({ platformIncidents: 'id, updatedAt' })
+  .upgrade(async (transaction) => {
+    const date = await transaction
+      .table<{ key: string; value: string }, string>('metadata')
+      .get('referenceDay');
+    if (date) await transaction.table('platformIncidents').bulkAdd(initialIncidents(date.value));
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -122,6 +202,10 @@ export function initialize() {
         db.admissions,
         db.labOrders,
         db.facilities,
+        db.memberships,
+        db.prescriptions,
+        db.stockLots,
+        db.platformIncidents,
         db.organisations,
         db.invoices,
         db.payments,
@@ -133,6 +217,7 @@ export function initialize() {
         if (await db.metadata.get('referenceDay')) return;
         const referenceDay = dayInIndia();
         const data = seed(referenceDay);
+        const pharmacy = pharmacyFixtures(initialFacilities, data.encounters, referenceDay);
         await Promise.all([
           db.patients.bulkAdd(data.patients),
           db.practitioners.bulkAdd(data.practitioners),
@@ -143,6 +228,10 @@ export function initialize() {
           db.admissions.bulkAdd(data.admissions),
           db.labOrders.bulkAdd(labFixtures(data.encounters)),
           db.facilities.bulkAdd(initialFacilities),
+          db.memberships.bulkAdd(initialStaff),
+          db.stockLots.bulkAdd(pharmacy.lots),
+          db.platformIncidents.bulkAdd(initialIncidents(referenceDay)),
+          db.prescriptions.bulkAdd(pharmacy.prescriptions),
           db.organisations.bulkAdd(organisations),
           db.events.bulkAdd(initialPlatformActivity(referenceDay)),
           db.invoices.bulkAdd(data.invoices),
