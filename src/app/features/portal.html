@@ -252,6 +252,9 @@
               @if (bill.reviewMinor) {
                 <small>{{ bill.reviewMinor | rupees }} needs payment review</small>
               }
+              @if (bill.refundedMinor) {
+                <small>{{ bill.refundedMinor | rupees }} refunded locally</small>
+              }
               <p>
                 {{ bill.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} · Balance
                 {{ bill.balanceMinor | rupees }}

@@ -28,5 +28,7 @@
 | Radiologist | Facility-scoped report preparation and release. Release requires the current report author. |
 | Blood bank officer | Authorized inpatient-enabled facilities. Reviews, reserves, releases and issues component units, with a verified active admission and recorded unit custody. |
 | Cashier | Signed-encounter invoices, local settlements, medication credits and payment review amounts, and scoped bed charges at inpatient-enabled facilities. |
+| Finance officer | Facility posting-day collections and reconciliation. Resolves medication payment reviews and can record a local refund. |
+| Insurance coordinator | Facility consultation and inpatient invoices. Records patient coverage, versioned claim decisions and approved payer settlements. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications and bill balances. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

@@ -28,8 +28,8 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D22 | Pharmacy | `/work/pharmacy` | Partial | Catalogue authoring, linked purchase orders, quarantine disposition, reconciliation and partial fills |
 | D23 | Blood Bank | `/work/blood-bank` | Partial | Donor intake, testing records, inventory receiving, returns and traceability exports |
 | D24 | Patient Billing & Cashier | `/work/billing` | Partial | Deposits, taxes, discounts, receipts, refunds and invoice pagination |
-| D25 | Finance & Revenue | — | Open | Cash close, reports, accounting and reconciliation |
-| D26 | Insurance & TPA | — | Open | Coverage, authorisation, claim and settlement |
+| D25 | Finance & Revenue | `/work/finance` | Partial | Tender-level reconciliation, payment receipts, adjusting closed days and accounting exports |
+| D26 | Insurance & TPA | `/work/insurance` | Partial | Payer rules, retries and appeals, attachments, batch remittance and claim aging |
 | D27 | Inventory & Stores | — | Open | Stock movements, batch inventory and counts |
 | D28 | Procurement | — | Open | Approval, purchase orders and goods receipt |
 | D29 | HR & Workforce | — | Open | Roster, assignment, credentialing and attendance |

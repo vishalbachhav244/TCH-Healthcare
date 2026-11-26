@@ -25,6 +25,9 @@ import { updateBloodRequest, wardBloodCommand } from './blood-bank';
 import { pharmacyCommand } from './pharmacy';
 import { stockCommand } from './pharmacy-stock';
 import { invoiceBalances } from './invoice-balances';
+import { closeCollections, decideRefund, requireOpenCollectionDay } from './finance';
+import { claimCommand, recordCoverage } from './insurance';
+import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
 import { criticalCareCommand, emergencyCommand, theatreCommand } from './acute-care';
@@ -85,6 +88,10 @@ export async function command(
       db.prescriptions,
       db.stockLots,
       db.stockMovements,
+      db.refundDecisions,
+      db.collectionCloses,
+      db.insuranceCoverages,
+      db.insuranceClaims,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -438,13 +445,50 @@ export async function command(
           const facility = scope(session, facilityRecord, 'D24', 'billing');
           const invoice = await db.invoices.get(field(payload, 'invoiceId'));
           if (invoice?.facilityId !== facility.id) throw new ApiError(404, 'Invoice not found.');
-          const { balanceMinor: amountMinor } = (await invoiceBalances([invoice])).get(invoice.id)!;
+          const { balanceMinor: amountMinor, insurancePending } = (
+            await invoiceBalances([invoice])
+          ).get(invoice.id)!;
+          if (insurancePending)
+            throw new ApiError(409, 'Patient settlement is on hold while insurance is pending.');
           if (amountMinor <= 0) throw new ApiError(409, 'This invoice has no outstanding balance.');
+          const day = dayInIndia();
+          await requireOpenCollectionDay(facility.id, day);
           const id = crypto.randomUUID();
-          await db.payments.add({ id, invoiceId: invoice.id, day: dayInIndia(), amountMinor });
+          await db.payments.add({ id, invoiceId: invoice.id, day, amountMinor });
           changed = event(facility, 'PaymentRecorded', id);
           break;
         }
+        case 'finance/closes':
+          changed = await closeCollections(
+            scope(session, facilityRecord, 'D25', 'finance'),
+            session,
+            checkedDay(field(payload, 'day')),
+            payload['countedMinor'],
+          );
+          break;
+        case 'finance/refund-reviews':
+          changed = await decideRefund(
+            scope(session, facilityRecord, 'D25', 'finance'),
+            session,
+            payload,
+          );
+          break;
+        case 'insurance/coverage':
+          changed = await recordCoverage(
+            scope(session, facilityRecord, 'D26', 'insurance'),
+            session,
+            payload,
+          );
+          break;
+        case 'insurance/claims':
+        case 'insurance/claims/status':
+          changed = await claimCommand(
+            scope(session, facilityRecord, 'D26', 'insurance'),
+            session,
+            payload,
+            path === 'insurance/claims',
+          );
+          break;
         case 'alerts/acknowledge': {
           const facility = scope(session, facilityRecord, 'D06', 'overview');
           const alert = await db.alerts.get(field(payload, 'alertId'));

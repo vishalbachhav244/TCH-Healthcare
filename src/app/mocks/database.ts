@@ -48,6 +48,8 @@ import type { BedStay, DischargePlan, InpatientAccount } from '../domain/dischar
 import { initialBedStays } from '../domain/bed-charges';
 import type { BloodRequest, BloodUnit } from '../domain/blood-bank';
 import type { ImagingOrder } from '../domain/radiology';
+import type { CollectionClose, RefundDecision } from '../domain/finance';
+import type { InsuranceClaim, InsuranceCoverage } from '../domain/insurance';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
@@ -64,6 +66,10 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   prescriptions: EntityTable<Prescription, 'id'>;
   stockLots: EntityTable<StockLot, 'id'>;
   stockMovements: EntityTable<StockMovement, 'id'>;
+  refundDecisions: EntityTable<RefundDecision, 'movementId'>;
+  collectionCloses: EntityTable<CollectionClose, 'id'>;
+  insuranceCoverages: EntityTable<InsuranceCoverage, 'id'>;
+  insuranceClaims: EntityTable<InsuranceClaim, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -413,6 +419,29 @@ db.version(19)
     const at = Date.parse((reference?.value ?? dayInIndia()) + 'T00:00:00+05:30');
     await movements.bulkPut(history.map((move) => ({ ...move, kind: 'Dispensed' })));
     await movements.bulkAdd(openingStock(lots, at, history));
+  });
+
+db.version(20)
+  .stores({
+    refundDecisions: 'movementId, facilityId, invoiceId, [facilityId+day]',
+    collectionCloses: 'id, facilityId',
+    insuranceCoverages: 'id, facilityId, [facilityId+patientId], &[facilityId+payer+policy]',
+    insuranceClaims: 'id, facilityId, &invoiceId',
+    payments: 'id, invoiceId, day, &claimId',
+  })
+  .upgrade(async (transaction) => {
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    const facilities = transaction.table<Facility, string>('facilities');
+    for (const membership of initialStaff.filter(
+      (row) => row.role === 'finance' || row.role === 'insurance',
+    )) {
+      if (
+        (await facilities.get(membership.facilityId)) &&
+        !(await memberships.get(membership.id))
+      ) {
+        await memberships.add(membership);
+      }
+    }
   });
 
 export function initialize() {

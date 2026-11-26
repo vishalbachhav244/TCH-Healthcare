@@ -9,6 +9,8 @@ import { platformData, updatePlatform } from './platform';
 import { board } from './inpatient';
 import { admissionDischargeDocument } from './discharge';
 import { inpatientBillingDetail, inpatientBillingRows } from './inpatient-billing';
+import { financeData } from './finance';
+import { insuranceData } from './insurance';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -88,6 +90,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'radiology/orders/status',
     'inpatient-physician/blood-requests/withdraw',
     'blood-bank/requests/status',
+    'insurance/claims/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -355,8 +358,48 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       const day = checkedDay(params.get('day'));
       return db.transaction(
         'r',
-        [db.invoices, db.patients, db.payments, db.stockMovements],
+        [
+          db.invoices,
+          db.patients,
+          db.payments,
+          db.stockMovements,
+          db.refundDecisions,
+          db.insuranceClaims,
+        ],
         async () => invoiceRows(facility, day),
+      );
+    }
+    case 'finance': {
+      const facility = scope(session, facilityRecord, 'D25', 'finance');
+      const day = checkedDay(params.get('day'));
+      return db.transaction(
+        'r',
+        [
+          db.invoices,
+          db.payments,
+          db.refundDecisions,
+          db.collectionCloses,
+          db.stockMovements,
+          db.patients,
+        ],
+        async () => financeData(facility, day),
+      );
+    }
+    case 'insurance': {
+      const facility = scope(session, facilityRecord, 'D26', 'insurance');
+      const day = checkedDay(params.get('day'));
+      return db.transaction(
+        'r',
+        [
+          db.invoices,
+          db.payments,
+          db.refundDecisions,
+          db.insuranceCoverages,
+          db.insuranceClaims,
+          db.stockMovements,
+          db.patients,
+        ],
+        async () => insuranceData(facility, day),
       );
     }
     case 'billing/inpatient':

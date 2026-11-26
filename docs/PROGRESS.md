@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Finance and Insurance, 27 November 2026
+
+- Added D25 `/work/finance` for facility posting-day totals, medication return decisions and collection close. Cashier and patient bills reflect the refund resolution. Hospital and network metrics use net collections.
+- Added D26 `/work/insurance` for policy coverage, preauthorisation, preparation, submission and approved payer settlement. An open claim holds patient collection. A recorded payer payment leaves the remaining patient portion available for settlement.
+- Updated access, typed contracts, finance and insurance adapters, cashier and portal views, schema version 20 and OpenAPI. Verified the V19 to V20 upgrade with preserved payment data and a medication return from the previous schema.
+- Coverage is 26 dashboard IDs with partial routes and 10 open. Payer rules, appeals, remittances, full reconciliation and accounting exports remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Finance](screenshots/finance-390.png) · [Insurance](screenshots/insurance-1440.png)
+
 ## Pharmacy receiving and returns, 27 November 2026
 
 - Extended D22 with batch receipts, supplier returns, patient returns, and a stock movement ledger. The lot projection separates on-hand stock from quarantined units. Dispensing reads the same on-hand ledger.

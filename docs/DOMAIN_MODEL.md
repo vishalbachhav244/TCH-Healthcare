@@ -26,4 +26,8 @@ A `BloodRequest` links the assigned physician’s order to an active admission a
 
 A pharmacy lot records a facility, catalogue item, batch and expiry. Its opening balance, receipts, dispensing and supplier returns determine the on-hand quantity. Patient returns reference the dispensed prescription, lot and original invoice. They add only to quarantine and carry the calculated invoice credit and any amount requiring payment review. The invoice and previous settlement records retain their original values. [Pharmacy contracts](../src/app/domain/pharmacy.ts)
 
+A `RefundDecision` resolves one paid medication return review. A recorded refund reduces net collections on the posting day and leaves the original invoice and payment as recorded. A `CollectionClose` stores the expected ledger totals and matching count for one facility and IST day. [Finance contracts](../src/app/domain/finance.ts)
+
+`InsuranceCoverage` belongs to a patient and facility. An `InsuranceClaim` binds eligible coverage to one consultation or inpatient invoice. The claim keeps the requested and approved amounts and a version for transitions. An open claim holds patient collection. A settled claim posts one invoice payment with the claim ID and releases the hold. [Insurance contracts](../src/app/domain/insurance.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

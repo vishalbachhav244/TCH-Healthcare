@@ -112,9 +112,12 @@
                   @if (row.reviewMinor) {
                     <small>{{ row.reviewMinor | rupees }} needs payment review</small>
                   }
+                  @if (row.refundedMinor) {
+                    <small>{{ row.refundedMinor | rupees }} refunded locally</small>
+                  }
                 </td>
                 <td>
-                  @if (row.balanceMinor && store.writeAllowed('billing')) {
+                  @if (row.balanceMinor && !row.insurancePending && store.writeAllowed('billing')) {
                     <button class="text-button" (click)="openPayment(row, paymentDialog)">
                       Record settlement
                     </button>

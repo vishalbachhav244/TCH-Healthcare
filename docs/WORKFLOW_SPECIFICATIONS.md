@@ -9,8 +9,8 @@
 | 5 Inpatient | Request → allocate bed → assign physician and nurse → record care → resolve open tasks, theatre cases and component requests → sign summary → discharge and release the summary → clean and release the bed | Medication administration, advance discharge coordination and summary amendments |
 | 6 Laboratory | Clinician order → collect → process → enter result → separate reviewer authorises and publishes → patient-scoped view | Numeric panels, corrections, report files and richer audit |
 | 7 Pharmacy | Receive stock → record batch ledger → dispense signed prescription → issue medication invoice and update patient history → process supplier or patient returns | Purchase order receipts, quarantine disposition, customer instructions and partial fills |
-| 8 Billing | Signed encounter, medication dispense or finalized bed ledger → invoice → apply eligible medication return credits → local settlement → update balance | Deposits, receipts, tax rules, payment review resolution and refunds |
-| 9 Insurance | Open | Payer lifecycle |
+| 8 Billing | Signed encounter, medication dispense or finalized bed ledger → invoice → credits and local settlement → refund review → daily collection close | Deposits, receipts, taxes, tender-level reconciliation and closed-day corrections |
+| 9 Insurance | Eligible invoice → patient coverage → preauthorisation → prepare and submit → record payer settlement or denial → collect patient remainder → reconcile | Payer rules, appeals, attachments, batch remittances and external clearing |
 | 10 Procurement | Open | Requisition, purchase order, goods receipt and ledger |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
 | 12 Integration | Configure connector → redeem patient code → request report → grant one published version → verify provenance and consent → audit access | Real external transport, verified partner identities and additional record formats |
@@ -33,3 +33,7 @@ An assigned clinician orders imaging during an active consultation. A technician
 An assigned ward physician requests a component for an active admission. Blood Bank can decline the request or record a synthetic review and reserve one in-date unit. The officer can issue the verified reservation or release it to inventory. A pending or reserved request blocks discharge until resolved.
 
 Pharmacy receives a catalogue item against an in-date batch and unique stock reference. Supplier returns deduct the recorded count from on-hand stock. Patients see dispensed medication and returned quantities. Returned medication goes to quarantine, and its original invoice price determines the return value. Credits reduce the unpaid balance. Any remainder is recorded for payment review.
+
+Finance records a local refund or closes the review without one. Finance reconciles the selected posting day against patient and payer collections less refunds. A successful close preserves the counted amount and ledger snapshot.
+
+Insurance uses an existing consultation or inpatient invoice as its synthetic claim anchor. The policy period covers the invoice date. An active claim temporarily holds patient settlement. Approval can cover part of the balance. Posted payer settlement, denial, rejection or cancellation releases the hold. The cashier can then record the remaining patient balance.

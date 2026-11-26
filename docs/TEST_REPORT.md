@@ -6,14 +6,14 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 35 contract and domain tests passed across 3 files |
-| `npm run e2e` | All 18 Chromium journeys passed, including pharmacy receipts, returns and adjusted settlement. |
-| `npm run build` | Passed. Initial assets approximately 371 kB raw and 96 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 373 kB raw and 97 kB estimated transfer. |
+| `npm test` | 36 contract and domain tests passed across 3 files |
+| `npm run e2e` | All 18 Chromium journeys passed, including payer and patient settlement, medication refund decisions and collection close. |
+| `npm run build` | Passed. Initial assets approximately 372 kB raw and 97 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 375 kB raw and 97 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 18 to 19 in Chromium. A legacy lot preserved 36 on-hand units and reconstructed an opening balance of 38 against a dispense of two. The return increased quarantine by one and credited the original medicine bill without changing its line. |
-| OpenAPI | 124 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 19 to 20 in Chromium. A legacy payment survived the upgrade, Finance resolved the existing medication return, and Insurance showed the existing unpaid consultation. |
+| OpenAPI | 131 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
@@ -31,9 +31,9 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 - Confirm that a clinic omits bed occupancy and rejects direct access to a disabled bed route.
 - Review a subscription, reject an incompatible downgrade and drill into authorized network departments.
 - Open, investigate, resolve and reload a platform incident.
-- Register a patient, reschedule the visit and decode the replacement pass. Check in, reject replay, call the token on a separate display tab, recall, skip, requeue and transfer it. Complete the consultation, order a laboratory test, sign a prescription, then issue and settle a consultation invoice.
+- Register a patient, reschedule the visit and decode the replacement pass. Check in, reject replay, call the token on a separate display tab, recall, skip, requeue and transfer it. Finish the consultation and issue an invoice. Record coverage and claim stages, reject authorisation above the requested amount, post the approved share and record the patient remainder.
 - Dispense a signed prescription from an unexpired lot, check the stock reduction and confirm the resulting cashier charge.
-- Receive a batch, return units to the supplier and dispense from the received stock. Reject excess patient return quantity, then record one return to quarantine. Verify the same credited balance in the cashier and portal views, settle the adjusted charge, and reload the stock ledger.
+- Receive a batch, return units to the supplier and dispense from the received stock. Reject excess patient return quantity, credit an unpaid return, and settle the adjusted charge. Process a later return through Finance, verify refund status in the cashier and patient portal, reject a mismatched count and reload the reconciled day.
 - Request admission, allocate a bed, discharge and release the bed after it has entered cleaning.
 - Collect a specimen as a technician and open a patient-owned appointment pass and records tabs on mobile. Check mobile axe rules and reflow.
 
@@ -62,3 +62,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Modality schedule](screenshots/radiology-schedule-1440.png) · [Mobile imaging report](screenshots/imaging-report-390.png) · [Mobile Blood Bank review](screenshots/blood-bank-review-390.png)
 
 [Pharmacy stock ledger](screenshots/pharmacy-ledger-1440.png) · [Mobile patient medication history](screenshots/patient-medications-390.png)
+
+[Insurance settlement](screenshots/insurance-1440.png) · [Mobile finance reconciliation](screenshots/finance-390.png)

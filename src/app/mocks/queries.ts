@@ -145,18 +145,23 @@ export async function dashboard(
   includeAppointmentActivity = true,
 ): Promise<DashboardData> {
   const slots = Array.from({ length: range }, (_, i) => shiftDay(day, i - range + 1));
-  const [forPeriod, prior, providers, beds, alerts, datedPayments] = await Promise.all([
+  const priorDay = shiftDay(day, -1);
+  const [forPeriod, prior, providers, beds, alerts, datedPayments, refunds] = await Promise.all([
     db.appointments
       .where('[facilityId+day]')
       .between([facility.id, slots[0]], [facility.id, day], true, true)
       .toArray(),
-    dailyAppointments(facility, shiftDay(day, -1)),
+    dailyAppointments(facility, priorDay),
     db.practitioners.where('facilityId').equals(facility.id).toArray(),
     facility.inpatient ? db.beds.where('facilityId').equals(facility.id).toArray() : [],
     db.alerts.where('facilityId').equals(facility.id).toArray(),
-    db.payments
-      .where('day')
-      .anyOf([shiftDay(day, -1), day])
+    db.payments.where('day').anyOf([priorDay, day]).toArray(),
+    db.refundDecisions
+      .where('[facilityId+day]')
+      .anyOf([
+        [facility.id, priorDay],
+        [facility.id, day],
+      ])
       .toArray(),
   ]);
   const today = forPeriod.filter((item) => item.day === day);
@@ -186,7 +191,10 @@ export async function dashboard(
   const revenue = (on: string) =>
     payments
       .filter((payment) => payment.day === on)
-      .reduce((sum, payment) => sum + payment.amountMinor, 0);
+      .reduce((sum, payment) => sum + payment.amountMinor, 0) -
+    refunds
+      .filter((refund) => refund.day === on)
+      .reduce((sum, refund) => sum + refund.amountMinor, 0);
   return {
     days: slots.map((on) => {
       const rows = forPeriod.filter((row) => row.day === on && row.status !== 'Cancelled');
@@ -203,7 +211,7 @@ export async function dashboard(
       bedCapacity: beds.filter((bed) => bed.status !== 'Maintenance').length,
       bedsOccupied: beds.filter((bed) => bed.status === 'Occupied').length,
       revenueMinor: revenue(day),
-      priorRevenueMinor: revenue(shiftDay(day, -1)),
+      priorRevenueMinor: revenue(priorDay),
     },
     departments: specialties.map((name) => {
       const rows = available.filter((row) => providerMap.get(row.practitionerId) === name);

@@ -105,6 +105,7 @@ export interface Payment {
   invoiceId: string;
   day: string;
   amountMinor: number;
+  claimId?: string;
 }
 
 export interface Bed {
@@ -204,6 +205,8 @@ export interface InvoiceAmounts {
   totalMinor: number;
   creditedMinor: number;
   reviewMinor: number;
+  refundedMinor?: number;
+  insurancePending?: boolean;
 }
 
 export interface InvoiceRow extends InvoiceAmounts {
@@ -280,6 +283,10 @@ export type EventType =
   | 'PharmacyStockReceived'
   | 'PharmacyStockReturned'
   | 'MedicationReturnRecorded'
+  | 'CollectionDayClosed'
+  | 'RefundReviewDecided'
+  | 'InsuranceCoverageRecorded'
+  | 'InsuranceClaimUpdated'
   | 'IncidentOpened'
   | 'IncidentInvestigating'
   | 'IncidentResolved'
@@ -320,6 +327,7 @@ export function invoiceTotal(invoice: Invoice) {
 }
 
 export function invoiceStatus(amounts: InvoiceAmounts) {
+  if (amounts.insurancePending) return 'Insurance pending';
   if (amounts.balanceMinor > 0) return 'Outstanding';
   if (amounts.reviewMinor > 0) return 'Review needed';
   return amounts.creditedMinor === amounts.totalMinor && amounts.totalMinor > 0

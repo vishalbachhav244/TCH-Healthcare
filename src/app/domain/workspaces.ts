@@ -20,6 +20,8 @@ export type Resource =
   | 'operation-theatre'
   | 'beds'
   | 'billing'
+  | 'finance'
+  | 'insurance'
   | 'laboratory'
   | 'radiology'
   | 'blood-bank'
@@ -205,8 +207,8 @@ export const workspaces: readonly Workspace[] = [
     icon: 'wallet',
     resource: 'billing',
   },
-  { id: 'D25', title: 'Finance & Revenue', group: 'Finance', icon: 'chart' },
-  { id: 'D26', title: 'Insurance & TPA', group: 'Finance', icon: 'shield' },
+  { id: 'D25', title: 'Finance & Revenue', group: 'Finance', icon: 'wallet', resource: 'finance' },
+  { id: 'D26', title: 'Insurance & TPA', group: 'Finance', icon: 'shield', resource: 'insurance' },
   { id: 'D27', title: 'Inventory & Stores', group: 'Operations', icon: 'box' },
   { id: 'D28', title: 'Procurement', group: 'Operations', icon: 'clipboard' },
   { id: 'D29', title: 'HR & Workforce', group: 'Operations', icon: 'users' },
@@ -264,6 +266,8 @@ export const navigation = [
   { title: 'Pharmacy', resource: 'pharmacy', icon: 'cross', workspace: 'D22' },
   { title: 'Blood bank', resource: 'blood-bank', icon: 'heart', workspace: 'D23' },
   { title: 'Revenue cycle', resource: 'billing', icon: 'wallet', workspace: 'D24' },
+  { title: 'Finance & revenue', resource: 'finance', icon: 'wallet', workspace: 'D25' },
+  { title: 'Insurance & TPA', resource: 'insurance', icon: 'shield', workspace: 'D26' },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
 ] as const;
 

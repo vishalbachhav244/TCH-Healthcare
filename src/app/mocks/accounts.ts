@@ -43,6 +43,8 @@ export const staff = {
     facilities: ['mer-central', 'mer-north'],
   },
   cashier: { name: 'Rohan Nair', role: 'cashier', facilities: ['mer-central'] },
+  finance: { name: 'Sanjay Das', role: 'finance', facilities: ['mer-central', 'mer-north'] },
+  claims: { name: 'Leena Patel', role: 'insurance', facilities: ['mer-central', 'mer-north'] },
   admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
   lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },
   labreview: { name: 'Dr. Ajay Iyer', role: 'labReviewer', facilities: ['mer-central'] },

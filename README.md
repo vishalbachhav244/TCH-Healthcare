@@ -39,6 +39,8 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `radiologist` | Imaging report preparation and release |
 | `bloodbank` | Component request review, reservation, issue and unit inventory |
 | `cashier` | Consultation and inpatient invoices, bed charges and local settlement |
+| `finance` | Patient and payer collections, medication refund review and daily reconciliation |
+| `claims` | Synthetic policy coverage, preauthorisation, claim status and local payer settlement |
 | `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
@@ -63,6 +65,10 @@ During an active consultation, `clinician` can order an imaging study. Use `imag
 On an assigned admission, `wardphysician` can request a blood component and track its status. Use `bloodbank` to record a synthetic review, reserve a unit and issue it to the linked admission. The inventory shows which units are available, reserved, issued or expired.
 
 In **Pharmacy**, use **Receive stock** to record a batch and its receipt reference. **Stock lots** shows on-hand and quarantined quantities and allows supplier returns. **Stock activity** shows the ledger. A patient return goes into quarantine and credits the unpaid portion of the original medication invoice where applicable. The cashier and patient can see the credited balance or an amount needing payment review.
+
+In **Insurance & TPA**, `claims` can open an eligible invoice, record patient coverage, request preauthorisation and record approval or denial. Prepare and submit the approved claim, then record the local payer settlement. When the claim is resolved, `cashier` can collect any outstanding patient portion.
+
+In **Finance & Revenue**, `finance` can resolve a medication return review and reconcile the facility’s posting day. The counted net amount must match the ledger before the day can be closed.
 
 ## Verify
 

@@ -7,6 +7,7 @@ import {
   invoiceTotal,
   shiftDay,
   type AppointmentPage,
+  type DashboardData,
   type InvoiceRow,
   type Session,
 } from '../domain/operations';
@@ -19,6 +20,8 @@ import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../doma
 import type { ImagingOrder, ImagingRow } from '../domain/radiology';
 import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
+import type { FinanceData } from '../domain/finance';
+import type { InsuranceRow } from '../domain/insurance';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -2229,8 +2232,170 @@ describe('medication authorization and dispensing', () => {
       reviewMinor: 6400,
     });
     expect(await db.invoices.get(invoice.id)).toEqual(invoice);
+    const officer = await login('finance');
+    const financePath = 'finance?day=' + day;
+    const before = (await get(financePath, officer, facility)) as FinanceData;
+    const review = before.reviews.find(
+      (row) => row.reference === 'PR-7002' || row.reference === 'PR-7003',
+    )!;
+    const decision = { movementId: review.id, outcome: 'Record local refund' };
+    await expect(post('finance/refund-reviews', decision, cashier, facility)).rejects.toMatchObject(
+      { status: 403 },
+    );
+    await expect(
+      post('finance/refund-reviews', decision, officer, 'mer-north'),
+    ).rejects.toMatchObject({ status: 404 });
+    const refunds = await Promise.allSettled([
+      post('finance/refund-reviews', decision, officer, facility),
+      post('finance/refund-reviews', decision, officer, facility),
+    ]);
+    expect(refunds.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const after = (await get(financePath, officer, facility)) as FinanceData;
+    expect(after.summary.refundedMinor - before.summary.refundedMinor).toBe(6400);
+    expect(after.summary.netMinor).toBe(before.summary.netMinor - 6400);
+    const executive = await login('executive');
+    expect(
+      ((await get('overview?day=' + day, executive, facility)) as DashboardData).metrics
+        .revenueMinor,
+    ).toBe(after.summary.netMinor);
+    expect(await cashierInvoice()).toMatchObject({
+      balanceMinor: 0,
+      reviewMinor: 0,
+      refundedMinor: 6400,
+    });
+    expect((await portal()).invoices.find((row) => row.id === invoice.id)).toMatchObject({
+      balanceMinor: 0,
+      reviewMinor: 0,
+      refundedMinor: 6400,
+    });
     await expect(
       post('billing/payments', { invoiceId: invoice.id }, cashier, facility),
     ).rejects.toMatchObject({ status: 409 });
+  }, 90_000);
+});
+
+describe('insurance and daily reconciliation', () => {
+  it('guards claim stages, posts the approved portion once, and locks a matched collection day', async () => {
+    const facility = 'mer-central';
+    const day = dayInIndia();
+    const [coordinator, finance, cashier] = await Promise.all(
+      ['claims', 'finance', 'cashier'].map(login),
+    );
+    const encounters = await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => !!row.signedAt)
+      .limit(2)
+      .toArray();
+    const ids = ['contract-insured-invoice', 'contract-uncollected-invoice'];
+    await db.invoices.bulkAdd(
+      encounters.map((encounter, index) => ({
+        id: ids[index],
+        facilityId: facility,
+        patientId: encounter.patientId,
+        encounterId: encounter.id,
+        day,
+        lines: [
+          { description: 'Insurance evaluation consultation', unitMinor: 57_000, quantity: 1 },
+        ],
+      })),
+    );
+    const [invoiceId, otherInvoiceId] = ids;
+    await expect(get('finance?day=' + day, coordinator, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(get('insurance?day=' + day, finance, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    const policy = {
+      invoiceId,
+      payer: 'Meridian Health Cover',
+      policy: 'TEST-2026',
+      startsOn: day,
+      expiresOn: shiftDay(day, 45),
+    };
+    await expect(
+      post('insurance/coverage', { ...policy, startsOn: shiftDay(day, 1) }, coordinator, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const { id: coverageId } = (await post(
+      'insurance/coverage',
+      policy,
+      coordinator,
+      facility,
+    )) as { id: string };
+    await expect(
+      post('insurance/coverage', { ...policy, policy: 'test-2026' }, coordinator, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      post('insurance/claims', { invoiceId: otherInvoiceId, coverageId }, coordinator, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    const { id: claimId } = (await post(
+      'insurance/claims',
+      { invoiceId, coverageId },
+      coordinator,
+      facility,
+    )) as { id: string };
+    await expect(
+      post('insurance/claims', { invoiceId, coverageId }, coordinator, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(post('billing/payments', { invoiceId }, cashier, facility)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('on hold'),
+    });
+    const update = (
+      version: string,
+      action: string,
+      data: Record<string, string> = {},
+      at = facility,
+    ) => patch('insurance/claims/status', { claimId, version, action, ...data }, coordinator, at);
+    await expect(
+      update('1', 'authorise', { approvedMinor: '40000' }, 'mer-north'),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(update('1', 'submit')).rejects.toMatchObject({ status: 409 });
+    await expect(update('1', 'authorise', { approvedMinor: '58000' })).rejects.toMatchObject({
+      status: 422,
+    });
+    await update('1', 'authorise', { approvedMinor: '40000' });
+    await expect(update('1', 'prepare')).rejects.toMatchObject({ status: 409 });
+    await update('2', 'prepare');
+    await update('3', 'submit');
+    const settled = await Promise.allSettled([update('4', 'settle'), update('4', 'settle')]);
+    expect(settled.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(await db.payments.where('claimId').equals(claimId).count()).toBe(1);
+    const cases = (await get('insurance?day=' + day, coordinator, facility)) as InsuranceRow[];
+    expect(cases.find((row) => row.invoiceId === invoiceId)).toMatchObject({
+      balanceMinor: 17_000,
+      claim: { status: 'Settled' },
+    });
+    await post('billing/payments', { invoiceId }, cashier, facility);
+    const payments = await db.payments.where('invoiceId').equals(invoiceId).toArray();
+    expect(payments.map((row) => row.amountMinor).sort((a, b) => a - b)).toEqual([17_000, 40_000]);
+    const view = (await get('finance?day=' + day, finance, facility)) as FinanceData;
+    expect(view.summary.payerMinor).toBe(40_000);
+    expect(view.summary.netMinor).toBe(
+      view.summary.patientMinor + view.summary.payerMinor - view.summary.refundedMinor,
+    );
+    const close = { day, countedMinor: String(view.summary.netMinor) };
+    await expect(
+      post(
+        'finance/closes',
+        { ...close, countedMinor: String(view.summary.netMinor + 1) },
+        finance,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await post('finance/closes', close, finance, facility);
+    await expect(post('finance/closes', close, finance, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(
+      post('billing/payments', { invoiceId: otherInvoiceId }, cashier, facility),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('Collections are closed'),
+    });
+    expect(
+      ((await get('finance?day=' + day, finance, facility)) as FinanceData).close,
+    ).toMatchObject({ day, countedMinor: view.summary.netMinor });
   }, 90_000);
 });

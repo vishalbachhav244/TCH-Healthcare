@@ -4534,6 +4534,303 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /finance:
+    get:
+      operationId: getFinanceWorkspace
+      summary: Read facility collections by posting day and medication payment reviews.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: day
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /finance/closes:
+    post:
+      operationId: closeCollectionDay
+      summary: Close a facility’s date after matching counted net collections. New postings for that day
+        are blocked.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - day
+                - countedMinor
+              properties:
+                day:
+                  type: string
+                  format: date
+                countedMinor:
+                  type: string
+                  pattern: ^-?[0-9]{1,12}$
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /finance/refund-reviews:
+    post:
+      operationId: decideMedicationRefund
+      summary: Resolve a medication payment review once. A recorded local refund changes the posting day’s
+        net collections.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - movementId
+                - outcome
+              properties:
+                movementId:
+                  type: string
+                outcome:
+                  $ref: "#/components/schemas/RefundOutcome"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /insurance:
+    get:
+      operationId: getInsuranceWorkspace
+      summary: List scoped consultation and inpatient invoices with eligible coverage and claim status.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: day
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InsuranceRow"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /insurance/coverage:
+    post:
+      operationId: recordPatientCoverage
+      summary: Record synthetic policy coverage for an eligible invoice’s patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - invoiceId
+                - payer
+                - policy
+                - startsOn
+                - expiresOn
+              properties:
+                invoiceId:
+                  type: string
+                payer:
+                  $ref: "#/components/schemas/InsurancePayer"
+                policy:
+                  type: string
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9-]{5,23}$
+                startsOn:
+                  type: string
+                  format: date
+                expiresOn:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /insurance/claims:
+    post:
+      operationId: requestInsurancePreauthorisation
+      summary: Start one preauthorisation per eligible invoice and hold patient settlement.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - invoiceId
+                - coverageId
+              properties:
+                invoiceId:
+                  type: string
+                coverageId:
+                  type: string
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /insurance/claims/status:
+    patch:
+      operationId: updateInsuranceClaim
+      summary: Record a versioned claim action. Settlement posts the approved payer amount once.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - claimId
+                - version
+                - action
+              properties:
+                claimId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                action:
+                  type: string
+                  enum:
+                    - authorise
+                    - deny
+                    - prepare
+                    - submit
+                    - settle
+                    - reject
+                    - cancel
+                approvedMinor:
+                  type: string
+                  pattern: ^[0-9]{1,12}$
+              if:
+                properties:
+                  action:
+                    const: authorise
+              then:
+                required:
+                  - approvedMinor
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -5000,6 +5297,8 @@ components:
           type: 'integer'
         creditedMinor: { type: integer, minimum: 0 }
         reviewMinor: { type: integer, minimum: 0 }
+        refundedMinor: { type: integer, minimum: 0 }
+        insurancePending: { type: boolean }
     BillingOptions:
       type: 'object'
       required: ['services', 'encounters']
@@ -5075,6 +5374,8 @@ components:
                 type: 'integer'
               creditedMinor: { type: integer, minimum: 0 }
               reviewMinor: { type: integer, minimum: 0 }
+              refundedMinor: { type: integer, minimum: 0 }
+              insurancePending: { type: boolean }
               inpatient:
                 type: boolean
     QueueDisplay:
@@ -7049,6 +7350,263 @@ components:
         returnedQuantity:
           type: integer
           minimum: 0
+    CollectionSummary:
+      type: object
+      required:
+        - billedMinor
+        - patientMinor
+        - payerMinor
+        - refundedMinor
+        - netMinor
+        - paymentCount
+      properties:
+        billedMinor:
+          type: integer
+          minimum: 0
+        patientMinor:
+          type: integer
+          minimum: 0
+        payerMinor:
+          type: integer
+          minimum: 0
+        refundedMinor:
+          type: integer
+          minimum: 0
+        netMinor:
+          type: integer
+        paymentCount:
+          type: integer
+          minimum: 0
+    CollectionClose:
+      type: object
+      required:
+        - id
+        - facilityId
+        - day
+        - summary
+        - countedMinor
+        - closedAt
+        - actor
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        day:
+          type: string
+          format: date
+        summary:
+          $ref: "#/components/schemas/CollectionSummary"
+        countedMinor:
+          type: integer
+        closedAt:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+    RefundOutcome:
+      type: string
+      enum:
+        - Record local refund
+        - Close without refund
+    RefundDecision:
+      type: object
+      required:
+        - movementId
+        - invoiceId
+        - facilityId
+        - outcome
+        - amountMinor
+        - day
+        - decidedAt
+        - actor
+      properties:
+        movementId:
+          type: string
+        invoiceId:
+          type: string
+        facilityId:
+          type: string
+        outcome:
+          $ref: "#/components/schemas/RefundOutcome"
+        amountMinor:
+          type: integer
+          minimum: 0
+        day:
+          type: string
+          format: date
+        decidedAt:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+    RefundReviewRow:
+      type: object
+      required:
+        - id
+        - patient
+        - medication
+        - reference
+        - requestedAt
+        - requestedMinor
+      properties:
+        id:
+          type: string
+        patient:
+          type: string
+        medication:
+          type: string
+        reference:
+          type: string
+        requestedAt:
+          type: integer
+          minimum: 0
+        requestedMinor:
+          type: integer
+          minimum: 0
+        decision:
+          $ref: "#/components/schemas/RefundDecision"
+    FinanceData:
+      type: object
+      required:
+        - summary
+        - reviews
+      properties:
+        summary:
+          $ref: "#/components/schemas/CollectionSummary"
+        close:
+          $ref: "#/components/schemas/CollectionClose"
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefundReviewRow"
+    InsurancePayer:
+      type: string
+      enum:
+        - Meridian Health Cover
+        - Horizon Benefits
+        - Civic Health Plan
+    InsuranceCoverage:
+      type: object
+      required:
+        - id
+        - facilityId
+        - patientId
+        - payer
+        - policy
+        - startsOn
+        - expiresOn
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        patientId:
+          type: string
+        payer:
+          $ref: "#/components/schemas/InsurancePayer"
+        policy:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]{5,23}$
+        startsOn:
+          type: string
+          format: date
+        expiresOn:
+          type: string
+          format: date
+    InsuranceClaim:
+      type: object
+      required:
+        - id
+        - facilityId
+        - patientId
+        - invoiceId
+        - coverageId
+        - payer
+        - requestedMinor
+        - version
+        - changedAt
+        - status
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        patientId:
+          type: string
+        invoiceId:
+          type: string
+        coverageId:
+          type: string
+        payer:
+          $ref: "#/components/schemas/InsurancePayer"
+        requestedMinor:
+          type: integer
+          minimum: 0
+        approvedMinor:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+        changedAt:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+            - Requested
+            - Authorised
+            - Prepared
+            - Submitted
+            - Settled
+            - Denied
+            - Rejected
+            - Cancelled
+    InsuranceRow:
+      type: object
+      required:
+        - invoiceId
+        - patientId
+        - patientName
+        - service
+        - totalMinor
+        - balanceMinor
+        - creditedMinor
+        - reviewMinor
+        - coverages
+      properties:
+        invoiceId:
+          type: string
+        patientId:
+          type: string
+        patientName:
+          type: string
+        service:
+          type: string
+        totalMinor:
+          type: integer
+          minimum: 0
+        balanceMinor:
+          type: integer
+          minimum: 0
+        creditedMinor:
+          type: integer
+          minimum: 0
+        reviewMinor:
+          type: integer
+          minimum: 0
+        refundedMinor:
+          type: integer
+          minimum: 0
+        insurancePending:
+          type: boolean
+        coverages:
+          type: array
+          items:
+            $ref: "#/components/schemas/InsuranceCoverage"
+        claim:
+          $ref: "#/components/schemas/InsuranceClaim"
   responses:
     Error401:
       description: 'Missing or expired session.'

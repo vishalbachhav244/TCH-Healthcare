@@ -1,6 +1,6 @@
 # Frontend implementation status
 
-The frontend is an independent project built from the supplied brief. 24 of 36 dashboard IDs have working routes with partial workflow coverage. The other 12 remain open. No dashboard has passed every acceptance criterion in the brief.
+The frontend is an independent project built from the supplied brief. 26 of 36 dashboard IDs have working routes with partial workflow coverage. The other 10 remain open. No dashboard has passed every acceptance criterion in the brief.
 
 The 137 canonical screen rows and 171 canonical requirement rows are referenced by count in the attachment. Their IDs and individual definitions were not supplied. The register uses local screen IDs and the brief's section numbers while they are unavailable. [Screen inventory](SCREEN_INVENTORY.md)
 
@@ -28,13 +28,15 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §§9,16.6 Radiology | D21 | TC-LOCAL-35 and 36 `/work/radiology` | Partial | Assigned outpatient orders, modality booking, acquisition, reviewer draft and release | Patient and room collision checks, stage and role restrictions, released patient view | Configurable rooms and schedules, attachments, image viewing and corrections |
 | §§9,16.7 Pharmacy | D22 | TC-LOCAL-17, 39 and 40 `/work/pharmacy` | Partial | Signed worklist, stock receipt and ledger, batch dispensing, supplier returns and quarantined patient returns | Expiry, facility and lot boundaries, duplicate references, concurrent returns, and invoice and portal updates | Purchase orders, inventory reconciliation, partial fills and quarantine disposition |
 | §9 Blood Bank | D23 | TC-LOCAL-37 and 38 `/work/blood-bank` | Partial | Assigned inpatient requests, recorded review, unit expiry and custody, reservation and issue | Assignment, entitlement, expired unit rejection, release, duplicate issue and discharge checks | Donor intake, lab testing workflow, receiving, returns and traceability exports |
-| §§9,16.8 Billing | D24 | TC-LOCAL-11, 33 and 40 `/work/billing` | Partial | Consultation, medication and inpatient invoices, bed charges, medication return credits and local settlement | Transfer-aware rates, legacy charges, duplicate issue, credit caps and adjusted settlement | Other inpatient charges, deposits, tax rules, receipts, payment review resolution, refunds and reconciliation |
+| §§9,16.8 Billing | D24 | TC-LOCAL-11, 33, 40 and 42 `/work/billing` | Partial | Consultation, medication and inpatient invoices, bed charges, credits, refund status, insurance hold and local settlement | Transfer-aware rates, legacy charges, duplicate issue, adjustment caps and the remaining patient balance | Other inpatient charges, deposits, tax rules, receipts and invoice pagination |
+| §§9,16.8 Finance | D25 | TC-LOCAL-41 `/work/finance` | Partial | Posting-day totals, local refund decisions and daily collection close | Matched and mismatched counts, duplicate review blocking, cross-role balances and closed-day posting checks | Tender-level reconciliation, reopening, corrected postings and accounting exports |
+| §§9,16.9 Insurance | D26 | TC-LOCAL-42 `/work/insurance` | Partial | Patient coverage, preauthorisation, preparation, submission and payer settlement on eligible invoices | Facility and policy checks, versioned transitions, duplicate settlement rejection and claim hold | Payer configuration, outpatient medication claims, attachments, retries, appeals and remittance reconciliation |
 
 Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBILITY_REPORT.md) for exact run evidence.
 
 ## Continuation checkpoint
 
-1. Continue M6 with Finance D25 and Insurance D26, including local adjustment and payment review workflows.
-2. Continue M7–M8 with operational domains D27–D32 and engagement and analytics D33–D36. Extend inpatient service charges, diagnostic records and stock reconciliation.
+1. Continue M7 with D27 Inventory & Stores and D28 Procurement. Connect requisition, purchase order and goods receipt to the stock ledger.
+2. Continue D29–D32 and M8 engagement and analytics D33–D36. Extend payments, insurance, inpatient service charges, diagnostic records and stock reconciliation.
 3. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
 4. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.

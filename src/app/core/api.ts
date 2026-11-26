@@ -20,6 +20,13 @@ import type {
   WardBloodRequest,
 } from '../domain/blood-bank';
 import type { PatientPortal } from '../domain/portal';
+import type { FinanceData, RefundOutcome } from '../domain/finance';
+import type {
+  ClaimAction,
+  CoverageFields,
+  InsuranceClaim,
+  InsuranceRow,
+} from '../domain/insurance';
 import type {
   DischargeDocument,
   DischargeFields,
@@ -839,6 +846,62 @@ export class Api {
       admissionId,
       acknowledgePartial: String(acknowledgePartial),
     });
+  }
+
+  finance(token: string, facility: string, day: string) {
+    return this.get('finance', token, facility, { day }).pipe(
+      map((value) => objectShape<FinanceData>(value, ['summary', 'reviews'])),
+    );
+  }
+
+  closeCollections(token: string, facility: string, day: string, countedMinor: number) {
+    return this.execute('finance/closes', token, facility, {
+      day,
+      countedMinor: String(countedMinor),
+    });
+  }
+
+  decideRefund(token: string, facility: string, movementId: string, outcome: RefundOutcome) {
+    return this.execute('finance/refund-reviews', token, facility, { movementId, outcome });
+  }
+
+  insurance(token: string, facility: string, day: string) {
+    return this.get('insurance', token, facility, { day }).pipe(
+      map((value) =>
+        collection<InsuranceRow>(value, [
+          'invoiceId',
+          'patientId',
+          'patientName',
+          'service',
+          'coverages',
+          'balanceMinor',
+        ]),
+      ),
+    );
+  }
+
+  recordCoverage(token: string, facility: string, invoiceId: string, fields: CoverageFields) {
+    return this.execute('insurance/coverage', token, facility, { invoiceId, ...fields });
+  }
+
+  requestClaim(token: string, facility: string, invoiceId: string, coverageId: string) {
+    return this.execute('insurance/claims', token, facility, { invoiceId, coverageId });
+  }
+
+  changeClaim(token: string, facility: string, claim: InsuranceClaim, command: ClaimAction) {
+    const { action } = command;
+    return this.execute(
+      'insurance/claims/status',
+      token,
+      facility,
+      {
+        claimId: claim.id,
+        version: String(claim.version),
+        action,
+        ...(action === 'authorise' ? { approvedMinor: String(command.approvedMinor) } : {}),
+      },
+      'PATCH',
+    );
   }
 
   invoiceOptions(token: string, facility: string, day: string) {

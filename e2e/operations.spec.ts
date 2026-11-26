@@ -1314,9 +1314,10 @@ test('opens, investigates, resolves and reloads a platform incident', async ({
   });
 });
 
-test('registers, books, checks in, completes a consultation, and settles an invoice', async ({
+test('registers, books, checks in and settles consultation charges through insurance and cashier', async ({
   page,
-}) => {
+}, testInfo) => {
+  test.setTimeout(120_000);
   await signIn(page, 'reception');
   await page.getByRole('link', { name: 'Patients', exact: true }).click();
   await page.getByRole('button', { name: 'Register patient', exact: true }).click();
@@ -1432,14 +1433,69 @@ test('registers, books, checks in, completes a consultation, and settles an invo
   await invoice.getByLabel('Signed encounter').selectOption({ index: 1 });
   await invoice.getByLabel('Service').selectOption('Outpatient consultation');
   await invoice.getByRole('button', { name: 'Issue invoice' }).click();
-  await page
-    .getByRole('row', { name: new RegExp(id) })
-    .getByRole('button', { name: 'Record settlement' })
-    .click();
+  const bill = page.getByRole('row', { name: new RegExp(id) });
+  const claims = await page.context().newPage();
+  await signIn(claims, 'claims');
+  await claims.getByRole('searchbox', { name: 'Find insurance case' }).fill(id);
+  const row = claims.getByRole('row', { name: new RegExp(id) });
+  const addCoverage = row.getByRole('button', { name: 'Record coverage' });
+  await addCoverage.focus();
+  await claims.keyboard.press('Enter');
+  const coverage = claims.getByRole('dialog', { name: 'Record patient coverage' });
+  await expect(coverage).toBeVisible();
+  await claims.keyboard.press('Escape');
+  await expect(addCoverage).toBeFocused();
+  await addCoverage.click();
+  await coverage.getByLabel('Payer', { exact: true }).selectOption('Meridian Health Cover');
+  await coverage.getByLabel('Policy code').fill('DEMO-3002');
+  await coverage.getByRole('button', { name: 'Save coverage' }).click();
+  await expect(row).toContainText('Coverage recorded');
+  await row.getByRole('button', { name: 'Request preauthorisation' }).click();
+  await claims.getByRole('button', { name: 'Save request' }).click();
+  await expect(bill).toContainText('Insurance pending');
+  await expect(bill.getByRole('button', { name: 'Record settlement' })).toHaveCount(0);
+  const update = claims.getByRole('dialog', { name: 'Update insurance claim' });
+  async function action(value: string, status: string) {
+    await row.getByRole('button', { name: 'Update claim' }).click();
+    await update.getByLabel('Claim action').selectOption(value);
+    await update.getByRole('button', { name: 'Save claim action' }).click();
+    await expect(row).toContainText(status);
+  }
+  await row.getByRole('button', { name: 'Update claim' }).click();
+  await update.getByLabel('Claim action').selectOption('authorise');
+  await update.getByLabel('Approved amount (₹)').fill('751');
+  await update.getByRole('button', { name: 'Save claim action' }).click();
+  await expect(update.getByRole('alert')).toContainText('no greater');
+  await update.getByLabel('Approved amount (₹)').fill('500');
+  await update.getByRole('button', { name: 'Save claim action' }).click();
+  await expect(row).toContainText('Authorised');
+  await action('prepare', 'Prepared');
+  await action('submit', 'Submitted');
+  await claims.reload();
+  await claims.getByRole('searchbox', { name: 'Find insurance case' }).fill(id);
+  await action('settle', 'Settled');
+  await expect(bill.getByRole('cell', { name: '₹250.00', exact: true })).toBeVisible();
+  await checkReflow(claims);
+  expect(
+    (await new AxeBuilder({ page: claims }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await claims.screenshot({
+    path: testInfo.outputPath('insurance-1440.png'),
+    animations: 'disabled',
+  });
+  const finance = await page.context().newPage();
+  await signIn(finance, 'finance');
+  await expect(finance.getByRole('row', { name: /Payer collections/ })).toContainText('₹500.00');
+  await bill.getByRole('button', { name: 'Record settlement' }).click();
   await page.getByRole('button', { name: 'Confirm settlement' }).click();
-  await expect(page.getByRole('row', { name: new RegExp(id) })).toContainText('Paid');
+  await expect(bill).toContainText('Paid');
   await page.reload();
-  await expect(page.getByRole('row', { name: new RegExp(id) })).toContainText('Paid');
+  await expect(bill).toContainText('Paid');
+  await finance.goto('/work/insurance');
+  await expect(finance.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await claims.close();
+  await finance.close();
 });
 
 test('dispenses from a current stock lot and posts the medication to billing', async ({
@@ -1604,9 +1660,55 @@ test('tracks pharmacy receipts, supplier returns and a credited patient return',
   await expect(patient.getByRole('article').filter({ hasText: '₹32.00 credited' })).toContainText(
     'Paid',
   );
+  await page.getByRole('button', { name: 'Prescriptions', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search prescriptions' }).fill(patientId);
+  await order.getByRole('button', { name: 'Record patient return' }).click();
+  await returned.getByLabel('Return reason').selectOption('Unused medication returned');
+  await returned.getByLabel('Stock reference').fill('PR-602');
+  await returned.getByRole('button', { name: 'Confirm return' }).click();
+  await expect(bill).toContainText('₹32.00 needs payment review');
+  const finance = await page.context().newPage();
+  await signIn(finance, 'finance');
+  await finance.getByRole('button', { name: 'Return reviews', exact: true }).click();
+  await finance
+    .getByRole('row', { name: /PR-602/ })
+    .getByRole('button', { name: 'Review return' })
+    .click();
+  const review = finance.getByRole('dialog', { name: 'Review medication return' });
+  await review.getByLabel('Review decision').selectOption('Record local refund');
+  await review.getByRole('button', { name: 'Save decision' }).click();
+  await expect(bill).toContainText('₹32.00 refunded locally');
+  await expect(patient.getByRole('article').filter({ hasText: '₹32.00 credited' })).toContainText(
+    '₹32.00 refunded locally',
+  );
+  await finance.getByRole('button', { name: 'Collections', exact: true }).click();
+  await expect(finance.getByRole('row', { name: /Local refunds/ })).toContainText('₹32.00');
+  const net = finance.getByRole('row', { name: /Net collection/ }).getByRole('cell');
+  const counted = (await net.innerText()).replace(/[^0-9.-]/g, '');
+  await finance.getByRole('button', { name: 'Reconcile day' }).click();
+  const reconcile = finance.getByRole('dialog', { name: 'Reconcile collections' });
+  const amount = reconcile.getByLabel('Counted net collection (₹)');
+  await amount.fill(String(Number(counted) + 1));
+  await reconcile.getByRole('button', { name: 'Confirm close' }).click();
+  await expect(reconcile.getByRole('alert')).toContainText('must match');
+  await amount.fill(counted);
+  await reconcile.getByRole('button', { name: 'Confirm close' }).click();
+  await expect(finance.getByText('Closed', { exact: true })).toBeVisible();
+  await finance.reload();
+  await expect(finance.getByText('Closed', { exact: true })).toBeVisible();
+  await checkReflow(finance);
+  await finance.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page: finance }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await finance.screenshot({
+    path: testInfo.outputPath('finance-390.png'),
+    animations: 'disabled',
+  });
   await patient.goto('/work/pharmacy');
   await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
-  for (const tab of [desk, clinician, cashier, patient]) await tab.close();
+  for (const tab of [desk, clinician, cashier, patient, finance]) await tab.close();
 });
 
 test('moves a patient from admission request through cleaning and bed release', async ({
