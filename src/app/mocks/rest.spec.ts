@@ -3,11 +3,21 @@ import 'fake-indexeddb/auto';
 import { HttpHeaders, HttpRequest } from '@angular/common/http';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { dayInIndia, invoiceTotal, type AppointmentPage, type Session } from '../domain/operations';
-import { db } from './database';
+import type { GovernanceData, QualityView } from '../domain/governance';
+import { db, initialize } from './database';
 import { handle } from './rest';
 import { seed } from './seed';
+import type {
+  IntegrationDashboard,
+  PatientSharing,
+  RequestSummary,
+  SharedReport,
+} from '../domain/interoperability';
 
-beforeAll(() => vi.stubGlobal('location', { origin: 'http://127.0.0.1:4317' }));
+beforeAll(async () => {
+  vi.stubGlobal('location', { origin: 'http://127.0.0.1:4317' });
+  await initialize();
+}, 60_000);
 
 function get(path: string, session?: Session, facility?: string) {
   return handle(new HttpRequest('GET', '/api/v1/' + path, { headers: headers(session, facility) }));
@@ -16,6 +26,12 @@ function get(path: string, session?: Session, facility?: string) {
 function post(path: string, body: Record<string, string>, session?: Session, facility?: string) {
   return handle(
     new HttpRequest('POST', '/api/v1/' + path, body, { headers: headers(session, facility) }),
+  );
+}
+
+function patch(path: string, body: Record<string, string>, session: Session, facility?: string) {
+  return handle(
+    new HttpRequest('PATCH', '/api/v1/' + path, body, { headers: headers(session, facility) }),
   );
 }
 
@@ -28,6 +44,241 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('facility governance', () => {
+  const facility = 'mer-central';
+
+  it('scopes review and referral and closes a de-identified case through a versioned lifecycle', async () => {
+    const director = await login('medicaldirector');
+    const coordinator = await login('quality');
+    const executive = await login('executive');
+    const worklist = 'clinical-governance?day=' + dayInIndia();
+    await expect(get(worklist, executive, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(worklist, director, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    await expect(get('quality', director, facility)).rejects.toMatchObject({ status: 403 });
+    const governance = (await get(worklist, director, facility)) as GovernanceData;
+    expect(governance.pendingReviews).toBeGreaterThan(0);
+    const item = governance.items.find((row) => !row.review)!;
+    const referral = { reportId: item.id, action: 'refer', version: String(item.version) };
+    await expect(
+      post('clinical-governance/reviews', referral, coordinator, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('clinical-governance/reviews', { ...referral, version: '0' }, director, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await post('clinical-governance/reviews', referral, director, facility);
+    await expect(
+      post('clinical-governance/reviews', referral, director, facility),
+    ).rejects.toMatchObject({ status: 409 });
+
+    const register = (await get('quality', coordinator, facility)) as QualityView[];
+    const matches = register.filter((row) => row.origin === 'Clinical referral');
+    expect(matches).toHaveLength(1);
+    const qualityCase = matches[0];
+    expect(JSON.stringify(qualityCase)).not.toContain(item.accession);
+    expect(JSON.stringify(qualityCase)).not.toContain(item.id);
+    const command = { caseId: qualityCase.id, version: '1', action: 'claim' };
+    await expect(
+      patch('quality/cases/status', { ...command, action: 'resolve' }, coordinator, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch('quality/cases/status', command, coordinator, facility);
+    await expect(
+      patch('quality/cases/status', command, coordinator, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    const resolution = { ...command, version: '2', action: 'resolve' };
+    await expect(
+      patch('quality/cases/status', resolution, coordinator, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await patch(
+      'quality/cases/status',
+      { ...resolution, disposition: 'Follow-up scheduled' },
+      coordinator,
+      facility,
+    );
+    const refreshed = (await get('quality', coordinator, facility)) as QualityView[];
+    const resolved = refreshed.find((row) => row.id === qualityCase.id)!;
+    expect(resolved.timeline.map((entry) => entry.status)).toEqual([
+      'Open',
+      'Investigating',
+      'Resolved',
+    ]);
+    expect(resolved.timeline.at(-1)?.disposition).toBe('Follow-up scheduled');
+    const reviewed = (await get(worklist, director, facility)) as GovernanceData;
+    expect(reviewed.items.find((row) => row.id === item.id)).toMatchObject({
+      review: 'Referred',
+      caseStatus: 'Resolved',
+    });
+  });
+});
+
+describe('consent and interoperability', () => {
+  const facility = 'mer-central';
+  const connector = 'mer-referral-records';
+
+  async function issue(patient: Session, connectorId = connector) {
+    return post('portal/matching-code', { connectorId }, patient, facility) as Promise<{
+      code: string;
+    }>;
+  }
+
+  function request(recipient: Session, code: string) {
+    return post(
+      'record-requests',
+      { code, purpose: 'Continuation of care' },
+      recipient,
+    ) as Promise<{ id: string }>;
+  }
+
+  function access(recipient: Session, requestId: string) {
+    return post('record-requests/retrieve', { requestId }, recipient) as Promise<{
+      report: SharedReport;
+    }>;
+  }
+
+  function decision(
+    patient: Session,
+    requestId: string,
+    action: string,
+    version: string,
+    reportId = '',
+  ) {
+    return patch(
+      'portal/sharing',
+      { requestId, version, action, hours: '24', reportId },
+      patient,
+      facility,
+    );
+  }
+
+  it('isolates connector configuration and rejects stale lifecycle commands', async () => {
+    const admin = await login('integration');
+    const patient = await login('patient');
+    const recipient = await login('partnercare');
+    await expect(get('integrations', recipient)).rejects.toMatchObject({ status: 403 });
+    await expect(get('record-requests', admin)).rejects.toMatchObject({ status: 403 });
+    await expect(get('portal/sharing', patient, 'mer-north')).rejects.toMatchObject({
+      status: 403,
+    });
+    const { id } = (await post(
+      'integrations/connectors',
+      {
+        facilityId: facility,
+        name: 'Alternate referral records',
+        standard: 'HL7 FHIR',
+        recipientAccount: 'partnercare',
+      },
+      admin,
+    )) as { id: string };
+    await expect(issue(patient, id)).rejects.toMatchObject({ status: 404 });
+    await expect(
+      patch('integrations/connectors', { connectorId: id, action: 'enable', version: '1' }, admin),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(
+      'integrations/connectors',
+      { connectorId: id, action: 'validate', version: '1' },
+      admin,
+    );
+    await expect(
+      patch('integrations/connectors', { connectorId: id, action: 'enable', version: '1' }, admin),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(
+      'integrations/connectors',
+      { connectorId: id, action: 'enable', version: '2' },
+      admin,
+    );
+    await expect(issue(patient, id)).resolves.toHaveProperty('code');
+    await patch(
+      'integrations/connectors',
+      { connectorId: id, action: 'pause', version: '3' },
+      admin,
+    );
+    await expect(issue(patient, id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('matches one recipient, releases only the approved report version, and audits revocation', async () => {
+    const patient = await login('patient');
+    const recipient = await login('partnercare');
+    const other = await login('partnerlab');
+    const admin = await login('integration');
+    const { code } = await issue(patient);
+    await expect(request(other, code)).rejects.toMatchObject({ status: 404 });
+    const attempts = await Promise.allSettled([request(recipient, code), request(recipient, code)]);
+    expect(attempts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const confirmed = attempts.find((item) => item.status === 'fulfilled')!;
+    const id = confirmed.value.id;
+    await expect(access(recipient, id)).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringContaining('Consent required'),
+    });
+    await expect(access(other, id)).rejects.toMatchObject({ status: 404 });
+    await expect(access(admin, id)).rejects.toMatchObject({ status: 403 });
+    const feed = (await get('portal/sharing', patient, facility)) as PatientSharing;
+    const own = feed.reports[0]!;
+    const otherReport = await db.labOrders
+      .filter((item) => item.status === 'Published' && item.patientId !== 'TC-MERIDIAN-01001')
+      .first();
+    await expect(decision(patient, id, 'grant', '1', otherReport!.id)).rejects.toMatchObject({
+      status: 422,
+    });
+    await decision(patient, id, 'grant', '1', own.id);
+    const released = await access(recipient, id);
+    expect(released.report).toMatchObject({
+      test: own.test,
+      accession: own.accession,
+      source: 'Meridian Medical Centre',
+    });
+    expect(released.report).not.toHaveProperty('patientId');
+    const requests = (await get('record-requests', recipient)) as RequestSummary[];
+    expect(requests.find((item) => item.id === id)).not.toHaveProperty('reportId');
+    await expect(decision(patient, id, 'revoke', '1')).rejects.toMatchObject({ status: 409 });
+    await decision(patient, id, 'revoke', '2');
+    await expect(access(recipient, id)).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringContaining('Revoked'),
+    });
+    const logs = (await get('integrations', admin)) as IntegrationDashboard;
+    expect(logs.audit.map((entry) => entry.outcome)).toEqual(
+      expect.arrayContaining(['Consent required', 'Released', 'Revoked']),
+    );
+    expect(logs.audit.every((entry) => !('patientId' in entry) && !('requestId' in entry))).toBe(
+      true,
+    );
+  });
+
+  it('denies expired codes, expired grants and reports whose provenance changed', async () => {
+    const patient = await login('patient');
+    const recipient = await login('partnercare');
+    const expired = await issue(patient);
+    await db.matchingCodes.update(expired.code, { expiresAt: Date.now() - 1 });
+    await expect(request(recipient, expired.code)).rejects.toMatchObject({ status: 404 });
+    const record = await request(recipient, (await issue(patient)).code);
+    const feed = (await get('portal/sharing', patient, facility)) as PatientSharing;
+    const selected = (await db.labOrders.get(feed.reports[0]!.id))!;
+    await decision(patient, record.id, 'grant', '1', selected.id);
+    expect(await db.consentGrants.get(record.id)).toMatchObject({
+      revoked: false,
+      record: { kind: 'Laboratory report', id: selected.id, version: selected.version },
+    });
+    expect(await db.recordRequests.get(record.id)).not.toHaveProperty('reportId');
+    await db.labOrders.update(selected.id, { version: selected.version + 1 });
+    try {
+      await expect(access(recipient, record.id)).rejects.toMatchObject({
+        status: 403,
+        message: expect.stringContaining('Source mismatch'),
+      });
+    } finally {
+      await db.labOrders.update(selected.id, { version: selected.version });
+    }
+    await db.consentGrants.update(record.id, { expiresAt: Date.now() - 1 });
+    await expect(access(recipient, record.id)).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringContaining('Expired'),
+    });
+    const rows = (await get('record-requests', recipient)) as RequestSummary[];
+    expect(rows.find((row) => row.id === record.id)?.status).toBe('Expired');
+    expect(await db.exchangeAudit.where('requestId').equals(record.id).count()).toBe(2);
+  });
+});
 
 describe('evaluation REST contract', () => {
   it('requires a valid unexpired session and rejects disabled entitlements or another tenant', async () => {

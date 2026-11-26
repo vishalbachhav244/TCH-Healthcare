@@ -19,6 +19,7 @@ if (channel)
     )
       return;
     invalidations.next(data.facilityId);
+    if ('exchange' in data && data.exchange === true) invalidations.next('integrations');
     if ('configuration' in data && data.configuration === true) {
       if (data.facilityId !== 'platform') invalidations.next('platform');
       configurations.next(data.facilityId);
@@ -34,8 +35,16 @@ export function notifyFacility(event: DomainEvent) {
     'StaffAccessChanged',
     'FacilityCreated',
   ].includes(event.type);
-  channel?.postMessage({ facilityId: event.facilityId, configuration });
+  const exchange = [
+    'ConnectorConfigured',
+    'RecordRequested',
+    'ConsentChanged',
+    'RecordAccessed',
+    'FacilityActivationChanged',
+  ].includes(event.type);
+  channel?.postMessage({ facilityId: event.facilityId, configuration, exchange });
   invalidations.next(event.facilityId);
+  if (exchange) invalidations.next('integrations');
   if (configuration) {
     if (event.facilityId !== 'platform') invalidations.next('platform');
     configurations.next(event.facilityId);

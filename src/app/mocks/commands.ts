@@ -14,6 +14,7 @@ import { createPatient } from './seed';
 import { inpatientCommand } from './inpatient';
 import { laboratoryCommand } from './laboratory';
 import { pharmacyCommand } from './pharmacy';
+import { governanceCommand } from './governance';
 
 export const services = [
   { description: 'Outpatient consultation', unitMinor: 75000 },
@@ -71,6 +72,8 @@ export async function command(
       db.prescriptions,
       db.stockLots,
       db.stockMovements,
+      db.clinicalReviews,
+      db.qualityCases,
     ],
     async () => {
       const session = await requireSession(token);
@@ -404,6 +407,23 @@ export async function command(
           changed = await pharmacyCommand(
             path,
             scope(session, facilityRecord, 'D22', 'pharmacy'),
+            session,
+            payload,
+          );
+          break;
+        case 'clinical-governance/reviews':
+          changed = await governanceCommand(
+            path,
+            scope(session, facilityRecord, 'D07', 'clinical-governance'),
+            session,
+            payload,
+          );
+          break;
+        case 'quality/cases':
+        case 'quality/cases/status':
+          changed = await governanceCommand(
+            path,
+            scope(session, facilityRecord, 'D08', 'quality'),
             session,
             payload,
           );

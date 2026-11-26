@@ -1,0 +1,176 @@
+@let state = response();
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@if (error() && !editor.open) {
+  <p class="inline-notice" role="alert">{{ error() }}</p>
+}
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading record sharing…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <section class="panel portal-list" aria-labelledby="matching-heading">
+    <h2 id="matching-heading">Create a matching code</h2>
+    <p class="subtle">
+      Give a code to the named recipient so they can request a report. You choose whether to grant
+      access.
+    </p>
+    @if (state.data.connectors.length) {
+      <form class="fields" (submit)="$event.preventDefault(); issue()">
+        <label for="patient-recipient">Recipient</label
+        ><select id="patient-recipient" [formControl]="connector">
+          <option value="">Select a recipient</option>
+          @for (item of state.data.connectors; track item.id) {
+            <option [value]="item.id">{{ item.recipient }} · {{ item.name }}</option>
+          }
+        </select>
+        <button class="button secondary" type="submit" [disabled]="connector.invalid || busy()">
+          Generate matching code
+        </button>
+      </form>
+      @if (code(); as issued) {
+        <div class="pass-body">
+          <code data-testid="issued-matching-code">{{ issued.code }}</code>
+          <p class="subtle">
+            Expires {{ issued.expiresAt | date: 'HH:mm' : '+0530' }} IST. The recipient can use it
+            once.
+          </p>
+          <button class="text-button" type="button" (click)="copy()">Copy code</button>
+        </div>
+      }
+    } @else {
+      <p class="subtle">No recipients are available at this facility.</p>
+    }
+  </section>
+  <section
+    class="panel portal-list"
+    aria-labelledby="patient-requests"
+    style="margin-block-start: 1rem"
+  >
+    <h2 id="patient-requests">Consent requests</h2>
+    @for (item of state.data.requests; track item.id) {
+      <article>
+        <span class="square-icon teal"><ng-icon name="shield" /></span>
+        <div>
+          <strong>{{ item.connector.recipient }}</strong>
+          <p>{{ item.purpose }} · {{ item.createdAt | date: 'd MMM' : '+0530' }}</p>
+          @if (item.expiresAt) {
+            <p>Consent expires {{ item.expiresAt | date: 'd MMM, HH:mm' : '+0530' }} IST</p>
+          }
+        </div>
+        <span
+          [class]="
+            'status ' +
+            (item.status === 'Granted'
+              ? 'positive'
+              : item.status === 'Pending'
+                ? 'information'
+                : 'attention')
+          "
+          >{{ item.status }}</span
+        >
+        <div class="page-actions">
+          @if (item.status === 'Pending') {
+            <button class="text-button" type="button" (click)="open(item, 'grant', editor)">
+              Review request
+            </button>
+          }
+          @if (item.decision === 'Pending') {
+            <button class="text-button" type="button" (click)="open(item, 'decline', editor)">
+              Decline
+            </button>
+          }
+          @if (item.decision === 'Granted' && item.status !== 'Expired') {
+            <button class="text-button" type="button" (click)="open(item, 'revoke', editor)">
+              Revoke access
+            </button>
+          }
+        </div>
+      </article>
+    } @empty {
+      <p class="subtle">There are no record requests to review.</p>
+    }
+  </section>
+  <section
+    class="panel portal-list"
+    aria-labelledby="patient-access-history"
+    style="margin-block-start: 1rem"
+  >
+    <h2 id="patient-access-history">My access history</h2>
+    @for (entry of state.data.audit; track entry.id) {
+      <article>
+        <div>
+          <strong>{{ entry.connector }}</strong>
+          <p>{{ entry.source }} · {{ entry.occurredAt | date: 'd MMM, HH:mm' : '+0530' }} IST</p>
+        </div>
+        <span class="status information">{{ entry.outcome }}</span>
+      </article>
+    } @empty {
+      <p class="subtle">There are no report access attempts in your history.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="consent-editor-heading">
+  <div class="dialog-head">
+    <h2 id="consent-editor-heading">
+      {{
+        selected()?.action === 'grant'
+          ? 'Review record request'
+          : selected()?.action === 'decline'
+            ? 'Decline record request'
+            : 'Revoke report access'
+      }}
+    </h2>
+    <button type="button" class="icon-button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as target) {
+    <form class="dialog-body fields" [formGroup]="grant" (ngSubmit)="decide(editor)">
+      <p>
+        <strong>{{ target.request.connector.recipient }}</strong> · {{ target.request.purpose }}
+      </p>
+      @if (target.action === 'grant') {
+        <label for="approved-report">Report to share</label
+        ><select id="approved-report" formControlName="reportId" required>
+          <option value="">Choose a released report</option>
+          @if (state.state === 'ready') {
+            @for (report of state.data.reports; track report.id) {
+              <option [value]="report.id">{{ report.test }} · {{ report.accession }}</option>
+            }
+          }
+        </select>
+        <label for="consent-duration">Consent duration</label
+        ><select id="consent-duration" formControlName="hours">
+          <option value="24">24 hours</option>
+          <option value="168">7 days</option>
+        </select>
+        <p class="subtle">The recipient gets access to the selected version of this report.</p>
+      } @else if (target.action === 'revoke') {
+        <p>The recipient will lose access to this report immediately.</p>
+      } @else {
+        <p>This request will close without releasing a report.</p>
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button
+        class="button primary"
+        type="submit"
+        [disabled]="busy() || (target.action === 'grant' && grant.invalid)"
+      >
+        {{
+          target.action === 'grant'
+            ? 'Grant report access'
+            : target.action === 'decline'
+              ? 'Confirm decline'
+              : 'Confirm revocation'
+        }}
+      </button>
+    </form>
+  }
+</dialog>

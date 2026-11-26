@@ -1,0 +1,215 @@
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> INTEROPERABILITY</p>
+    <h1>Integrations</h1>
+    <p>Configure records exchange and review access activity.</p>
+  </div>
+  <button type="button" class="button primary" (click)="open(editor)">
+    <ng-icon name="plus" /> Register connector
+  </button>
+</section>
+@if (notice()) {
+  <p role="status" class="inline-notice success">{{ notice() }}</p>
+}
+@if (error() && !editor.open) {
+  <p role="alert" class="inline-notice">{{ error() }}</p>
+}
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading integrations…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="network" /></span>
+      </div>
+      <p>Connector profiles</p>
+      <strong>{{ state.data.connectors.length }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon violet"><ng-icon name="activity" /></span>
+      </div>
+      <p>Enabled for local exchange</p>
+      <strong>{{ enabled() }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="shield" /></span>
+      </div>
+      <p>Recent audited attempts</p>
+      <strong>{{ state.data.audit.length }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-labelledby="connector-heading">
+    <div class="panel-heading">
+      <div>
+        <h2 id="connector-heading">Connector directory</h2>
+        <p>Local configuration and lifecycle</p>
+      </div>
+    </div>
+    @if (state.data.connectors.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Connector directory">
+        <table>
+          <caption class="sr-only">
+            Connector directory
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Connector</th>
+              <th scope="col">Source facility</th>
+              <th scope="col">Recipient</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (connector of state.data.connectors; track connector.id) {
+              <tr>
+                <td>
+                  <strong>{{ connector.name }}</strong
+                  ><small>{{ connector.standard }}</small>
+                </td>
+                <td>{{ connector.source }}</td>
+                <td>{{ connector.recipient }}</td>
+                <td>
+                  <span
+                    [class]="
+                      'status ' +
+                      (connector.status === 'Enabled'
+                        ? 'positive'
+                        : connector.status === 'Paused'
+                          ? 'attention'
+                          : 'information')
+                    "
+                    >{{ connector.status }}</span
+                  >
+                </td>
+                <td>
+                  @if (connector.status === 'Draft') {
+                    <button
+                      type="button"
+                      class="text-button"
+                      [disabled]="busy()"
+                      (click)="change(connector, 'validate')"
+                    >
+                      Validate configuration
+                    </button>
+                  } @else if (connector.status === 'Enabled') {
+                    <button
+                      type="button"
+                      class="text-button"
+                      [disabled]="busy()"
+                      (click)="change(connector, 'pause')"
+                    >
+                      Pause connector
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="text-button"
+                      [disabled]="busy()"
+                      (click)="change(connector, 'enable')"
+                    >
+                      Enable connector
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No record exchange connectors have been registered.</p>
+    }
+  </section>
+  <section
+    class="panel table-panel"
+    aria-labelledby="exchange-audit-heading"
+    style="margin-block-start: 1rem"
+  >
+    <div class="panel-heading">
+      <div>
+        <h2 id="exchange-audit-heading">Exchange audit</h2>
+        <p>Latest attempts by connector and outcome</p>
+      </div>
+    </div>
+    @if (state.data.audit.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Exchange audit">
+        <table>
+          <caption class="sr-only">
+            Exchange audit
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Connector</th>
+              <th scope="col">Source facility</th>
+              <th scope="col">Outcome</th>
+              <th scope="col">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of state.data.audit; track entry.id) {
+              <tr>
+                <td>{{ entry.connector }}</td>
+                <td>{{ entry.source }}</td>
+                <td>{{ entry.outcome }}</td>
+                <td>{{ entry.occurredAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No report access attempts have been recorded.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="connector-editor-title">
+  <div class="dialog-head">
+    <h2 id="connector-editor-title">Register connector</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="create(editor)">
+    <label for="connector-name">Connector name</label
+    ><input id="connector-name" formControlName="name" maxlength="70" required />
+    <label for="connector-facility">Source facility</label
+    ><select id="connector-facility" formControlName="facilityId" required>
+      <option value="">Select a facility</option>
+      @if (state.state === 'ready') {
+        @for (item of state.data.facilities; track item.id) {
+          <option [value]="item.id">{{ item.name }}</option>
+        }
+      }
+    </select>
+    <label for="connector-recipient">Recipient organization</label
+    ><select id="connector-recipient" formControlName="recipientAccount" required>
+      <option value="">Select a recipient</option>
+      @if (state.state === 'ready') {
+        @for (item of state.data.recipients; track item.account) {
+          <option [value]="item.account">{{ item.name }}</option>
+        }
+      }
+    </select>
+    <label for="connector-standard">Exchange standard</label
+    ><select id="connector-standard" formControlName="standard">
+      @for (item of standards; track item) {
+        <option>{{ item }}</option>
+      }
+    </select>
+    @if (error()) {
+      <p role="alert" class="field-error">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="form.invalid || busy()">
+      Save connector
+    </button>
+  </form>
+</dialog>

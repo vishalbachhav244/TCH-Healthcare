@@ -78,7 +78,7 @@ export class SessionStore {
     return (
       !!entry &&
       (platformResources.includes(resource)
-        ? !!this.session()?.workspaces.includes(entry.workspace)
+        ? !!this.session()?.workspaces.includes(entry.workspace) && this.canPerform(resource)
         : !!this.access()?.workspaces.includes(entry.workspace)) &&
       (resource !== 'beds' || !!this.facility()?.inpatient)
     );

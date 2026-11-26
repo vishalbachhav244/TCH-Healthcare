@@ -1,0 +1,186 @@
+<section class="page-intro">
+  <div>
+    <h1>Clinical governance</h1>
+    <p>Monitor clinical documentation and review flagged laboratory reports.</p>
+  </div>
+</section>
+<div class="filter-bar">
+  <label class="select-control"
+    >Reporting period ends
+    <input
+      type="date"
+      #reportingDay
+      [value]="day()"
+      [max]="today"
+      (change)="setDay(reportingDay.value)"
+    />
+  </label>
+  <p>{{ from() | date: 'd MMM' }} to {{ day() | date: 'd MMM yyyy' }} IST</p>
+</div>
+@if (notice()) {
+  <p role="status" class="inline-notice success">{{ notice() }}</p>
+}
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading clinical governance…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="stethoscope" /></span>
+      </div>
+      <p>Encounters started</p>
+      <strong>{{ state.data.encounters }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="clipboard" /></span>
+      </div>
+      <p>Encounters with signed notes</p>
+      <strong>{{ state.data.signedNotes }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="flask" /></span>
+      </div>
+      <p>Flagged published reports</p>
+      <strong>{{ state.data.flaggedReports }}</strong>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="alert" /></span>
+      </div>
+      <p>Reports awaiting review</p>
+      <strong>{{ state.data.pendingReviews }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-labelledby="governance-worklist-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="governance-worklist-title">Flagged diagnostic reports</h2>
+        <p>Published reports for this facility and period</p>
+      </div>
+      <label class="select-control"
+        >Review status
+        <select #reviewStatus [value]="status()" (change)="setStatus(reviewStatus.value)">
+          <option value="">All statuses</option>
+          <option>Needs review</option>
+          <option>Acknowledged</option>
+          <option>Referred</option>
+        </select>
+      </label>
+    </div>
+    @if (state.data.items.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Flagged diagnostic reports">
+        <table>
+          <caption class="sr-only">
+            Flagged diagnostic reports
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Report</th>
+              <th scope="col">Published</th>
+              <th scope="col">Review</th>
+              <th scope="col">Quality case</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of state.data.items; track item.id) {
+              <tr>
+                <td>
+                  <strong>{{ item.test }}</strong
+                  ><small>{{ item.accession }}</small>
+                </td>
+                <td>{{ item.publishedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+                <td>
+                  <span [class]="'status ' + (item.review ? 'information' : 'attention')">{{
+                    item.review ?? 'Needs review'
+                  }}</span>
+                </td>
+                <td>{{ item.caseStatus ?? '—' }}</td>
+                <td>
+                  @if (!item.review) {
+                    <button type="button" class="text-button" (click)="open(reviewDialog, item)">
+                      Review result
+                    </button>
+                  } @else {
+                    <span>—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No flagged reports match this period and status.</p>
+    }
+    @if (state.data.total > 12) {
+      <div class="panel-heading">
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="offset() === 0"
+          (click)="offset.set(offset() - 12)"
+        >
+          Previous page
+        </button>
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="offset() + 12 >= state.data.total"
+          (click)="offset.set(offset() + 12)"
+        >
+          Next page
+        </button>
+      </div>
+    }
+  </section>
+}
+<dialog #reviewDialog aria-labelledby="review-dialog-title">
+  <div class="dialog-head">
+    <h2 id="review-dialog-title">Review diagnostic report</h2>
+    <button
+      class="icon-button"
+      type="button"
+      aria-label="Close review"
+      (click)="reviewDialog.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as item) {
+    <div class="dialog-body fields">
+      <p>
+        <strong>{{ item.test }}</strong> · {{ item.accession }}
+      </p>
+      <p>{{ item.finding }}</p>
+      <p>A referral opens a case in the facility’s quality register.</p>
+      @if (error()) {
+        <p role="alert" class="field-error">{{ error() }}</p>
+      }
+      <button
+        type="button"
+        class="button secondary"
+        [disabled]="busy()"
+        (click)="review(reviewDialog, 'acknowledge')"
+      >
+        Acknowledge review
+      </button>
+      <button
+        type="button"
+        class="button primary"
+        [disabled]="busy()"
+        (click)="review(reviewDialog, 'refer')"
+      >
+        Refer to quality
+      </button>
+    </div>
+  }
+</dialog>

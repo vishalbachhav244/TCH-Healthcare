@@ -233,7 +233,16 @@ export type EventType =
   | 'PrescriptionDispensed'
   | 'IncidentOpened'
   | 'IncidentInvestigating'
-  | 'IncidentResolved';
+  | 'IncidentResolved'
+  | 'ConnectorConfigured'
+  | 'MatchingCodeIssued'
+  | 'RecordRequested'
+  | 'ConsentChanged'
+  | 'RecordAccessed'
+  | 'ClinicalReviewRecorded'
+  | 'QualityCaseOpened'
+  | 'QualityCaseClaimed'
+  | 'QualityCaseResolved';
 
 export interface DomainEvent {
   type: EventType;

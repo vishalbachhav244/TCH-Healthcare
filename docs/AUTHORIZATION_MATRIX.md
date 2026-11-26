@@ -7,7 +7,11 @@
 | SaaS platform administrator | Creates organizations, activates facilities, configures inpatient entitlements and grants or revokes named facility roles. |
 | Customer success | Reviews subscriptions and changes compatible plans. |
 | Platform operations | Tracks incidents and views activity metadata and counts. |
+| Integration administrator | Manages connector configuration and masked audit metadata. Cannot open report content or impersonate recipients. |
+| Record recipient | Can redeem its own matching codes and view only the exact report version covered by active consent to its connector. |
 | Network executive | Compares active, assigned facilities within the selected tenant and drills into their overviews. |
+| Medical director | Reviews eligible published reports at assigned facilities and sees linked case status. |
+| Quality coordinator | Creates and claims quality cases within assigned facilities. Resolution requires ownership. Clinical referrals expose a process description and status. |
 | Pharmacist | Views signed facility prescriptions and stock. Dispensing writes a stock movement and a medicine invoice. |
 | Executive | Meridian facilities. Overview and alert acknowledgement. Read-only appointment, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointments and queue commands. |

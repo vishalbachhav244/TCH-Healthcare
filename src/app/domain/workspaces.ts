@@ -2,6 +2,10 @@ export type Resource =
   | 'platform'
   | 'subscriptions'
   | 'platform-operations'
+  | 'integrations'
+  | 'record-requests'
+  | 'clinical-governance'
+  | 'quality'
   | 'network'
   | 'overview'
   | 'appointments'
@@ -45,7 +49,13 @@ export const workspaces: readonly Workspace[] = [
     icon: 'activity',
     resource: 'platform-operations',
   },
-  { id: 'D04', title: 'Interoperability & Integration', group: 'Platform', icon: 'network' },
+  {
+    id: 'D04',
+    title: 'Interoperability & Integration',
+    group: 'Platform',
+    icon: 'network',
+    resource: 'integrations',
+  },
   {
     id: 'D05',
     title: 'Healthcare Network Executive',
@@ -60,8 +70,20 @@ export const workspaces: readonly Workspace[] = [
     icon: 'layout',
     resource: 'overview',
   },
-  { id: 'D07', title: 'Medical Director', group: 'Governance', icon: 'stethoscope' },
-  { id: 'D08', title: 'Quality & Compliance', group: 'Governance', icon: 'shield' },
+  {
+    id: 'D07',
+    title: 'Medical Director',
+    group: 'Governance',
+    icon: 'stethoscope',
+    resource: 'clinical-governance',
+  },
+  {
+    id: 'D08',
+    title: 'Quality & Compliance',
+    group: 'Governance',
+    icon: 'shield',
+    resource: 'quality',
+  },
   {
     id: 'D09',
     title: 'Front Desk & Reception',
@@ -162,8 +184,17 @@ export const navigation = [
     icon: 'activity',
     workspace: 'D03',
   },
+  { title: 'Integrations', resource: 'integrations', icon: 'network', workspace: 'D04' },
+  { title: 'Record requests', resource: 'record-requests', icon: 'clipboard', workspace: 'D04' },
   { title: 'Network performance', resource: 'network', icon: 'activity', workspace: 'D05' },
   { title: 'Overview', resource: 'overview', icon: 'layout', workspace: 'D06' },
+  {
+    title: 'Clinical governance',
+    resource: 'clinical-governance',
+    icon: 'stethoscope',
+    workspace: 'D07',
+  },
+  { title: 'Quality & compliance', resource: 'quality', icon: 'shield', workspace: 'D08' },
   { title: 'Appointments', resource: 'appointments', icon: 'calendar', workspace: 'D10' },
   { title: 'Patients', resource: 'patients', icon: 'users', workspace: 'D09' },
   { title: 'Consultation queue', resource: 'queue', icon: 'list', workspace: 'D11' },
@@ -179,4 +210,6 @@ export const platformResources: readonly string[] = [
   'platform',
   'subscriptions',
   'platform-operations',
+  'integrations',
+  'record-requests',
 ];

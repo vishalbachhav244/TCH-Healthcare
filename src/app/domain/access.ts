@@ -1,4 +1,10 @@
 export const staffRoles = {
+  medicalDirector: {
+    label: 'Medical director',
+    workspaces: ['D07'],
+    writes: ['clinical-governance'],
+  },
+  qualityCoordinator: { label: 'Quality coordinator', workspaces: ['D08'], writes: ['quality'] },
   pharmacist: { label: 'Pharmacist', workspaces: ['D22'], writes: ['pharmacy'] },
   networkExecutive: { label: 'Network executive', workspaces: ['D05', 'D06'], writes: [] },
   executive: {

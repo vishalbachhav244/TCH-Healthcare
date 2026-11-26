@@ -89,6 +89,35 @@ export const routes: Routes = [
         title: 'Network Performance · TrueCare',
       },
       {
+        path: 'integrations',
+        data: { resource: 'integrations' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/integrations').then((m) => m.Integrations),
+        title: 'Integrations · TrueCare',
+      },
+      {
+        path: 'record-requests',
+        data: { resource: 'record-requests' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/record-requests').then((m) => m.RecordRequests),
+        title: 'Record Requests · TrueCare',
+      },
+      {
+        path: 'clinical-governance',
+        data: { resource: 'clinical-governance' },
+        canActivate: [workspaceAccess],
+        loadComponent: () =>
+          import('./features/clinical-governance').then((m) => m.ClinicalGovernance),
+        title: 'Clinical Governance · TrueCare',
+      },
+      {
+        path: 'quality',
+        data: { resource: 'quality' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/quality-register').then((m) => m.QualityRegister),
+        title: 'Quality & Compliance · TrueCare',
+      },
+      {
         path: 'appointments',
         data: { resource: 'appointments' },
         canActivate: [workspaceAccess],

@@ -1,0 +1,230 @@
+<section class="page-intro">
+  <div>
+    <h1>Quality &amp; Compliance</h1>
+    <p>Track facility cases from intake through investigation and resolution.</p>
+  </div>
+  <button type="button" class="button primary" (click)="showEditor(editor)">
+    <ng-icon name="plus" /> Open quality case
+  </button>
+</section>
+@if (notice()) {
+  <p role="status" class="inline-notice success">{{ notice() }}</p>
+}
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading the quality register…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid">
+    @for (total of totals(); track total.status) {
+      <article class="panel metric">
+        <div class="metric-top">
+          <span [class]="'square-icon ' + (total.status === 'Open' ? 'amber' : 'teal')"
+            ><ng-icon [name]="total.status === 'Resolved' ? 'check' : 'shield'"
+          /></span>
+        </div>
+        <p>{{ total.status }} cases</p>
+        <strong>{{ total.count }}</strong>
+      </article>
+    }
+  </div>
+  <section class="panel table-panel" aria-labelledby="quality-register-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="quality-register-title">Case register</h2>
+        <p>Clinical referrals and facility reports</p>
+      </div>
+      <label class="select-control"
+        >Case status
+        <select #caseStatus [value]="status()" (change)="setStatus(caseStatus.value)">
+          <option value="">All statuses</option>
+          @for (item of statuses; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    @if (filtered().length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Case register">
+        <table>
+          <caption class="sr-only">
+            Case register
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Case</th>
+              <th scope="col">Category</th>
+              <th scope="col">Priority</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of filtered() | slice: offset() : offset() + 12; track item.id) {
+              <tr>
+                <td>
+                  <strong>{{ item.title }}</strong
+                  ><small>{{ item.origin }} · {{ item.createdAt | date: 'd MMM' : '+0530' }}</small>
+                </td>
+                <td>{{ item.category }}</td>
+                <td>{{ item.priority }}</td>
+                <td>
+                  <span
+                    [class]="
+                      'status ' +
+                      (item.status === 'Open'
+                        ? 'attention'
+                        : item.status === 'Resolved'
+                          ? 'positive'
+                          : 'information')
+                    "
+                    >{{ item.status }}</span
+                  >
+                </td>
+                <td>
+                  <button type="button" class="text-button" (click)="showCase(details, item)">
+                    View case
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No quality cases match this status.</p>
+    }
+    @if (filtered().length > 12) {
+      <div class="panel-heading">
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="offset() === 0"
+          (click)="offset.set(offset() - 12)"
+        >
+          Previous page
+        </button>
+        <button
+          type="button"
+          class="button secondary"
+          [disabled]="offset() + 12 >= filtered().length"
+          (click)="offset.set(offset() + 12)"
+        >
+          Next page
+        </button>
+      </div>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="quality-editor-title">
+  <div class="dialog-head">
+    <h2 id="quality-editor-title">Open quality case</h2>
+    <button
+      class="icon-button"
+      type="button"
+      aria-label="Close case editor"
+      (click)="editor.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="create(editor)">
+    <label for="quality-case-title">Case title</label>
+    <input
+      id="quality-case-title"
+      formControlName="title"
+      minlength="4"
+      maxlength="100"
+      required
+      aria-describedby="case-title-hint"
+    />
+    <small id="case-title-hint"
+      >Use a short process description without patient or staff identifiers.</small
+    >
+    <label for="quality-category">Category</label>
+    <select id="quality-category" formControlName="category" required>
+      <option value="">Select a category</option>
+      @for (category of categories; track category) {
+        <option>{{ category }}</option>
+      }
+    </select>
+    <label for="quality-priority">Priority</label>
+    <select id="quality-priority" formControlName="priority" required>
+      @for (priority of priorities; track priority) {
+        <option>{{ priority }}</option>
+      }
+    </select>
+    @if (error()) {
+      <p role="alert" class="field-error">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="form.invalid || busy()">
+      Create case
+    </button>
+  </form>
+</dialog>
+<dialog #details aria-labelledby="quality-detail-title">
+  <div class="dialog-head">
+    <h2 id="quality-detail-title">Quality case details</h2>
+    <button
+      class="icon-button"
+      type="button"
+      aria-label="Close case details"
+      (click)="details.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as item) {
+    <div class="dialog-body fields">
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.category }} · {{ item.priority }} priority · {{ item.status }}</p>
+      <h4>Case history</h4>
+      <ol>
+        @for (entry of item.timeline; track $index) {
+          <li>
+            <strong>{{ entry.status }}</strong> ·
+            {{ entry.at | date: 'd MMM, HH:mm' : '+0530' }} IST
+            @if (entry.disposition) {
+              <div>{{ entry.disposition }}</div>
+            }
+          </li>
+        }
+      </ol>
+      @if (error()) {
+        <p role="alert" class="field-error">{{ error() }}</p>
+      }
+      @if (item.status === 'Open') {
+        <button
+          type="button"
+          class="button primary"
+          [disabled]="busy()"
+          (click)="update(details, 'claim')"
+        >
+          Take ownership
+        </button>
+      } @else if (item.status === 'Investigating' && item.ownedByCurrentUser) {
+        <label for="quality-disposition">Resolution</label>
+        <select id="quality-disposition" [formControl]="resolution" required>
+          <option value="">Select a resolution</option>
+          @for (item of dispositions; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          class="button primary"
+          [disabled]="resolution.invalid || busy()"
+          (click)="update(details, 'resolve')"
+        >
+          Resolve case
+        </button>
+      } @else if (item.status === 'Investigating') {
+        <p>Assigned to another quality coordinator.</p>
+      }
+    </div>
+  }
+</dialog>

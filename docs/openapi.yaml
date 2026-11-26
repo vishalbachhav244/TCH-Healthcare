@@ -1879,6 +1879,555 @@ paths:
           $ref: '#/components/responses/Error422'
         '503':
           $ref: '#/components/responses/Error503'
+  /integrations:
+    get:
+      operationId: getIntegrations
+      summary: Read connector configuration and redacted exchange activity.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationOverview'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /integrations/connectors:
+    post:
+      operationId: registerConnector
+      summary: Register a draft connector for an approved recipient.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                facilityId:
+                  type: string
+                recipientAccount:
+                  type: string
+                standard:
+                  type: string
+                  enum:
+                    - HL7 FHIR
+                    - Document exchange
+              required:
+                - name
+                - facilityId
+                - recipientAccount
+                - standard
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateConnector
+      summary: Validate, enable or pause a connector at its expected version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectorId: &a6
+                  type: string
+                version: *a6
+                action:
+                  type: string
+                  enum:
+                    - validate
+                    - enable
+                    - pause
+              required:
+                - connectorId
+                - version
+                - action
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /portal/sharing:
+    get:
+      operationId: getPatientSharing
+      summary: Read own report choices, consent decisions and access history.
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientSharing'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: decideReportConsent
+      summary: Approve one released report version for a limited duration, decline the
+        request, or revoke access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId: &a6
+                  type: string
+                version: *a6
+                reportId: *a6
+                hours:
+                  type: string
+                  enum:
+                    - '24'
+                    - '168'
+                action:
+                  type: string
+                  enum:
+                    - grant
+                    - decline
+                    - revoke
+              required:
+                - requestId
+                - version
+                - action
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /portal/matching-code:
+    post:
+      operationId: issueMatchingCode
+      summary: Issue a single-use, 15-minute code restricted to one recipient.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectorId:
+                  type: string
+              required:
+                - connectorId
+      parameters:
+        - $ref: '#/components/parameters/Facility'
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchingCode'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /record-requests:
+    get:
+      operationId: getRecordRequests
+      summary: Read requests for the authenticated recipient.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecordRequest'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: requestRecord
+      summary: Redeem a matching code without releasing clinical content.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                purpose:
+                  type: string
+                  enum:
+                    - Continuation of care
+                    - Specialist review
+              required:
+                - code
+                - purpose
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /record-requests/retrieve:
+    post:
+      operationId: retrieveSharedReport
+      summary: Validate current consent and provenance, then audit and release the
+        selected report or deny access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+              required:
+                - requestId
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  report:
+                    $ref: '#/components/schemas/SharedReport'
+                required:
+                  - id
+                  - report
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /clinical-governance:
+    get:
+      operationId: getClinicalGovernance
+      summary: Read facility clinical indicators and flagged reports for the seven
+        days ending on the requested date.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: day
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - Needs review
+              - Acknowledged
+              - Referred
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalGovernance"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical-governance/reviews:
+    post:
+      operationId: recordClinicalReview
+      summary: Acknowledge or refer an eligible published laboratory report.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reportId:
+                  type: string
+                version:
+                  type: string
+                action:
+                  type: string
+                  enum:
+                    - acknowledge
+                    - refer
+              required:
+                - reportId
+                - version
+                - action
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /quality:
+    get:
+      operationId: getQualityRegister
+      summary: Read the quality register and case history for an authorized facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QualityCase"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /quality/cases:
+    post:
+      operationId: openQualityCase
+      summary: Open a facility quality case with a process description.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 4
+                  maxLength: 100
+                category:
+                  type: string
+                  enum:
+                    - Patient safety
+                    - Documentation
+                    - Service process
+                priority:
+                  type: string
+                  enum:
+                    - Routine
+                    - Elevated
+              required:
+                - title
+                - category
+                - priority
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /quality/cases/status:
+    patch:
+      operationId: updateQualityCaseStatus
+      summary: Take ownership of an open case or resolve an assigned case at its
+        expected version.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caseId:
+                  type: string
+                version:
+                  type: string
+                action:
+                  type: string
+                  enum:
+                    - claim
+                    - resolve
+                disposition:
+                  type: string
+                  enum:
+                    - Follow-up scheduled
+                    - Policy reviewed
+                    - Containment confirmed
+              required:
+                - caseId
+                - version
+                - action
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -2707,6 +3256,395 @@ components:
               type: *a5
               location: *a5
               occurredAt: *a4
+    ExchangeConnector:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        facilityId: *a6
+        recipientAccount: *a6
+        name: *a6
+        source: *a6
+        recipient: *a6
+        standard:
+          type: string
+          enum:
+            - HL7 FHIR
+            - Document exchange
+        status:
+          type: string
+          enum:
+            - Draft
+            - Validated
+            - Enabled
+            - Paused
+        version:
+          type: integer
+      required:
+        - id
+        - facilityId
+        - recipientAccount
+        - name
+        - source
+        - recipient
+        - standard
+        - status
+        - version
+    ExchangeConnectorSummary:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        name: *a6
+        recipient: *a6
+      required:
+        - id
+        - name
+        - recipient
+    ExchangeAudit:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        connector: *a6
+        source: *a6
+        outcome:
+          type: string
+          enum:
+            - Released
+            - Consent required
+            - Revoked
+            - Expired
+            - Connector unavailable
+            - Source mismatch
+        occurredAt:
+          type: integer
+      required:
+        - id
+        - connector
+        - source
+        - outcome
+        - occurredAt
+    IntegrationOverview:
+      type: object
+      properties:
+        connectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeConnector'
+        facilities:
+          type: array
+          items:
+            type: object
+            properties:
+              id: &a6
+                type: string
+              name: *a6
+            required:
+              - id
+              - name
+        recipients:
+          type: array
+          items:
+            type: object
+            properties:
+              account: *a6
+              name: *a6
+            required:
+              - account
+              - name
+        audit:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeAudit'
+      required:
+        - connectors
+        - facilities
+        - recipients
+        - audit
+    RecordRequest:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        source: *a6
+        connector:
+          $ref: '#/components/schemas/ExchangeConnectorSummary'
+        purpose:
+          type: string
+          enum:
+            - Continuation of care
+            - Specialist review
+        status:
+          type: string
+          enum:
+            - Pending
+            - Granted
+            - Declined
+            - Revoked
+            - Expired
+            - Unavailable
+        createdAt: &a7
+          type: integer
+        version: *a7
+        expiresAt: *a7
+      required:
+        - id
+        - source
+        - connector
+        - purpose
+        - status
+        - createdAt
+        - version
+    PatientRecordRequest:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        source: *a6
+        reportId: *a6
+        connector:
+          $ref: '#/components/schemas/ExchangeConnectorSummary'
+        purpose:
+          type: string
+          enum:
+            - Continuation of care
+            - Specialist review
+        status:
+          type: string
+          enum:
+            - Pending
+            - Granted
+            - Declined
+            - Revoked
+            - Expired
+            - Unavailable
+        decision:
+          type: string
+          enum:
+            - Pending
+            - Granted
+            - Declined
+            - Revoked
+        createdAt: &a7
+          type: integer
+        version: *a7
+        expiresAt: *a7
+      required:
+        - id
+        - source
+        - connector
+        - purpose
+        - status
+        - decision
+        - createdAt
+        - version
+    PatientSharing:
+      type: object
+      properties:
+        connectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeConnectorSummary'
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatientRecordRequest'
+        audit:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExchangeAudit'
+        reports:
+          type: array
+          items:
+            type: object
+            properties:
+              id: &a6
+                type: string
+              test: *a6
+              accession: *a6
+              publishedAt:
+                type: integer
+            required:
+              - id
+              - test
+              - publishedAt
+      required:
+        - connectors
+        - requests
+        - audit
+        - reports
+    MatchingCode:
+      type: object
+      properties:
+        id: &a6
+          type: string
+        code: *a6
+        expiresAt:
+          type: integer
+      required:
+        - id
+        - code
+        - expiresAt
+    SharedReport:
+      type: object
+      properties:
+        test: &a6
+          type: string
+        finding: *a6
+        accession: *a6
+        source: *a6
+        publishedAt: &a7
+          type: integer
+        expiresAt: *a7
+      required:
+        - test
+        - finding
+        - accession
+        - source
+        - publishedAt
+        - expiresAt
+    GovernanceReport:
+      type: object
+      properties:
+        id:
+          type: string
+        test:
+          type: string
+        finding:
+          type: string
+        accession:
+          type: string
+        publishedAt:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 0
+        review:
+          type: string
+          enum:
+            - Acknowledged
+            - Referred
+        caseStatus:
+          type: string
+          enum:
+            - Open
+            - Investigating
+            - Resolved
+      required:
+        - id
+        - test
+        - finding
+        - accession
+        - publishedAt
+        - version
+    ClinicalGovernance:
+      type: object
+      properties:
+        encounters:
+          type: integer
+          minimum: 0
+        signedNotes:
+          type: integer
+          minimum: 0
+        flaggedReports:
+          type: integer
+          minimum: 0
+        pendingReviews:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GovernanceReport"
+      required:
+        - encounters
+        - signedNotes
+        - flaggedReports
+        - pendingReviews
+        - total
+        - items
+    QualityHistoryEntry:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - Open
+            - Investigating
+            - Resolved
+        at:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+        disposition:
+          type: string
+          enum:
+            - Follow-up scheduled
+            - Policy reviewed
+            - Containment confirmed
+      required:
+        - status
+        - at
+        - actor
+    QualityCase:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+          enum:
+            - Patient safety
+            - Documentation
+            - Service process
+            - Diagnostic follow-up
+        priority:
+          type: string
+          enum:
+            - Routine
+            - Elevated
+        origin:
+          type: string
+          enum:
+            - Clinical referral
+            - Facility report
+        status:
+          type: string
+          enum:
+            - Open
+            - Investigating
+            - Resolved
+        version:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: integer
+          minimum: 0
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityHistoryEntry"
+        ownedByCurrentUser:
+          type: boolean
+      required:
+        - id
+        - title
+        - category
+        - priority
+        - origin
+        - status
+        - version
+        - createdAt
+        - timeline
+        - ownedByCurrentUser
   responses:
     Error401:
       description: 'Missing or expired session.'

@@ -8,9 +8,10 @@ import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
 import { dayInIndia } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
+import { PatientSharing } from './patient-sharing';
 
 @Component({
-  imports: [DatePipe, NgIcon, ReactiveFormsModule, Rupees, StatusTone],
+  imports: [DatePipe, NgIcon, PatientSharing, ReactiveFormsModule, Rupees, StatusTone],
   templateUrl: './portal.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -18,7 +19,7 @@ export class Portal {
   private readonly api = inject(Api);
   protected readonly store = inject(SessionStore);
   protected readonly today = dayInIndia();
-  protected readonly active = signal<'visits' | 'records' | 'billing'>('visits');
+  protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing'>('visits');
   protected readonly report = signal<LabOrder | undefined>(undefined);
   protected readonly busy = signal(false);
   protected readonly message = signal('');

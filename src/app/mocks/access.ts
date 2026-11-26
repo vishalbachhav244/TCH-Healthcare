@@ -3,6 +3,7 @@ import type { Facility, Session } from '../domain/operations';
 import type { Resource } from '../domain/workspaces';
 import {
   accountNames,
+  examplePatientId,
   globalAccess,
   patientAccount,
   patientFacility,
@@ -73,7 +74,7 @@ async function project(identity: Identity): Promise<Session> {
 
 export function patientSubject(session: Session) {
   if (session.account !== patientAccount) throw new ApiError(403, 'Patient access is unavailable.');
-  return 'TC-MERIDIAN-01001';
+  return examplePatientId;
 }
 
 export async function startSession(body: unknown): Promise<Session> {

@@ -14,6 +14,183 @@ async function signOut(page: Page) {
   await expect(page).toHaveURL(/\/sign-in/);
 }
 
+async function checkReflow(page: Page) {
+  for (const width of [390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+      `${width}px viewport`,
+    ).toBeLessThanOrEqual(width);
+  }
+}
+
+test('matches a record request, grants one report, and withdraws access live', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await signIn(page, 'patient');
+  await page.getByRole('button', { name: 'Record sharing' }).click();
+  await page.getByLabel('Recipient', { exact: true }).selectOption('mer-referral-records');
+  await page.getByRole('button', { name: 'Generate matching code' }).click();
+  const code = await page.getByTestId('issued-matching-code').innerText();
+  expect(code).toMatch(/^[\da-f-]{36}$/);
+
+  const recipient = await page.context().newPage();
+  await signIn(recipient, 'partnercare');
+  await recipient.getByRole('button', { name: 'Request report', exact: true }).click();
+  const editor = recipient.getByRole('dialog', { name: 'Request report' });
+  await editor.getByLabel('Patient-issued matching code').fill(code);
+  await editor.getByRole('button', { name: 'Send request' }).click();
+  await expect(recipient.getByText('Request sent for patient review.')).toBeVisible();
+  await expect(recipient.getByRole('button', { name: 'View shared report' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Review request' }).click();
+  const consent = page.getByRole('dialog', { name: 'Review record request' });
+  const report = consent.getByLabel('Report to share');
+  const option = report.locator('option', { hasText: 'LAB-SHARE-0147' });
+  await expect(option).toHaveCount(1);
+  await report.selectOption({ label: 'Complete blood count · LAB-SHARE-0147' });
+  await consent.getByRole('button', { name: 'Grant report access' }).click();
+  await expect(page.getByText('Report access granted.')).toBeVisible();
+  await recipient.getByRole('button', { name: 'View shared report' }).click();
+  const shared = recipient.getByRole('dialog', { name: 'Shared report' });
+  await expect(shared.getByText('LAB-SHARE-0147')).toBeVisible();
+
+  const admin = await page.context().newPage();
+  await signIn(admin, 'integration');
+  const connectors = admin.getByRole('region', { name: 'Connector directory' });
+  const referral = connectors.getByRole('row', { name: /Referral records/ });
+  await referral.getByRole('button', { name: 'Pause connector' }).click();
+  await expect(
+    shared.getByText('This report is no longer available to this recipient.'),
+  ).toBeVisible();
+  await shared.getByRole('button', { name: 'Close' }).click();
+  await expect(recipient.getByRole('row', { name: /Continuation of care/ })).toContainText(
+    'Unavailable',
+  );
+  await referral.getByRole('button', { name: 'Enable connector' }).click();
+  await recipient.getByRole('button', { name: 'View shared report' }).click();
+  await expect(shared.getByText('LAB-SHARE-0147')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Revoke access', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm revocation' }).click();
+  await expect(
+    shared.getByText('This report is no longer available to this recipient.'),
+  ).toBeVisible();
+  await shared.getByRole('button', { name: 'Close' }).click();
+  await expect(recipient.getByRole('row', { name: /Continuation of care/ })).toContainText(
+    'Revoked',
+  );
+  const audit = admin.getByRole('region', { name: 'Exchange audit' });
+  await expect(audit.getByRole('row', { name: /Referral records.*Released/ })).toHaveCount(2);
+  await expect(audit.getByText('LAB-SHARE-0147')).toHaveCount(0);
+  for (const workspace of [admin, recipient, page]) await checkReflow(workspace);
+  expect(
+    (await new AxeBuilder({ page: admin }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await admin.screenshot({
+    path: testInfo.outputPath('integrations-desktop.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await page.getByRole('button', { name: 'Record sharing' }).click();
+  await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('record-sharing-390.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  await recipient.close();
+  await admin.close();
+});
+
+test('refers a diagnostic result and resolves the quality case across roles', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await signIn(page, 'medicaldirector');
+  const reports = page.getByRole('region', { name: 'Flagged diagnostic reports' });
+  const first = reports
+    .getByRole('row')
+    .filter({ has: page.getByRole('button', { name: 'Review result' }) })
+    .first();
+  const accession = await first.locator('small').innerText();
+  await first.getByRole('button', { name: 'Review result' }).focus();
+  await page.keyboard.press('Enter');
+  const review = page.getByRole('dialog', { name: 'Review diagnostic report' });
+  await expect(review.getByText(accession, { exact: false })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(first.getByRole('button', { name: 'Review result' })).toBeFocused();
+  await first.getByRole('button', { name: 'Review result' }).click();
+  await review.getByRole('button', { name: 'Refer to quality' }).click();
+  await expect(page.getByText('Referred to Quality & Compliance.')).toBeVisible();
+  const referred = reports.getByRole('row').filter({ hasText: accession });
+  await expect(referred).toContainText('Open');
+
+  const coordinator = await page.context().newPage();
+  await signIn(coordinator, 'quality');
+  const referredCase = coordinator.getByRole('row', { name: /Review diagnostic follow-up/ });
+  await expect(referredCase).not.toContainText(accession);
+  await referredCase.getByRole('button', { name: 'View case' }).click();
+  const details = coordinator.getByRole('dialog', { name: 'Quality case details' });
+  await details.getByRole('button', { name: 'Take ownership' }).click();
+  await expect(referred).toContainText('Investigating');
+  await referredCase.getByRole('button', { name: 'View case' }).click();
+  await expect(details.getByRole('button', { name: 'Resolve case' })).toBeDisabled();
+  await details.getByLabel('Resolution').selectOption('Follow-up scheduled');
+  await details.getByRole('button', { name: 'Resolve case' }).click();
+  await expect(referred).toContainText('Resolved');
+  await coordinator.reload();
+  await referredCase.getByRole('button', { name: 'View case' }).click();
+  await expect(details.getByText('Follow-up scheduled')).toBeVisible();
+  await details.getByRole('button', { name: 'Close case details' }).click();
+
+  await coordinator.getByRole('button', { name: 'Open quality case' }).click();
+  const editor = coordinator.getByRole('dialog', { name: 'Open quality case' });
+  await editor.getByLabel('Case title').fill('Review shift handover checklist');
+  await editor.getByLabel('Category').selectOption('Service process');
+  await editor.getByRole('button', { name: 'Create case' }).click();
+  await expect(
+    coordinator.getByRole('row', { name: /Review shift handover checklist/ }),
+  ).toContainText('Open');
+  await coordinator.getByLabel('Case status').selectOption('Resolved');
+  await expect(
+    coordinator.getByRole('row', { name: /Review shift handover checklist/ }),
+  ).toHaveCount(0);
+  await coordinator.getByLabel('Case status').selectOption('');
+
+  for (const [workspace, file] of [
+    [page, 'clinical-governance'],
+    [coordinator, 'quality-register'],
+  ] as const) {
+    await checkReflow(workspace);
+    expect(
+      (
+        await new AxeBuilder({ page: workspace })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+          .analyze()
+      ).violations,
+    ).toEqual([]);
+    await workspace.screenshot({
+      path: testInfo.outputPath(file + '-desktop.png'),
+      animations: 'disabled',
+      fullPage: true,
+    });
+  }
+  await page.goto('/work/quality');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await page.getByRole('link', { name: 'Return to workspace' }).click();
+  await expect(page.getByRole('heading', { name: 'Clinical governance' })).toBeVisible();
+  await coordinator.close();
+});
+
 test('platform provisions organizations and facilities and revokes an active bed workspace', async ({
   page,
 }, testInfo) => {

@@ -6,16 +6,19 @@ Verification ran locally on 26 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 15 contract and domain tests passed across 2 files |
-| `npm run e2e` | Nine Chromium journeys passed, including the scoped staff access, incident and pharmacy workflows. |
-| `npm run build` | Passed. Initial assets approximately 352 kB raw and 93 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 355 kB raw and 94 kB estimated transfer. |
+| `npm test` | 19 contract and domain tests passed across 2 files |
+| `npm run e2e` | 11 Chromium journeys passed, including the three-role consent and two-role clinical quality flows. |
+| `npm run build` | Passed. Initial assets approximately 356 kB raw and 94 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 359 kB raw and 95 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| OpenAPI | 59 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified version 11 to 12 against the loopback app in a fresh browser context. Active and revoked grants moved intact, and pending requests remained available. |
+| OpenAPI | 73 operations, unique IDs and checked internal references. |
 
 ## Browser journeys
 
+- Match a recipient with a patient-issued code, grant one report version, preview it, pause and resume the connector, then revoke access. Check that access disappears on the recipient’s open screen and the patient’s decision survives reload.
+- Refer a flagged laboratory result using the keyboard, claim the redacted case, require a resolution and close it. Verify that status updates in the original worklist, the case history survives reload, and the Medical Director cannot open the quality register. Create and filter a facility case.
 - Create an organization and a facility, stage a staff role, activate the facility, revoke the scoped role in an open staff tab, then revoke inpatient access.
 - Compare hospital facilities, time ranges and metrics. Export the patient-flow CSV and persist an alert acknowledgement. Check responsive layout, keyboard navigation and axe rules.
 - Confirm that a clinic omits bed occupancy and rejects direct access to a disabled bed route.
@@ -35,3 +38,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Desktop overview](screenshots/overview-1440.png) · [Mobile overview](screenshots/overview-390.png) · [Patient home](screenshots/patient-390.png) · [Platform administration](screenshots/platform-desktop.png)
 
 [Subscriptions](screenshots/subscriptions-desktop.png) · [Network performance](screenshots/network-desktop.png) · [Platform operations](screenshots/platform-operations-desktop.png) · [Pharmacy](screenshots/pharmacy-desktop.png)
+
+[Integrations](screenshots/integrations-desktop.png) · [Patient record sharing](screenshots/record-sharing-390.png) · [Clinical governance](screenshots/clinical-governance-desktop.png) · [Quality & Compliance](screenshots/quality-register-desktop.png)

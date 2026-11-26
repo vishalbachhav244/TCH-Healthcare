@@ -18,6 +18,17 @@ import type { SubscriptionRow } from '../domain/platform';
 import type { NetworkFacilityMetrics } from '../domain/operations';
 import type { PharmacyData, Prescription } from '../domain/pharmacy';
 import type { PlatformOperationsData } from '../domain/platform-operations';
+import type {
+  Connector,
+  ConnectorAction,
+  ConsentAction,
+  IntegrationDashboard,
+  PatientSharing,
+  RecordRequest,
+  RequestSummary,
+  SharedReport,
+} from '../domain/interoperability';
+import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
 
 interface CommandResult {
   id: string;
@@ -262,13 +273,218 @@ export class Api {
     body: Record<string, string>,
     method: 'POST' | 'PATCH' = 'POST',
   ) {
+    return this.mutate<CommandResult>(path, token, facility, body, method, ['id']);
+  }
+
+  integrations(token: string) {
+    return this.get('integrations', token).pipe(
+      map((value) =>
+        objectShape<IntegrationDashboard>(value, [
+          'connectors',
+          'facilities',
+          'recipients',
+          'audit',
+        ]),
+      ),
+    );
+  }
+
+  registerConnector(
+    token: string,
+    profile: Pick<Connector, 'facilityId' | 'name' | 'recipientAccount' | 'standard'>,
+  ) {
+    return this.execute('integrations/connectors', token, '', profile);
+  }
+
+  updateConnector(
+    token: string,
+    connector: Pick<Connector, 'id' | 'version'>,
+    action: ConnectorAction,
+  ) {
+    return this.execute(
+      'integrations/connectors',
+      token,
+      '',
+      {
+        connectorId: connector.id,
+        version: String(connector.version),
+        action,
+      },
+      'PATCH',
+    );
+  }
+
+  recordRequests(token: string) {
+    return this.get('record-requests', token).pipe(
+      map((value) =>
+        collection<RequestSummary>(value, [
+          'id',
+          'connector',
+          'source',
+          'purpose',
+          'status',
+          'version',
+          'createdAt',
+        ]),
+      ),
+    );
+  }
+
+  requestReport(token: string, request: { code: string; purpose: RecordRequest['purpose'] }) {
+    return this.execute('record-requests', token, '', request);
+  }
+
+  clinicalGovernance(token: string, facility: string, params: Record<string, string | number>) {
+    return this.get('clinical-governance', token, facility, params).pipe(
+      map((value) =>
+        objectShape<GovernanceData>(value, [
+          'encounters',
+          'signedNotes',
+          'flaggedReports',
+          'pendingReviews',
+          'total',
+          'items',
+        ]),
+      ),
+    );
+  }
+
+  recordClinicalReview(
+    token: string,
+    facility: string,
+    reportId: string,
+    version: number,
+    action: 'acknowledge' | 'refer',
+  ) {
+    return this.execute('clinical-governance/reviews', token, facility, {
+      reportId,
+      version: String(version),
+      action,
+    });
+  }
+
+  qualityRegister(token: string, facility: string) {
+    return this.get('quality', token, facility).pipe(
+      map((value) =>
+        collection<QualityView>(value, [
+          'id',
+          'title',
+          'status',
+          'category',
+          'priority',
+          'version',
+          'timeline',
+          'ownedByCurrentUser',
+        ]),
+      ),
+    );
+  }
+
+  openQualityCase(
+    token: string,
+    facility: string,
+    fields: Pick<QualityCase, 'title' | 'priority'> & {
+      category: Exclude<QualityCase['category'], 'Diagnostic follow-up'>;
+    },
+  ) {
+    return this.execute('quality/cases', token, facility, fields);
+  }
+
+  updateQualityCase(
+    token: string,
+    facility: string,
+    item: Pick<QualityCase, 'id' | 'version'>,
+    action: 'claim' | 'resolve',
+    disposition?: Disposition,
+  ) {
+    return this.execute(
+      'quality/cases/status',
+      token,
+      facility,
+      {
+        caseId: item.id,
+        version: String(item.version),
+        action,
+        ...(disposition ? { disposition } : {}),
+      },
+      'PATCH',
+    );
+  }
+
+  patientSharing(token: string, facility: string) {
+    return this.get('portal/sharing', token, facility).pipe(
+      map((value) =>
+        objectShape<PatientSharing>(value, ['connectors', 'requests', 'audit', 'reports']),
+      ),
+    );
+  }
+
+  decideReportConsent(
+    token: string,
+    facility: string,
+    request: Pick<RequestSummary, 'id' | 'version'>,
+    action: ConsentAction,
+    grant?: { reportId: string; hours: string },
+  ) {
+    return this.execute(
+      'portal/sharing',
+      token,
+      facility,
+      {
+        requestId: request.id,
+        version: String(request.version),
+        action,
+        ...grant,
+      },
+      'PATCH',
+    );
+  }
+
+  matchingCode(token: string, facility: string, connectorId: string) {
+    return this.mutate<{ id: string; code: string; expiresAt: number }>(
+      'portal/matching-code',
+      token,
+      facility,
+      { connectorId },
+      'POST',
+      ['id', 'code', 'expiresAt'],
+    );
+  }
+
+  async sharedReport(token: string, requestId: string) {
+    const response = await this.mutate<{ id: string; report: unknown }>(
+      'record-requests/retrieve',
+      token,
+      '',
+      { requestId },
+      'POST',
+      ['id', 'report'],
+    );
+    return objectShape<SharedReport>(response.report, [
+      'test',
+      'finding',
+      'accession',
+      'source',
+      'publishedAt',
+      'expiresAt',
+    ]);
+  }
+
+  private mutate<T>(
+    path: string,
+    token: string,
+    facility: string,
+    body: Record<string, string>,
+    method: 'POST' | 'PATCH',
+    required: readonly (keyof T)[],
+  ) {
     return firstValueFrom(
       this.http
         .request<unknown>(method, this.base + path, {
           body,
           headers: this.headers(token, facility),
         })
-        .pipe(map((value) => objectShape<CommandResult>(value, ['id']))),
+        .pipe(map((value) => objectShape<T>(value, required))),
     );
   }
 

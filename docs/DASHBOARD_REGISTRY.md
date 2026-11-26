@@ -7,11 +7,11 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D01 | SaaS Super Admin | `/work/platform` | Partial | Department setup, account creation, and additional entitlement policies |
 | D02 | Customer Success & Subscriptions | `/work/subscriptions` | Partial | Renewals, plan authoring and billing integration |
 | D03 | Platform Operations | `/work/platform-operations` | Partial | Service health probes, alert ownership, escalation and audit exports |
-| D04 | Interoperability & Integration | — | Open | Scoped connectors, consented exchange and activity |
+| D04 | Interoperability & Integration | `/work/integrations`, `/work/record-requests` | Partial | Endpoint validation, real transport adapters and additional record types |
 | D05 | Healthcare Network Executive | `/work/network` | Partial | Trend comparisons, longer reporting periods and network exports |
 | D06 | Hospital Executive | `/work/overview` | Partial | Staff capacity, approvals and deeper analytics |
-| D07 | Medical Director | — | Open | Clinical governance, quality indicators and approvals |
-| D08 | Quality & Compliance | — | Open | Incidents, audit and corrective actions |
+| D07 | Medical Director | `/work/clinical-governance` | Partial | Peer review, additional clinical indicators and approvals |
+| D08 | Quality & Compliance | `/work/quality` | Partial | Corrective actions, escalations and wider compliance audit |
 | D09 | Front Desk & Reception | `/work/patients` | Partial | Duplicate adjudication, contact data boundary and appointment history |
 | D10 | Appointments & Scheduling | `/work/appointments` | Partial | Availability calendars, reschedule, cancellation and waitlist |
 | D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility` | Partial | Recall, skip, transfer, delays and performance reports |

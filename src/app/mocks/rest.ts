@@ -13,6 +13,13 @@ import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
 import { clinicalPrescriptions, pharmacyData } from './pharmacy';
 import { platformOperations, updateIncident } from './platform-operations';
+import {
+  exchangeCommand,
+  integrationDashboard,
+  patientSharing,
+  recipientRequests,
+} from './interoperability';
+import { clinicalGovernance, qualityRegister } from './governance';
 
 export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   const url = new URL(request.urlWithParams, location.origin);
@@ -30,6 +37,28 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   if (path === 'session' && request.method === 'GET') return session;
   const facilityId = request.headers.get('X-Facility-Id');
   const params = url.searchParams;
+  const exchangeWrite =
+    (request.method === 'POST' &&
+      [
+        'integrations/connectors',
+        'portal/matching-code',
+        'record-requests',
+        'record-requests/retrieve',
+      ].includes(path)) ||
+    (request.method === 'PATCH' && ['integrations/connectors', 'portal/sharing'].includes(path));
+  if (exchangeWrite) {
+    const { event, ...result } = await exchangeCommand(
+      path,
+      request.method,
+      session.token,
+      facilityId,
+      request.body,
+    );
+    notifyFacility(event);
+    if ('denied' in result && result.denied)
+      throw new ApiError(403, 'Report access denied: ' + result.denied + '.');
+    return result;
+  }
   const isConfiguration = [
     'platform/entitlements',
     'platform/activation',
@@ -37,6 +66,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'subscriptions',
     'appointments/reschedule',
     'appointments/cancel',
+    'quality/cases/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -66,6 +96,16 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return subscriptions(session);
     case 'platform-operations':
       return platformOperations(session);
+    case 'integrations':
+      return integrationDashboard(session);
+    case 'record-requests':
+      return recipientRequests(session);
+    case 'portal/sharing':
+      return patientSharing(scope(session, facilityRecord, 'D12'), session);
+    case 'clinical-governance':
+      return clinicalGovernance(scope(session, facilityRecord, 'D07'), params);
+    case 'quality':
+      return qualityRegister(scope(session, facilityRecord, 'D08'), session);
     case 'network': {
       const selected = scope(session, facilityRecord, 'D05');
       const day = checkedDay(params.get('day'));

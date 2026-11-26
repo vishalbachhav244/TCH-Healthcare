@@ -1,0 +1,151 @@
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> RECORD EXCHANGE</p>
+    <h1>Record Requests</h1>
+    <p>Request a report using a patient-issued matching code and review consent decisions.</p>
+  </div>
+  <button class="button primary" type="button" (click)="open(editor)">
+    <ng-icon name="plus" /> Request report
+  </button>
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@if (error() && !editor.open) {
+  <p class="inline-notice" role="alert">{{ error() }}</p>
+}
+@let state = response();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading record requests…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <section class="panel table-panel" aria-labelledby="record-requests-heading">
+    <div class="panel-heading">
+      <div>
+        <h2 id="record-requests-heading">Requests</h2>
+        <p>{{ state.data.length }} records</p>
+      </div>
+      <button type="button" class="button secondary" (click)="reload.set(reload() + 1)">
+        Refresh statuses
+      </button>
+    </div>
+    @if (state.data.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Record requests">
+        <table>
+          <caption class="sr-only">
+            Record requests
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">Requested</th>
+              <th scope="col">Consent status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of state.data; track row.id) {
+              <tr>
+                <td>
+                  <strong>{{ row.source }}</strong
+                  ><small>{{ row.connector.name }}</small>
+                </td>
+                <td>{{ row.purpose }}</td>
+                <td>{{ row.createdAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+                <td>
+                  <span
+                    [class]="
+                      'status ' +
+                      (row.status === 'Granted'
+                        ? 'positive'
+                        : row.status === 'Pending'
+                          ? 'information'
+                          : 'attention')
+                    "
+                    >{{ row.status }}</span
+                  >
+                </td>
+                <td>
+                  @if (row.status === 'Granted') {
+                    <button
+                      type="button"
+                      class="text-button"
+                      [disabled]="busy()"
+                      (click)="view(row, preview)"
+                    >
+                      View shared report
+                    </button>
+                  } @else {
+                    <span>—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">There are no record requests for this recipient.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="new-request-title">
+  <div class="dialog-head">
+    <h2 id="new-request-title">Request report</h2>
+    <button type="button" class="icon-button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="request(editor)">
+    <label for="patient-matching-code">Patient-issued matching code</label
+    ><input
+      id="patient-matching-code"
+      formControlName="code"
+      maxlength="50"
+      autocomplete="off"
+      required
+    />
+    <label for="request-purpose">Purpose</label
+    ><select id="request-purpose" formControlName="purpose">
+      @for (item of purposes; track item) {
+        <option>{{ item }}</option>
+      }
+    </select>
+    @if (error()) {
+      <p role="alert" class="field-error">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="form.invalid || busy()">
+      Send request
+    </button>
+  </form>
+</dialog>
+<dialog #preview aria-labelledby="shared-report-title" (close)="viewed.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="shared-report-title">Shared report</h2>
+    <button type="button" class="icon-button" aria-label="Close" (click)="preview.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <div class="dialog-body fields">
+    @if (viewed()?.report; as report) {
+      <h3>{{ report.test }}</h3>
+      <p>{{ report.finding }}</p>
+      <p><strong>Source facility</strong><br />{{ report.source }}</p>
+      <p><strong>Accession</strong><br />{{ report.accession }}</p>
+      <p>
+        <strong>Published</strong><br />{{ report.publishedAt | date: 'd MMM y, HH:mm' : '+0530' }}
+        IST
+      </p>
+      <p class="subtle">
+        Consent expires {{ report.expiresAt | date: 'd MMM y, HH:mm' : '+0530' }} IST.
+      </p>
+    } @else {
+      <p role="status">This report is no longer available to this recipient.</p>
+    }
+  </div>
+</dialog>

@@ -77,6 +77,14 @@
     <button
       class="button secondary"
       type="button"
+      [attr.aria-pressed]="active() === 'sharing'"
+      (click)="active.set('sharing')"
+    >
+      Record sharing
+    </button>
+    <button
+      class="button secondary"
+      type="button"
       [attr.aria-pressed]="active() === 'billing'"
       (click)="active.set('billing')"
     >
@@ -148,6 +156,9 @@
       </section>
     }
   }
+}
+@if (active() === 'sharing') {
+  <tc-patient-sharing />
 }
 <dialog #visitDialog aria-labelledby="portal-booking">
   <div class="dialog-head">

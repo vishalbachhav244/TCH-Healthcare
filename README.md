@@ -18,8 +18,12 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `platform` | Organization provisioning, facility activation, staff roles and inpatient entitlements |
 | `success` | Subscription reviews and plan management |
 | `operations` | Platform activity and incident handling |
+| `integration` | Connector setup and redacted exchange audit |
+| `partnercare`, `partnerlab` | Separate recipient accounts for requesting a patient-authorized report |
 | `network` | Comparison and department drill-down across assigned Meridian facilities |
 | `executive` | Hospital overview, appointments, queue and beds, with two facilities |
+| `medicaldirector` | Clinical documentation indicators, flagged laboratory report reviews and referrals |
+| `quality` | Case intake, investigation ownership, resolution and history |
 | `reception` | Patient registration, scheduling, arrival verification and queue |
 | `clinician` | Assigned consultations, laboratory orders, and prescription drafting and signing |
 | `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
@@ -31,6 +35,10 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `sunrise` | Clinic overview and reception without inpatient access |
 
 Registration accepts evaluation codes such as `REG-1001` that generate a fictional profile. A new appointment yields a QR image and opaque code for same-date reception check-in. Booking, check-in, consultation, laboratory and invoice records persist in this browser across role sign-ins.
+
+To exercise records exchange, use separate tabs on the same browser profile. In the `patient` tab, generate a code for CityCare in **Record sharing**. Use `partnercare` to submit the code, then return to the patient tab to authorize a published report such as `LAB-SHARE-0147`. The `integration` account can pause the connector and review exchange activity.
+
+To exercise clinical governance, refer a flagged report as `medicaldirector`. Open the resulting case as `quality`, take ownership and choose a resolution. The Medical Director’s worklist reflects the new case status.
 
 ## Verify
 

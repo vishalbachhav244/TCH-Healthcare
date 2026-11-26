@@ -4,4 +4,8 @@ A facility belongs to a tenant organization with a subscription plan. A facility
 
 An outpatient invoice links a signed encounter, line items and posted payments. A laboratory order links an encounter with an accession, finding, review and publication state. Admissions track bed ownership separately and preserve the allocated bed reference after discharge. A patient session may find records only for its own patient identity and facility.
 
-The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts) and [portal.ts](../src/app/domain/portal.ts). Broader entities such as consent grants, prescription stock movements and imported record references remain open.
+A connector binds one facility to one recipient identity. A matching code references one patient and connector, expires after 15 minutes and allows one request. A `ConsentGrant` is stored separately from the request and contains a `RecordReference` for the exact released laboratory report version, its expiry and revocation state. Every authorized recipient retrieval attempt with an existing request records a release or denial outcome. The audit projection excludes patient identifiers and report content.
+
+A clinical review references a flagged published report. A referral links that review to a facility quality case. The quality register exposes a process title, category and priority. Case events preserve the actor, timestamp and status, with a structured disposition for resolution.
+
+The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

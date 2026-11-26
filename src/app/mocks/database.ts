@@ -23,6 +23,16 @@ import { initialStaff } from './accounts';
 import type { Prescription, StockLot, StockMovement } from '../domain/pharmacy';
 import { pharmacyFixtures } from './pharmacy-seed';
 import type { PlatformIncident } from '../domain/platform-operations';
+import type {
+  ConsentGrant,
+  Connector,
+  ExchangeAuditEntry,
+  MatchingCode,
+  RecordRequest,
+} from '../domain/interoperability';
+import { initialConnectors, initialSharingReport } from './interoperability-seed';
+import type { ClinicalReview, QualityCase } from '../domain/governance';
+import { initialQualityCases } from './governance-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -39,6 +49,13 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   stockLots: EntityTable<StockLot, 'id'>;
   stockMovements: EntityTable<StockMovement, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
+  connectors: EntityTable<Connector, 'id'>;
+  matchingCodes: EntityTable<MatchingCode, 'code'>;
+  recordRequests: EntityTable<RecordRequest, 'id'>;
+  consentGrants: EntityTable<ConsentGrant, 'requestId'>;
+  exchangeAudit: EntityTable<ExchangeAuditEntry, 'id'>;
+  clinicalReviews: EntityTable<ClinicalReview, 'reportId'>;
+  qualityCases: EntityTable<QualityCase, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -187,6 +204,72 @@ db.version(9)
     if (date) await transaction.table('platformIncidents').bulkAdd(initialIncidents(date.value));
   });
 
+db.version(10)
+  .stores({
+    connectors: 'id, facilityId, recipientAccount',
+    matchingCodes: 'code, [patientId+connectorId], expiresAt',
+    recordRequests: 'id, patientId, connectorId',
+    exchangeAudit: 'id, requestId, occurredAt',
+  })
+  .upgrade(async (transaction) => {
+    const date = await transaction
+      .table<{ key: string; value: string }, string>('metadata')
+      .get('referenceDay');
+    if (!date) return;
+    await transaction.table('connectors').bulkAdd(initialConnectors);
+    const encounters = await transaction.table<Encounter, string>('encounters').toArray();
+    await transaction.table('labOrders').bulkAdd(initialSharingReport(encounters));
+  });
+
+db.version(11)
+  .stores({ clinicalReviews: 'reportId, facilityId', qualityCases: 'id, facilityId' })
+  .upgrade(async (transaction) => {
+    const date = await transaction
+      .table<{ key: string; value: string }, string>('metadata')
+      .get('referenceDay');
+    if (date) await transaction.table('qualityCases').bulkAdd(initialQualityCases(date.value));
+    const memberships = transaction.table<StaffMembership, string>('memberships');
+    for (const grant of initialStaff.filter(
+      (item) => item.account === 'medicaldirector' || item.account === 'quality',
+    )) {
+      if (!(await memberships.get(grant.id))) await memberships.add(grant);
+    }
+  });
+
+db.version(12)
+  .stores({ consentGrants: 'requestId' })
+  .upgrade(async (transaction) => {
+    type PreviousRequest = RecordRequest & {
+      reportId?: string;
+      reportVersion?: number;
+      expiresAt?: number;
+    };
+    const requests = transaction.table<PreviousRequest, string>('recordRequests');
+    const grants: ConsentGrant[] = [];
+    await requests.toCollection().modify((request) => {
+      if (
+        request.reportId &&
+        request.reportVersion !== undefined &&
+        request.expiresAt !== undefined
+      ) {
+        grants.push({
+          requestId: request.id,
+          record: {
+            kind: 'Laboratory report',
+            id: request.reportId,
+            version: request.reportVersion,
+          },
+          expiresAt: request.expiresAt,
+          revoked: request.status === 'Revoked',
+        });
+      }
+      delete request.reportId;
+      delete request.reportVersion;
+      delete request.expiresAt;
+    });
+    await transaction.table<ConsentGrant, string>('consentGrants').bulkAdd(grants);
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -206,6 +289,8 @@ export function initialize() {
         db.prescriptions,
         db.stockLots,
         db.platformIncidents,
+        db.connectors,
+        db.qualityCases,
         db.organisations,
         db.invoices,
         db.payments,
@@ -226,11 +311,16 @@ export function initialize() {
           db.encounters.bulkAdd(data.encounters),
           db.beds.bulkAdd(data.beds),
           db.admissions.bulkAdd(data.admissions),
-          db.labOrders.bulkAdd(labFixtures(data.encounters)),
+          db.labOrders.bulkAdd([
+            ...labFixtures(data.encounters),
+            ...initialSharingReport(data.encounters),
+          ]),
           db.facilities.bulkAdd(initialFacilities),
           db.memberships.bulkAdd(initialStaff),
           db.stockLots.bulkAdd(pharmacy.lots),
           db.platformIncidents.bulkAdd(initialIncidents(referenceDay)),
+          db.connectors.bulkAdd(initialConnectors),
+          db.qualityCases.bulkAdd(initialQualityCases(referenceDay)),
           db.prescriptions.bulkAdd(pharmacy.prescriptions),
           db.organisations.bulkAdd(organisations),
           db.events.bulkAdd(initialPlatformActivity(referenceDay)),
