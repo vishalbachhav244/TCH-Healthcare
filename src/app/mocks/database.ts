@@ -44,6 +44,8 @@ import type {
 import { initialQualityCases } from './governance-seed';
 import { initialWardAssignments } from './ward-seed';
 import type { EmergencyCase, IcuReview, IcuStepDown, TheatreCase } from '../domain/acute-care';
+import type { BedStay, DischargePlan, InpatientAccount } from '../domain/discharge';
+import { initialBedStays } from '../domain/bed-charges';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
@@ -79,6 +81,9 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   icuReviews: EntityTable<IcuReview, 'id'>;
   icuStepDowns: EntityTable<IcuStepDown, 'id'>;
   theatreCases: EntityTable<TheatreCase, 'id'>;
+  bedStays: EntityTable<BedStay, 'id'>;
+  dischargePlans: EntityTable<DischargePlan, 'admissionId'>;
+  inpatientAccounts: EntityTable<InpatientAccount, 'admissionId'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -338,6 +343,27 @@ db.version(16)
     }
   });
 
+db.version(17)
+  .stores({
+    bedStays: 'id, facilityId, admissionId',
+    dischargePlans: 'admissionId, facilityId, [facilityId+patientId]',
+    inpatientAccounts: 'admissionId, facilityId',
+    invoices: 'id, facilityId, [facilityId+day], encounterId, &prescriptionId, &admissionId',
+  })
+  .upgrade(async (transaction) => {
+    const [admissions, beds, transfers] = await Promise.all([
+      transaction.table<Admission, string>('admissions').toArray(),
+      transaction.table<Bed, string>('beds').toArray(),
+      transaction
+        .table<DomainEvent, string>('events')
+        .filter((row) => row.type === 'BedAllocated')
+        .toArray(),
+    ]);
+    await transaction
+      .table('bedStays')
+      .bulkAdd(initialBedStays(admissions, beds, Date.now(), transfers));
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -351,6 +377,7 @@ export function initialize() {
         db.encounters,
         db.beds,
         db.admissions,
+        db.bedStays,
         db.wardAssignments,
         db.labOrders,
         db.facilities,
@@ -380,6 +407,7 @@ export function initialize() {
           db.encounters.bulkAdd(data.encounters),
           db.beds.bulkAdd(data.beds),
           db.admissions.bulkAdd(data.admissions),
+          db.bedStays.bulkAdd(initialBedStays(data.admissions, data.beds, Date.now())),
           db.wardAssignments.bulkAdd(initialWardAssignments(data.admissions)),
           db.labOrders.bulkAdd([
             ...labFixtures(data.encounters),

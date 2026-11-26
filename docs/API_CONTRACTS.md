@@ -5,3 +5,5 @@ The evaluation adapter handles `/api/v1/*` through Angular HttpClient. [OpenAPI]
 The appointments, queue, clinical and laboratory worklists use zero-based offsets and a 12-row page. Patient search and booking options return at most 35 matches. Billing and other scopes use the endpoint-specific limits described in the contract. 400-series responses include a plain-language message. Stale admission and result writes, double booking, replayed passes and duplicate payments return 409.
 
 Facility-local dates are ISO calendar days in Asia/Kolkata. Appointment times are 24-hour local strings. Current event timestamps are epoch milliseconds. Money uses integer INR minor units.
+
+Discharge summary commands check the admission, team and draft versions. The portal and Admissions can read a summary after release. Inpatient charge list and detail responses expose the admission account and its bed charges. Invoice creation uses the frozen ledger, requires acknowledgement for partial coverage and returns 409 if the admission already has an invoice.

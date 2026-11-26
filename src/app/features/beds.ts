@@ -10,11 +10,12 @@ import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import type { InpatientBoard } from '../domain/operations';
 import { WardTeamEditor } from './ward-team-editor';
+import { DischargeDocument } from './discharge-document';
 
 type AdmissionRow = InpatientBoard['admissions'][number];
 
 @Component({
-  imports: [DatePipe, NgIcon, ReactiveFormsModule, StatusTone, WardTeamEditor],
+  imports: [DatePipe, DischargeDocument, NgIcon, ReactiveFormsModule, StatusTone, WardTeamEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './beds.html',
 })
@@ -37,6 +38,8 @@ export class Beds {
     undefined,
   );
   protected readonly selected = signal<AdmissionRow | undefined>(undefined);
+  protected readonly summaryId = signal('');
+  protected readonly summaryReload = signal(0);
   protected readonly visible = signal(24);
   private readonly searchValue = toSignal(this.search.valueChanges.pipe(debounceTime(200)), {
     initialValue: '',
@@ -52,6 +55,17 @@ export class Beds {
   private readonly params = computed(() => ({ ...this.scope(), reload: this.reload() }));
   protected readonly data = facilityQuery(this.params, ({ token, facility }) =>
     this.api.beds(token, facility),
+  );
+  private readonly summaryParams = computed(() => ({
+    ...this.scope(),
+    facility: this.summaryId() ? this.scope().facility : '',
+    admissionId: this.summaryId(),
+    reload: this.summaryReload(),
+  }));
+  protected readonly summary = facilityQuery(
+    this.summaryParams,
+    ({ token, facility, admissionId }) =>
+      this.api.admissionDischargeDocument(token, facility, admissionId),
   );
   private readonly searchParams = computed(() =>
     this.task() === 'request'
@@ -90,6 +104,11 @@ export class Beds {
 
   protected location(id?: string) {
     return this.board()?.beds.find((bed) => bed.id === id)?.label ?? '—';
+  }
+
+  protected openSummary(dialog: HTMLDialogElement, row: AdmissionRow) {
+    this.summaryId.set(row.admission.id);
+    dialog.showModal();
   }
 
   protected open(

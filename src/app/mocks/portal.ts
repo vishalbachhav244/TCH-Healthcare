@@ -3,29 +3,32 @@ import type { PatientPortal } from '../domain/portal';
 import { ApiError, patientSubject } from './access';
 import { db } from './database';
 import { followUpsForPatient } from './continuity';
+import { patientDischargeSummaries } from './discharge';
 
 export async function portal(facility: Facility, session: Session): Promise<PatientPortal> {
   const patientId = patientSubject(session);
-  const [patient, appointments, clinicians, records, invoices, followUps] = await Promise.all([
-    db.patients.get(patientId),
-    db.appointments
-      .where('facilityId')
-      .equals(facility.id)
-      .filter((row) => row.patientId === patientId)
-      .toArray(),
-    db.practitioners.where('facilityId').equals(facility.id).toArray(),
-    db.labOrders
-      .where('patientId')
-      .equals(patientId)
-      .filter((row) => row.facilityId === facility.id && row.status === 'Published')
-      .toArray(),
-    db.invoices
-      .where('facilityId')
-      .equals(facility.id)
-      .filter((row) => row.patientId === patientId)
-      .toArray(),
-    followUpsForPatient(facility, patientId),
-  ]);
+  const [patient, appointments, clinicians, records, invoices, followUps, dischargeSummaries] =
+    await Promise.all([
+      db.patients.get(patientId),
+      db.appointments
+        .where('facilityId')
+        .equals(facility.id)
+        .filter((row) => row.patientId === patientId)
+        .toArray(),
+      db.practitioners.where('facilityId').equals(facility.id).toArray(),
+      db.labOrders
+        .where('patientId')
+        .equals(patientId)
+        .filter((row) => row.facilityId === facility.id && row.status === 'Published')
+        .toArray(),
+      db.invoices
+        .where('facilityId')
+        .equals(facility.id)
+        .filter((row) => row.patientId === patientId)
+        .toArray(),
+      followUpsForPatient(facility, patientId),
+      patientDischargeSummaries(facility, patientId),
+    ]);
   if (patient?.tenantId !== facility.tenantId)
     throw new ApiError(404, 'Patient profile unavailable.');
   const [tickets, payments] = await Promise.all([
@@ -43,6 +46,7 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
     clinicians,
     records: records.sort((a, b) => b.changedAt - a.changedAt),
     followUps,
+    dischargeSummaries,
     appointments: appointments
       .sort((a, b) => b.day.localeCompare(a.day) || b.time.localeCompare(a.time))
       .flatMap(({ pass: _pass, ...appointment }) => {
@@ -66,7 +70,13 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
           payments
             .filter((row) => row.invoiceId === invoice.id)
             .reduce((total, row) => total + row.amountMinor, 0);
-        return { id: invoice.id, day: invoice.day, totalMinor, balanceMinor };
+        return {
+          id: invoice.id,
+          day: invoice.day,
+          totalMinor,
+          balanceMinor,
+          ...(invoice.admissionId ? { inpatient: true } : {}),
+        };
       }),
   };
 }

@@ -13,6 +13,12 @@ import type {
 } from '../domain/operations';
 import type { LabRow, LabStage } from '../domain/diagnostics';
 import type { PatientPortal } from '../domain/portal';
+import type {
+  DischargeDocument,
+  DischargeFields,
+  InpatientBillingDetail,
+  InpatientBillingRow,
+} from '../domain/discharge';
 import type { PlatformData } from '../domain/platform';
 import type { SubscriptionRow } from '../domain/platform';
 import type { NetworkFacilityMetrics } from '../domain/operations';
@@ -523,6 +529,54 @@ export class Api {
     });
   }
 
+  saveDischargePlan(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    planVersion: number,
+    fields: DischargeFields,
+  ) {
+    return this.execute('inpatient-physician/discharge-summary', token, facility, {
+      ...this.wardVersions(context),
+      planVersion: String(planVersion),
+      ...fields,
+    });
+  }
+
+  signDischargePlan(
+    token: string,
+    facility: string,
+    context: WardRecordVersion,
+    planVersion: number,
+  ) {
+    return this.execute(
+      'inpatient-physician/discharge-summary/sign',
+      token,
+      facility,
+      {
+        ...this.wardVersions(context),
+        planVersion: String(planVersion),
+      },
+      'PATCH',
+    );
+  }
+
+  admissionDischargeDocument(token: string, facility: string, admissionId: string) {
+    return this.get('admissions/discharge-summary', token, facility, { admissionId }).pipe(
+      map((value) =>
+        objectShape<DischargeDocument>(value, [
+          'admissionId',
+          'patientName',
+          'releasedAt',
+          'signedBy',
+          'destination',
+          'course',
+          'followUp',
+        ]),
+      ),
+    );
+  }
+
   placeWardOrder(token: string, facility: string, context: WardRecordVersion, kind: WardOrderKind) {
     return this.execute('inpatient-physician/orders', token, facility, {
       ...this.wardVersions(context),
@@ -595,6 +649,7 @@ export class Api {
           'clinicians',
           'appointments',
           'records',
+          'dischargeSummaries',
           'followUps',
           'invoices',
         ]),
@@ -616,6 +671,48 @@ export class Api {
         collection<InvoiceRow>(value, ['invoice', 'patient', 'balanceMinor', 'totalMinor']),
       ),
     );
+  }
+
+  inpatientBilling(token: string, facility: string) {
+    return this.get('billing/inpatient', token, facility).pipe(
+      map((value) =>
+        collection<InpatientBillingRow>(value, [
+          'admissionId',
+          'patient',
+          'status',
+          'coverage',
+          'chargeDays',
+          'totalMinor',
+        ]),
+      ),
+    );
+  }
+
+  inpatientBillDetail(token: string, facility: string, admissionId: string) {
+    return this.get('billing/inpatient/detail', token, facility, { admissionId }).pipe(
+      map((value) =>
+        objectShape<InpatientBillingDetail>(value, [
+          'admissionId',
+          'patient',
+          'status',
+          'coverage',
+          'charges',
+          'totalMinor',
+        ]),
+      ),
+    );
+  }
+
+  issueInpatientInvoice(
+    token: string,
+    facility: string,
+    admissionId: string,
+    acknowledgePartial: boolean,
+  ) {
+    return this.execute('billing/inpatient/invoices', token, facility, {
+      admissionId,
+      acknowledgePartial: String(acknowledgePartial),
+    });
   }
 
   invoiceOptions(token: string, facility: string, day: string) {

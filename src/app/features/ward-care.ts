@@ -10,6 +10,12 @@ import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import {
+  dischargeCourses,
+  dischargeDestinations,
+  dischargeFollowUps,
+  type DischargeFields,
+} from '../domain/discharge';
+import {
   observationKinds,
   observationResults,
   roundFocuses,
@@ -28,6 +34,7 @@ import {
 type Editor = { context: WardRecordVersion } & (
   | { action: 'round' | 'order' | 'observation' }
   | { action: 'complete' | 'cancel'; order: WardOrderRow }
+  | { action: 'discharge' | 'sign-discharge'; planVersion: number }
 );
 
 @Component({
@@ -74,6 +81,14 @@ export class WardCare {
   protected readonly order = this.forms.control<WardOrderKind | ''>('');
   protected readonly observation = this.forms.control<ObservationKind | ''>('');
   protected readonly result = this.forms.control<ObservationResult | ''>('');
+  protected readonly destinations = dischargeDestinations;
+  protected readonly courses = dischargeCourses;
+  protected readonly followUps = dischargeFollowUps;
+  protected readonly discharge = this.forms.group({
+    destination: this.forms.control<DischargeFields['destination'] | ''>(''),
+    course: this.forms.control<DischargeFields['course'] | ''>(''),
+    followUp: this.forms.control<DischargeFields['followUp'] | ''>(''),
+  });
   private readonly scope = computed(() => ({
     token: this.store.session()?.token ?? '',
     facility: this.store.facility()?.id ?? '',
@@ -133,6 +148,10 @@ export class WardCare {
         return 'Complete nursing task';
       case 'cancel':
         return 'Cancel ward order';
+      case 'discharge':
+        return 'Prepare discharge summary';
+      case 'sign-discharge':
+        return 'Sign discharge summary';
       default:
         return 'Ward care';
     }
@@ -163,6 +182,24 @@ export class WardCare {
         }),
       'Task started.',
     );
+  }
+
+  protected openDischarge(
+    dialog: HTMLDialogElement,
+    detail: WardDetail,
+    action: 'discharge' | 'sign-discharge',
+  ) {
+    const plan = detail.dischargePlan;
+    this.discharge.reset({
+      destination: plan?.destination ?? '',
+      course: plan?.course ?? '',
+      followUp: plan?.followUp ?? '',
+    });
+    this.openEditor(dialog, {
+      context: this.version(detail),
+      action,
+      planVersion: plan?.version ?? 0,
+    });
   }
 
   protected async submit(dialog: HTMLDialogElement) {
@@ -206,6 +243,26 @@ export class WardCare {
             result,
           }),
         'Task completed and observation recorded.',
+        true,
+      );
+    } else if (editor.action === 'discharge') {
+      const { destination, course, followUp } = this.discharge.getRawValue();
+      if (!destination || !course || !followUp) return;
+      success = await this.save(
+        (token, facility) =>
+          this.api.saveDischargePlan(token, facility, context, editor.planVersion, {
+            destination,
+            course,
+            followUp,
+          }),
+        'Discharge draft saved.',
+        true,
+      );
+    } else if (editor.action === 'sign-discharge') {
+      success = await this.save(
+        (token, facility) =>
+          this.api.signDischargePlan(token, facility, context, editor.planVersion),
+        'Discharge summary signed.',
         true,
       );
     } else if (editor.action === 'cancel') {

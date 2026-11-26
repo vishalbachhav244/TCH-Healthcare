@@ -18,6 +18,8 @@ import {
 } from './continuity';
 import { createPatient } from './seed';
 import { inpatientCommand } from './inpatient';
+import { dischargePlanCommand } from './discharge';
+import { issueInpatientInvoice } from './inpatient-billing';
 import { laboratoryCommand } from './laboratory';
 import { pharmacyCommand } from './pharmacy';
 import { governanceCommand } from './governance';
@@ -94,6 +96,9 @@ export async function command(
       db.icuReviews,
       db.icuStepDowns,
       db.theatreCases,
+      db.dischargePlans,
+      db.bedStays,
+      db.inpatientAccounts,
     ],
     async () => {
       const session = await requireSession(token);
@@ -411,6 +416,18 @@ export async function command(
           changed = event(facility, 'InvoiceCreated', id);
           break;
         }
+        case 'billing/inpatient/invoices': {
+          const facility = scope(session, facilityRecord, 'D24', 'billing');
+          if (!facility.inpatient)
+            throw new ApiError(403, 'Inpatient services are disabled at this facility.');
+          const id = await issueInpatientInvoice(
+            facility,
+            field(payload, 'admissionId'),
+            payload['acknowledgePartial'],
+          );
+          changed = event(facility, 'InvoiceCreated', id);
+          break;
+        }
         case 'billing/payments': {
           const facility = scope(session, facilityRecord, 'D24', 'billing');
           const invoice = await db.invoices.get(field(payload, 'invoiceId'));
@@ -475,6 +492,15 @@ export async function command(
             scope(session, facilityRecord, 'D18', 'operation-theatre'),
             session,
             payload,
+          );
+          break;
+        case 'inpatient-physician/discharge-summary':
+        case 'inpatient-physician/discharge-summary/sign':
+          changed = await dischargePlanCommand(
+            scope(session, facilityRecord, 'D14', 'inpatient-physician'),
+            session,
+            payload,
+            path.endsWith('/sign'),
           );
           break;
         case 'inpatient-physician/rounds':

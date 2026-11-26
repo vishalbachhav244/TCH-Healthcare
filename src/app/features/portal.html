@@ -149,6 +149,26 @@
     }
     @case ('records') {
       <section class="panel portal-list">
+        <h2>Discharge summaries</h2>
+        @for (summary of response.data.dischargeSummaries; track summary.admissionId) {
+          <article>
+            <div>
+              <strong>{{ summary.ward }}</strong>
+              <p>Discharged {{ summary.releasedAt | date: 'd MMM y' : '+0530' }}</p>
+            </div>
+            <button
+              class="text-button"
+              type="button"
+              (click)="showSummary(summary, dischargeDialog)"
+            >
+              View discharge summary
+            </button>
+          </article>
+        } @empty {
+          <p class="subtle">There are no released discharge summaries at this facility.</p>
+        }
+      </section>
+      <section class="panel portal-list">
         <h2>Released laboratory reports</h2>
         @for (item of response.data.records; track item.id) {
           <article>
@@ -174,6 +194,9 @@
             <span class="square-icon amber"><ng-icon name="wallet" /></span>
             <div>
               <strong>{{ bill.totalMinor | rupees }}</strong>
+              @if (bill.inpatient) {
+                <small>Inpatient stay</small>
+              }
               <p>
                 {{ bill.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} · Balance
                 {{ bill.balanceMinor | rupees }}
@@ -296,6 +319,21 @@
         <p role="status">Preparing your appointment pass…</p>
       }
     </div>
+  }
+</dialog>
+<dialog
+  #dischargeDialog
+  aria-labelledby="portal-discharge-title"
+  (close)="dischargeSummary.set(undefined)"
+>
+  <div class="dialog-head">
+    <h2 id="portal-discharge-title">Discharge summary</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="dischargeDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (dischargeSummary(); as summary) {
+    <div class="dialog-body"><tc-discharge-document [document]="summary" /></div>
   }
 </dialog>
 <dialog #recordDialog aria-labelledby="record-title">

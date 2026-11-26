@@ -149,6 +149,13 @@
                     @if (row.stepDownRequestedAt !== undefined) {
                       <small>ICU step-down requested</small>
                     }
+                    @if (row.dischargeSummaryStatus; as status) {
+                      <small>{{
+                        status === 'Required'
+                          ? 'Discharge summary required'
+                          : 'Summary ' + status.toLowerCase()
+                      }}</small>
+                    }
                   </td>
                   <td>
                     @if (row.admission.status !== 'Discharged') {
@@ -174,6 +181,15 @@
                         (click)="open('discharge', admissionDialog, row)"
                       >
                         Discharge
+                      </button>
+                    }
+                    @if (row.dischargeSummaryStatus === 'Released') {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="openSummary(summaryDialog, row)"
+                      >
+                        View discharge summary
                       </button>
                     }
                   </td>
@@ -211,6 +227,31 @@
       <tc-ward-team-editor [admission]="row.admission" (saved)="teamSaved(teamDialog)" />
     </div>
   }
+</dialog>
+<dialog #summaryDialog (close)="summaryId.set('')" aria-labelledby="admission-summary-title">
+  <div class="dialog-head">
+    <h2 id="admission-summary-title">Discharge summary</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="summaryDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <div class="dialog-body">
+    @let state = summary();
+    @if (state.state === 'loading') {
+      <p role="status">Loading discharge summary…</p>
+    } @else if (state.state === 'error') {
+      <p role="alert">{{ state.message }}</p>
+      <button
+        class="button secondary"
+        type="button"
+        (click)="summaryReload.set(summaryReload() + 1)"
+      >
+        Retry
+      </button>
+    } @else {
+      <tc-discharge-document [document]="state.data" />
+    }
+  </div>
 </dialog>
 <dialog #admissionDialog (close)="task.set(undefined)" aria-labelledby="admission-dialog-title">
   <div class="dialog-head">
@@ -264,6 +305,9 @@
       </select>
     } @else {
       <p class="subtle">The current bed will move to cleaning after discharge.</p>
+      @if (selected()?.dischargeSummaryStatus === 'Signed') {
+        <p class="subtle">The signed summary will be released to the patient.</p>
+      }
     }
     @if (dialogFailure()) {
       <p class="field-error" role="alert">{{ dialogFailure() }}</p>

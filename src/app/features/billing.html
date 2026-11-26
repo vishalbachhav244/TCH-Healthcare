@@ -3,24 +3,49 @@
   <div>
     <p class="eyebrow"><span></span> PATIENT FINANCE</p>
     <h1>Revenue Cycle</h1>
-    <p>Issue consultation invoices and reconcile balances.</p>
+    <p>Issue invoices, review bed charges and reconcile balances.</p>
   </div>
-  <div class="page-actions">
-    <label class="date-filter"
-      ><ng-icon name="calendar" /><span class="sr-only">Invoice date</span
-      ><input #date type="date" [value]="day()" (change)="date.value && day.set(date.value)"
-    /></label>
-    @if (store.writeAllowed('billing')) {
-      <button class="button primary" type="button" (click)="newInvoice(invoiceDialog)">
-        <ng-icon name="plus" /> New invoice
-      </button>
-    }
-  </div>
+  @if (!showInpatient()) {
+    <div class="page-actions">
+      <label class="date-filter"
+        ><ng-icon name="calendar" /><span class="sr-only">Invoice date</span
+        ><input #date type="date" [value]="day()" (change)="date.value && day.set(date.value)"
+      /></label>
+      @if (store.writeAllowed('billing')) {
+        <button class="button primary" type="button" (click)="newInvoice(invoiceDialog)">
+          <ng-icon name="plus" /> New invoice
+        </button>
+      }
+    </div>
+  }
 </section>
+@if (inpatientAllowed()) {
+  <div class="view-controls" role="group" aria-label="Revenue Cycle view">
+    <button
+      class="button secondary"
+      #invoiceView
+      type="button"
+      [attr.aria-pressed]="!showInpatient()"
+      (click)="mode.set('invoices')"
+    >
+      Invoices
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="!!showInpatient()"
+      (click)="mode.set('inpatient')"
+    >
+      Inpatient charges
+    </button>
+  </div>
+}
 @if (message()) {
   <p class="inline-notice success" role="status">{{ message() }}</p>
 }
-@if (response.state === 'loading') {
+@if (showInpatient()) {
+  <tc-inpatient-billing (issued)="inpatientIssued()" />
+} @else if (response.state === 'loading') {
   <p class="panel state-panel" role="status">Loading invoices…</p>
 } @else if (response.state === 'error') {
   <div class="panel state-panel">
@@ -68,7 +93,13 @@
                   <strong>{{ row.patient.name }}</strong
                   ><small>{{ row.patient.id }}</small>
                 </td>
-                <td>{{ row.invoice.lines.at(0)?.description }}</td>
+                <td>
+                  {{
+                    row.invoice.admissionId
+                      ? 'Inpatient stay'
+                      : row.invoice.lines.at(0)?.description
+                  }}
+                </td>
                 <td>{{ row.totalMinor | rupees }}</td>
                 <td>{{ row.balanceMinor | rupees }}</td>
                 <td>

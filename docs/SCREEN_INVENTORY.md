@@ -35,3 +35,6 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-29 | D16 | `/work/emergency` | Arrival, manual clinical assessment priority, admission request and live disposition |
 | TC-LOCAL-30 | D17 | `/work/critical-care` | Critical-care census, review history, step-down requests and transfer status |
 | TC-LOCAL-31 | D18 | `/work/operation-theatre` | Date-based theatre schedule, room booking, stage transitions, recovery and cancellation |
+| TC-LOCAL-32 | D14 and D19 | `/work/inpatient-physician` → Care plan and `/work/beds` → Admissions | Discharge draft, signature confirmation, readiness and released summary |
+| TC-LOCAL-33 | D24 | `/work/billing` → Inpatient charges | Account worklist, status filter, daily bed ledger and inpatient invoice issue |
+| TC-LOCAL-34 | D12 | `/work/portal` → Reports | Own released discharge summaries and download |

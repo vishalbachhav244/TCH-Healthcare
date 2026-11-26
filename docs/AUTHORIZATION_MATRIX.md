@@ -16,14 +16,14 @@
 | Executive | Meridian facilities. Overview, alert acknowledgement and clinician schedule blocks. Read-only appointments, waitlist, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointment and waitlist commands, and queue operations. Follow-up booking exposes the clinician, date window and booking state. Appointment, queue and dashboard worklists omit encounter records. |
 | Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, requests or withdraws follow-up and orders laboratory tests. |
-| Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, places ward orders and cancels pending orders. Reads related nursing tasks and observations. |
+| Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, manages ward orders and drafts or signs the discharge summary. Reads related nursing tasks and observations. |
 | Ward nurse | Active assigned admissions at inpatient-enabled facilities. Starts and completes linked tasks and records observations. Reads rounds and orders for the assigned admission. |
 | Emergency clinician | Emergency arrivals, clinician-entered priority and disposition for registered patients within the selected facility tenant. May request admission. |
 | Critical care clinician | Current critical care beds and admissions at inpatient-enabled facilities. Records reviews and requests step-down. |
 | Theatre coordinator | Eligible active admissions and theatre schedules at inpatient-enabled facilities. Books rooms and records or cancels stages within the applicable lifecycle. |
-| Admissions | Default Meridian facility. Bed and admission lifecycle, including care teams and ICU step-down transfers. Discharge requires linked nursing tasks and theatre cases to be closed. |
+| Admissions | Default Meridian facility. Bed and admission lifecycle, including care teams and ICU step-down transfers. Discharge requires closure of open nursing and theatre work and a signed summary for an assigned care team. Can view released summaries. |
 | Laboratory technician | Collection, processing and result entry. |
 | Laboratory reviewer | Authorisation and publication. |
-| Cashier | Signed-encounter invoices and local settlements. |
-| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, published lab reports and bill balances. |
+| Cashier | Signed-encounter invoices, local settlements, and scoped bed charges and finalized inpatient invoices at inpatient-enabled facilities. |
+| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, published lab reports, released discharge summaries and bill balances. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

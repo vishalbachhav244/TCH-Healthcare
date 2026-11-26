@@ -1,5 +1,12 @@
 # Progress ledger
 
+## Discharge documentation and inpatient billing, 26 November 2026
+
+- Extended D14 and D19 with a versioned discharge draft, physician sign-off, a release gate and a read-only summary. D12 can view and download its own released summaries. Admissions without an assigned care team retain their administrative discharge path.
+- Added V17 bed history and frozen inpatient ledgers. Transfers preserve their ward rate. The cashier can review charges, issue one invoice per discharged stay and record a local settlement. Same-day transfers use the highest occupied ward rate. Legacy transfers record only verified coverage and require acknowledgement before invoicing. Already discharged legacy admissions keep their records without generated charges.
+- Changed the discharge and bed-charge domain, ward and inpatient mock adapters, typed API, and the physician, Admissions, Revenue Cycle and patient screens. Added OpenAPI operations, expanded the contract and Chromium journeys, and checked the V16 to V17 migration with an occupied bed, a transfer event, a closed admission and a prior consultation invoice.
+- Coverage is 22 dashboard IDs with partial routes and 14 open. Inpatient service orders as charge sources, deposits, tax rules, receipts and discharge amendments remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Test evidence](TEST_REPORT.md) · [Mobile discharge summary](screenshots/discharge-summary-390.png) · [Bed charge ledger](screenshots/inpatient-billing-1440.png)
+
 ## Emergency, ICU and Operation Theatre, 26 November 2026
 
 - Added D16 `/work/emergency`, D17 `/work/critical-care` and D18 `/work/operation-theatre`. Emergency records clinician-assigned priorities and requests admission. ICU uses occupied critical-care beds for its census and persists reviews and step-down requests. Theatre supports room booking and readiness through recovery.

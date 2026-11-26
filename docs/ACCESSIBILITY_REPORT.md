@@ -12,4 +12,6 @@ The physician care plan at 1440 px and the nursing plan at 390 px passed automat
 
 Emergency, critical care and Theatre passed reflow checks at 390, 768, 1024 and 1440 px. The emergency view at 390 px and the two desktop views passed the selected axe rules. The emergency assessment dialog opens with Enter and restores focus after Escape. [Mobile emergency](screenshots/emergency-390.png) · [Critical care](screenshots/critical-care-1440.png) · [Operation Theatre](screenshots/operation-theatre-1440.png)
 
+The patient Reports view and inpatient accounts worklist passed reflow checks at 390, 768, 1024 and 1440 px. The released summary at 390 px and the bed ledger at 1440 px passed the selected axe rules. Enter opens the ledger, Escape restores focus to the account action, and issuing an invoice moves focus to the Invoices view control. [Mobile discharge summary](screenshots/discharge-summary-390.png) · [Bed charge ledger](screenshots/inpatient-billing-1440.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

@@ -12,6 +12,7 @@ import {
 import type { SchedulingDay } from '../domain/scheduling';
 import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
+import type { DischargeDocument, InpatientBillingDetail } from '../domain/discharge';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
@@ -445,12 +446,143 @@ describe('assigned inpatient care', () => {
     expect(complete.observations).toMatchObject([
       { taskId, kind: 'Ward observations', result: 'Physician review requested' },
     ]);
+    const [patient, cashier] = await Promise.all([login('patient'), login('cashier')]);
+    const summaryPath = 'admissions/discharge-summary?admissionId=' + admissionId;
+    const billingPath = 'billing/inpatient/detail?admissionId=' + admissionId;
+    const invoicePath = 'billing/inpatient/invoices';
+    const ownPortal = () => get('portal', patient, facility) as Promise<PatientPortal>;
+    const draft = {
+      ...versions,
+      assignmentVersion: '2',
+      planVersion: '0',
+      destination: 'Home',
+      course: 'Ward care reviewed',
+      followUp: 'Arrange outpatient review',
+    };
+    const savePath = physicianPath + '/discharge-summary';
+    await expect(
+      post('admissions/discharge', discharge, admissions, facility),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('must sign') });
+    await expect(post(savePath, draft, nurse, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post(savePath, { ...draft, destination: 'invalid' }, physician, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    await post(savePath, draft, physician, facility);
+    expect((await readWard(physicianPath, physician)).dischargePlan).toMatchObject({
+      status: 'Draft',
+      version: 1,
+    });
+    expect((await readWard(nursePath, relief)).dischargePlan).toBeUndefined();
+    await expect(get(summaryPath, admissions, facility)).rejects.toMatchObject({ status: 404 });
+    const sign = { ...versions, assignmentVersion: '2', planVersion: '1' };
+    await expect(
+      patch(savePath + '/sign', { ...sign, planVersion: '0' }, physician, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(savePath + '/sign', sign, physician, facility);
+    await expect(
+      post(savePath, { ...draft, planVersion: '2' }, physician, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await ownPortal()).dischargeSummaries).not.toContainEqual(
+      expect.objectContaining({ admissionId }),
+    );
+    await expect(get(billingPath, admissions, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(billingPath, cashier, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    await expect(get(billingPath, cashier, facility)).resolves.toMatchObject({
+      status: 'Accruing',
+    });
+    await expect(post(invoicePath, { admissionId }, cashier, facility)).rejects.toMatchObject({
+      status: 409,
+    });
     await post('admissions/discharge', discharge, admissions, facility);
+    const summary = (await get(summaryPath, admissions, facility)) as DischargeDocument;
+    expect(summary).toMatchObject({
+      admissionId,
+      patientId,
+      destination: 'Home',
+      ward: bed.ward,
+      bed: bed.label,
+    });
+    expect((await ownPortal()).dischargeSummaries).toContainEqual(summary);
+    await expect(get(summaryPath, cashier, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(summaryPath, admissions, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    const account = (await get(billingPath, cashier, facility)) as InpatientBillingDetail;
+    expect(account).toMatchObject({
+      status: 'Ready to invoice',
+      coverage: 'Full stay',
+      chargeDays: 1,
+    });
+    expect(account.charges[0]).toMatchObject({ ward: bed.ward, bed: bed.label });
+    const issues = await Promise.allSettled([
+      post(invoicePath, { admissionId }, cashier, facility),
+      post(invoicePath, { admissionId }, cashier, facility),
+    ]);
+    expect(issues.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    const invoice = (await db.invoices.where('admissionId').equals(admissionId).first())!;
+    expect(invoice.encounterId).toBeUndefined();
+    expect(invoiceTotal(invoice)).toBe(account.totalMinor);
+    await post('billing/payments', { invoiceId: invoice.id }, cashier, facility);
+    expect((await ownPortal()).invoices).toContainEqual(
+      expect.objectContaining({ id: invoice.id, inpatient: true, balanceMinor: 0 }),
+    );
+    await db.facilities.update(facility, { inpatient: false });
+    try {
+      await expect(get('billing/inpatient', cashier, facility)).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(post(invoicePath, { admissionId }, cashier, facility)).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await db.facilities.update(facility, { inpatient: true });
+    }
     await expect(readWard(physicianPath, physician)).rejects.toMatchObject({ status: 409 });
     await expect(get(physicianPath, physician, facility)).resolves.not.toContainEqual(
       expect.objectContaining({ admission: expect.objectContaining({ id: admissionId }) }),
     );
     expect(await db.wardObservations.where('admissionId').equals(admissionId).count()).toBe(1);
+    await post('beds/release', { bedId: bed.id }, admissions, facility);
+  }, 60_000);
+});
+
+describe('inpatient billing for legacy stays', () => {
+  it('requires acknowledgement before issuing a tracked-only invoice', async () => {
+    const facility = 'mer-central';
+    const [admissions, cashier] = await Promise.all([login('admissions'), login('cashier')]);
+    const { id: admissionId } = (await post(
+      'admissions',
+      { patientId: 'TC-MERIDIAN-01199' },
+      admissions,
+      facility,
+    )) as { id: string };
+    const bed = (await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .first())!;
+    await post(
+      'admissions/allocate',
+      { admissionId, version: '1', bedId: bed.id },
+      admissions,
+      facility,
+    );
+    await db.admissions.update(admissionId, { version: 3 });
+    await db.bedStays.where('admissionId').equals(admissionId).modify({ partial: true });
+    await post('admissions/discharge', { admissionId, version: '3' }, admissions, facility);
+    const path = 'billing/inpatient/invoices';
+    await expect(post(path, { admissionId }, cashier, facility)).rejects.toMatchObject({
+      status: 422,
+    });
+    expect(await db.invoices.where('admissionId').equals(admissionId).count()).toBe(0);
+    await post(path, { admissionId, acknowledgePartial: 'true' }, cashier, facility);
+    await expect(
+      get('billing/inpatient/detail?admissionId=' + admissionId, cashier, facility),
+    ).resolves.toMatchObject({ status: 'Invoiced', coverage: 'Tracked segments only' });
     await post('beds/release', { bedId: bed.id }, admissions, facility);
   }, 60_000);
 });

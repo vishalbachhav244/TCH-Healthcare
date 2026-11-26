@@ -199,10 +199,10 @@ test('hands an emergency patient through ICU step-down and theatre recovery', as
   await admissions.close();
 });
 
-test('hands an admitted patient from physician rounds to nursing evidence and discharge', async ({
+test('hands an admitted patient from ward care through discharge and inpatient billing', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(160_000);
+  test.setTimeout(200_000);
   const patientId = 'TC-MERIDIAN-01001';
   await signIn(page, 'admissions');
   await page.getByRole('button', { name: 'Request admission' }).click();
@@ -331,9 +331,106 @@ test('hands an admitted patient from physician rounds to nursing evidence and di
 
   await admitted.getByRole('button', { name: 'Discharge', exact: true }).click();
   await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
-  await expect(admitted).toContainText('Discharged');
+  await expect(discharge.getByRole('alert')).toContainText('must sign the discharge summary');
+  await discharge.getByRole('button', { name: 'Close' }).click();
+  await admitted.getByRole('button', { name: 'Transfer bed' }).click();
+  const transfer = page.getByRole('dialog', { name: 'Assign bed' });
+  const nextBed = transfer.getByLabel('Available bed');
+  const criticalBed = await nextBed
+    .locator('option', { hasText: 'Critical care' })
+    .first()
+    .getAttribute('value');
+  await nextBed.selectOption(criticalBed!);
+  await transfer.getByRole('button', { name: 'Confirm bed allocation' }).click();
+  await expect(physician.getByText(/Critical care · Bed/)).toBeVisible();
+
+  const patient = await page.context().newPage();
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Reports', exact: true }).click();
+  const openSummary = patient.getByRole('button', { name: 'View discharge summary' });
+  const cashier = await page.context().newPage();
+  await signIn(cashier, 'cashier');
+  await cashier.getByRole('button', { name: 'Inpatient charges' }).click();
+  await cashier.getByRole('searchbox', { name: 'Find inpatient account' }).fill(patientId);
+  const account = cashier.getByRole('row', { name: new RegExp(patientId) });
+  await expect(account).toContainText('Accruing');
+  const review = account.getByRole('button', { name: 'Review bed charges' });
+  await review.focus();
+  await cashier.keyboard.press('Enter');
+  const ledger = cashier.getByRole('dialog', { name: 'Bed charge ledger' });
+  const issue = ledger.getByRole('button', { name: 'Issue inpatient invoice' });
+  await expect(ledger.getByRole('row', { name: /Critical care/ })).toBeVisible();
+  await expect(issue).toHaveCount(0);
+  await cashier.keyboard.press('Escape');
+  await expect(review).toBeFocused();
+
+  await physician.getByRole('button', { name: 'Prepare discharge summary' }).click();
+  const draft = physician.getByRole('dialog', { name: 'Prepare discharge summary' });
+  await draft.getByLabel('Destination').selectOption('Home');
+  await draft.getByLabel('Stay summary').selectOption('Ward care reviewed');
+  await draft.getByLabel('Follow-up handoff').selectOption('Arrange outpatient review');
+  await draft.getByRole('button', { name: 'Save discharge draft' }).click();
+  await expect(admitted).toContainText('Summary draft');
+  await expect(openSummary).toHaveCount(0);
+  await physician.reload();
+  await physician.getByRole('button', { name: 'Edit discharge draft' }).click();
+  await expect(draft.getByLabel('Destination')).toHaveValue('Home');
+  await physician.keyboard.press('Escape');
+  await physician.getByRole('button', { name: 'Sign summary' }).click();
+  const sign = physician.getByRole('dialog', { name: 'Sign discharge summary' });
+  await expect(sign).toContainText('Arrange outpatient review');
+  await sign.getByRole('button', { name: 'Confirm signature' }).click();
+  await expect(admitted).toContainText('Summary signed');
+  await expect(openSummary).toHaveCount(0);
+  await admitted.getByRole('button', { name: 'Discharge', exact: true }).click();
+  await discharge.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(admitted).toContainText('Summary released');
   await expect(physician.getByRole('alert')).toContainText('This admission is no longer active');
   await expect(nurse.getByRole('alert')).toContainText('This admission is no longer active');
+  await checkReflow(patient);
+  await patient.setViewportSize({ width: 390, height: 844 });
+  await openSummary.click();
+  const summary = patient.getByRole('dialog', { name: 'Discharge summary' });
+  await expect(summary).toContainText('Arrange outpatient review');
+  await expect(summary).toContainText('Critical care');
+  const download = patient.waitForEvent('download');
+  await summary.getByRole('button', { name: 'Download summary' }).click();
+  expect((await download).suggestedFilename()).toBe('truecare-discharge-summary.txt');
+  await expect(account).toContainText('Ready to invoice');
+  await checkReflow(cashier);
+  await review.click();
+  await expect(issue).toBeEnabled();
+  await expect(ledger.getByRole('row', { name: /Critical care.*3,500/ })).toBeVisible();
+  for (const [workspace, name] of [
+    [patient, 'discharge-summary-390'],
+    [cashier, 'inpatient-billing-1440'],
+  ] as const) {
+    expect(
+      (
+        await new AxeBuilder({ page: workspace })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+          .analyze()
+      ).violations,
+    ).toEqual([]);
+    await workspace.screenshot({
+      path: testInfo.outputPath(name + '.png'),
+      animations: 'disabled',
+    });
+  }
+  await issue.click();
+  await expect(cashier.getByRole('button', { name: 'Invoices', exact: true })).toBeFocused();
+  const invoice = cashier.getByRole('row', { name: new RegExp(patientId + '.*Inpatient stay') });
+  await expect(invoice).toContainText('Outstanding');
+  await invoice.getByRole('button', { name: 'Record settlement' }).click();
+  await cashier.getByRole('button', { name: 'Confirm settlement' }).click();
+  await expect(invoice).toContainText('Paid');
+  await patient.reload();
+  await patient.getByRole('button', { name: 'Bills', exact: true }).click();
+  await expect(patient.getByRole('article').filter({ hasText: 'Inpatient stay' })).toContainText(
+    'Paid',
+  );
+  await patient.close();
+  await cashier.close();
   await page.goto('/work/inpatient-physician');
   await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await physician.close();
@@ -810,9 +907,14 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   const ward = await page.context().newPage();
   const nursing = await page.context().newPage();
   const theatre = await page.context().newPage();
+  const cashier = await page.context().newPage();
   await signIn(ward, 'wardphysician');
   await signIn(nursing, 'wardnurse');
   await signIn(theatre, 'theatre');
+  await signIn(cashier, 'cashier');
+  const inpatientCharges = cashier.getByRole('button', { name: 'Inpatient charges' });
+  await inpatientCharges.click();
+  await expect(cashier.getByRole('heading', { name: 'Inpatient accounts' })).toBeVisible();
   await expect(ward.getByRole('heading', { name: 'Inpatient Physician' })).toBeVisible();
   await expect(nursing.getByRole('heading', { name: 'Nursing Station' })).toBeVisible();
   await expect(theatre.getByRole('heading', { name: 'Operation Theatre' })).toBeVisible();
@@ -828,9 +930,12 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(ward.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(nursing.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(theatre.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(inpatientCharges).toHaveCount(0);
+  await expect(cashier.getByRole('heading', { name: 'Invoices' })).toBeVisible();
   await ward.close();
   await nursing.close();
   await theatre.close();
+  await cashier.close();
   await staff.close();
 });
 

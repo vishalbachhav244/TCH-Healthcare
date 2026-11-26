@@ -11,9 +11,19 @@ import { dayInIndia, shiftDay } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
 import type { FollowUpDetails } from '../domain/continuity';
 import { PatientSharing } from './patient-sharing';
+import { DischargeDocument } from './discharge-document';
+import type { DischargeDocument as ReleasedSummary } from '../domain/discharge';
 
 @Component({
-  imports: [DatePipe, NgIcon, PatientSharing, ReactiveFormsModule, Rupees, StatusTone],
+  imports: [
+    DatePipe,
+    DischargeDocument,
+    NgIcon,
+    PatientSharing,
+    ReactiveFormsModule,
+    Rupees,
+    StatusTone,
+  ],
   templateUrl: './portal.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -24,6 +34,7 @@ export class Portal {
   protected readonly latest = shiftDay(this.today, 90);
   protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing'>('visits');
   protected readonly report = signal<LabOrder | undefined>(undefined);
+  protected readonly dischargeSummary = signal<ReleasedSummary | undefined>(undefined);
   protected readonly busy = signal(false);
   protected readonly message = signal('');
   protected readonly error = signal('');
@@ -131,6 +142,11 @@ export class Portal {
 
   protected showReport(report: LabOrder, dialog: HTMLDialogElement) {
     this.report.set(report);
+    dialog.showModal();
+  }
+
+  protected showSummary(summary: ReleasedSummary, dialog: HTMLDialogElement) {
+    this.dischargeSummary.set(summary);
     dialog.showModal();
   }
 

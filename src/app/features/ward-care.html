@@ -360,6 +360,52 @@
         }
       </section>
     </div>
+    @if (physician) {
+      <section class="panel portal-list" aria-labelledby="ward-discharge-heading">
+        <div class="panel-heading">
+          <div>
+            <h2 id="ward-discharge-heading">Discharge summary</h2>
+            <p>The patient receives the signed summary when Admissions completes discharge.</p>
+          </div>
+          @if (store.writeAllowed(role) && record.dischargePlan?.status !== 'Signed') {
+            <div class="page-actions">
+              <button
+                type="button"
+                class="button secondary"
+                (click)="openDischarge(wardEditor, record, 'discharge')"
+              >
+                {{ record.dischargePlan ? 'Edit discharge draft' : 'Prepare discharge summary' }}
+              </button>
+              @if (record.dischargePlan) {
+                <button
+                  type="button"
+                  class="button primary"
+                  (click)="openDischarge(wardEditor, record, 'sign-discharge')"
+                >
+                  Sign summary
+                </button>
+              }
+            </div>
+          }
+        </div>
+        @if (record.dischargePlan; as plan) {
+          <article>
+            <div>
+              <strong>{{ plan.status }}</strong>
+              <p>{{ plan.destination }} · {{ plan.course }}</p>
+              <p>{{ plan.followUp }}</p>
+              @if (plan.signedAt; as signedAt) {
+                <small
+                  >{{ plan.signedBy }} · {{ signedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small
+                >
+              }
+            </div>
+          </article>
+        } @else {
+          <p class="subtle">No discharge draft has been saved.</p>
+        }
+      </section>
+    }
   }
 }
 
@@ -414,6 +460,50 @@
         @case ('cancel') {
           <p>Cancel {{ current.order.kind }} for this admission?</p>
         }
+        @case ('discharge') {
+          <label for="discharge-destination">Destination</label>
+          <select
+            id="discharge-destination"
+            [formControl]="discharge.controls.destination"
+            required
+          >
+            <option value="">Choose a destination</option>
+            @for (item of destinations; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+          <label for="discharge-course">Stay summary</label>
+          <select id="discharge-course" [formControl]="discharge.controls.course" required>
+            <option value="">Choose a stay summary</option>
+            @for (item of courses; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+          <label for="discharge-follow-up">Follow-up handoff</label>
+          <select id="discharge-follow-up" [formControl]="discharge.controls.followUp" required>
+            <option value="">Choose a follow-up handoff</option>
+            @for (item of followUps; track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        }
+        @case ('sign-discharge') {
+          <p>Sign this summary for release at discharge. Signing locks this version.</p>
+          <dl class="document-facts">
+            <div>
+              <dt>Destination</dt>
+              <dd>{{ discharge.controls.destination.value }}</dd>
+            </div>
+            <div>
+              <dt>Stay summary</dt>
+              <dd>{{ discharge.controls.course.value }}</dd>
+            </div>
+            <div>
+              <dt>Follow-up handoff</dt>
+              <dd>{{ discharge.controls.followUp.value }}</dd>
+            </div>
+          </dl>
+        }
       }
       @if (current.action === 'observation' || current.action === 'complete') {
         <label for="ward-observation-result">Observation status</label>
@@ -437,7 +527,11 @@
                 ? 'Place order'
                 : current.action === 'round'
                   ? 'Save round'
-                  : 'Save observation'
+                  : current.action === 'discharge'
+                    ? 'Save discharge draft'
+                    : current.action === 'sign-discharge'
+                      ? 'Confirm signature'
+                      : 'Save observation'
         }}
       </button>
     </form>

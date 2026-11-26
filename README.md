@@ -28,15 +28,15 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `clinician` | Assigned consultations, signed visit history, follow-up requests, laboratory orders and prescriptions |
 | `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
 | `admissions` | Admission requests, bed allocation and transfer, care-team assignment and discharge |
-| `wardphysician`, `wardcover` | Assigned inpatient care plans, rounds and ward orders |
+| `wardphysician`, `wardcover` | Assigned inpatient care plans, rounds, ward orders and discharge sign-off |
 | `wardnurse`, `wardrelief` | Assigned nursing tasks, task completion and ward observations |
 | `emergency` | Emergency arrivals, clinician-assigned priority and admission requests |
 | `icu` | Critical care census, reviews and step-down requests |
 | `theatre` | Theatre room schedule, readiness and recovery stages |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |
-| `cashier` | Consultation invoices and local settlement |
-| `patient` | Own appointments and follow-up booking, QR passes, published laboratory reports and billing balances |
+| `cashier` | Consultation and inpatient invoices, bed charges and local settlement |
+| `patient` | Own appointments and follow-up booking, QR passes, published laboratory reports, released discharge summaries and billing balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
 Registration accepts evaluation codes such as `REG-1001` that generate a fictional profile. A new appointment yields a QR image and opaque code for same-date reception check-in. Booking, check-in, consultation, laboratory and invoice records persist in this browser across role sign-ins.
@@ -49,9 +49,11 @@ In **Scheduling**, `reception` can add a patient to a clinician’s waitlist and
 
 In **Appointments**, `reception` can select an existing patient and use their previous clinician at the current facility. After signing a consultation, `clinician` can open **View note** and request a follow-up with a date window. For the demonstration patient, the `patient` tab can book that request under **Follow-up requests**. Reception can also book the request from the patient’s appointment form.
 
-In **Bed Management**, `admissions` can allocate a bed and assign an inpatient physician and ward nurse from the active facility roster. The `wardphysician` and `wardnurse` accounts have sample assignments at both Meridian facilities. A physician’s ward order appears as a nursing task. Its observation and status appear in both workspaces when the assigned nurse completes it. Admissions can discharge after the linked tasks are closed.
+In **Bed Management**, `admissions` can allocate a bed and assign an inpatient physician and ward nurse from the active facility roster. The `wardphysician` and `wardnurse` accounts have sample assignments at both Meridian facilities. A physician’s ward order appears as a nursing task. Its observation and status appear in both workspaces when the assigned nurse completes it. The assigned physician prepares and signs the discharge summary. After Admissions discharges the patient, the summary appears under **Reports** in the patient’s portal.
 
 Use `emergency` to record a registered patient’s arrival, enter the clinician-assigned priority and request admission. Allocate a Critical care bed as `admissions` to show that patient in `icu`. Request step-down there and transfer the admission to a regular ward in Bed Management. Use `theatre` to book an active admission and record its readiness, in-theatre status, recovery and completion.
+
+In **Revenue Cycle**, `cashier` can review a stay under **Inpatient charges**. Discharge freezes the daily bed ledger. The cashier can issue one invoice for that stay and record a local settlement. The patient can see the balance under **Bills**.
 
 ## Verify
 

@@ -110,7 +110,12 @@ export async function currentlyAdmitted(facility: Facility, id: string) {
   return projected;
 }
 
-async function assignedPatient(facility: Facility, session: Session, role: WardRole, id: string) {
+export async function assignedPatient(
+  facility: Facility,
+  session: Session,
+  role: WardRole,
+  id: string,
+) {
   const assignment = await db.wardAssignments.get(id);
   if (!assignment || !ownsAssignment(assignment, facility, session.account, role))
     throw new ApiError(404, 'This admission is unavailable in your assigned worklist.');
@@ -124,7 +129,7 @@ export async function wardDetail(
   id: string,
 ): Promise<WardDetail> {
   const { assignment, ...patient } = await assignedPatient(facility, session, role, id);
-  const [orders, tasks, rounds, observations] = await Promise.all([
+  const [orders, tasks, rounds, observations, plan] = await Promise.all([
     db.wardOrders
       .where('admissionId')
       .equals(id)
@@ -145,10 +150,24 @@ export async function wardDetail(
       .equals(id)
       .filter((row) => row.facilityId === facility.id)
       .toArray(),
+    role === 'inpatient-physician' ? db.dischargePlans.get(id) : undefined,
   ]);
   const taskByOrder = new Map(tasks.map((item) => [item.orderId, item]));
   return {
     ...patient,
+    ...(plan?.facilityId === facility.id && plan.patientId === patient.patient.id && !plan.release
+      ? {
+          dischargePlan: {
+            version: plan.version,
+            status: plan.signedAt === undefined ? 'Draft' : 'Signed',
+            destination: plan.destination,
+            course: plan.course,
+            followUp: plan.followUp,
+            signedAt: plan.signedAt,
+            signedBy: plan.signedBy ? accountNames[plan.signedBy] : undefined,
+          },
+        }
+      : {}),
     team: {
       physician: accountNames[assignment.physician],
       nurse: accountNames[assignment.nurse],

@@ -4,6 +4,8 @@ import { db } from './database';
 import { openTask } from './ward-care';
 import { criticalCareWard, openTheatreCase } from '../domain/acute-care';
 import { requestAdmission } from './admission-records';
+import { releaseDischargeSummary } from './discharge';
+import { endBedStay, finalizeInpatientAccount, startBedStay } from './inpatient-billing';
 
 function pendingStepDown(facility: Facility, admissionId: string) {
   return db.icuStepDowns
@@ -16,7 +18,7 @@ export async function board(
   facility: Facility,
   includeAdmissions: boolean,
 ): Promise<InpatientBoard> {
-  const [beds, admissions, stepDowns] = await Promise.all([
+  const [beds, admissions, stepDowns, plans, assignments] = await Promise.all([
     db.beds.where('facilityId').equals(facility.id).toArray(),
     includeAdmissions ? db.admissions.where('facilityId').equals(facility.id).toArray() : [],
     includeAdmissions
@@ -26,17 +28,40 @@ export async function board(
           .filter((row) => row.status === 'Requested')
           .toArray()
       : [],
+    includeAdmissions ? db.dischargePlans.where('facilityId').equals(facility.id).toArray() : [],
+    includeAdmissions
+      ? db.wardAssignments.where('facilityId').equals(facility.id).primaryKeys()
+      : [],
   ]);
   const patients = await db.patients.bulkGet(admissions.map((row) => row.patientId));
   const handoffs = new Map(stepDowns.map((row) => [row.admissionId, row.requestedAt]));
+  const summaries = new Map(plans.map((row) => [row.admissionId, row]));
+  const assigned = new Set(assignments);
   return {
     beds,
     admissions: admissions
       .flatMap((admission, index) => {
         const patient = patients[index];
-        return patient?.tenantId === facility.tenantId
-          ? [{ admission, patient, stepDownRequestedAt: handoffs.get(admission.id) }]
-          : [];
+        if (patient?.tenantId !== facility.tenantId) return [];
+        const plan = summaries.get(admission.id);
+        const dischargeSummaryStatus =
+          plan?.patientId === patient.id
+            ? plan.release
+              ? ('Released' as const)
+              : plan.signedAt === undefined
+                ? ('Draft' as const)
+                : ('Signed' as const)
+            : admission.status === 'Admitted' && assigned.has(admission.id)
+              ? ('Required' as const)
+              : undefined;
+        return [
+          {
+            admission,
+            patient,
+            stepDownRequestedAt: handoffs.get(admission.id),
+            dischargeSummaryStatus,
+          },
+        ];
       })
       .sort((a, b) => b.admission.requestedAt - a.admission.requestedAt),
   };
@@ -103,6 +128,9 @@ export async function inpatientCommand(
     ) {
       throw new ApiError(409, 'Complete or cancel open theatre cases before discharge.');
     }
+    await releaseDischargeSummary(facility, admission, bed, time);
+    await endBedStay(admission, bed, time);
+    await finalizeInpatientAccount(admission, time);
     await db.beds.update(admission.bedId, { status: 'Cleaning' });
     await pendingStepDown(facility, admission.id).modify({ status: 'Closed', resolvedAt: time });
     await db.admissions.update(admission.id, { ...next, status: 'Discharged', dischargedAt: time });
@@ -118,6 +146,7 @@ export async function inpatientCommand(
     const previous = await db.beds.get(admission.bedId);
     if (previous?.facilityId !== facility.id || previous.status !== 'Occupied')
       throw new ApiError(409, 'The assigned bed could not be verified.');
+    await endBedStay(admission, previous, time);
     await db.beds.update(previous.id, { status: 'Cleaning' });
     if (previous.ward === criticalCareWard && bed.ward !== criticalCareWard) {
       await pendingStepDown(facility, admission.id).modify({
@@ -126,6 +155,7 @@ export async function inpatientCommand(
       });
     }
   }
+  await startBedStay(admission, bed, time);
   await db.beds.update(bed.id, { status: 'Occupied' });
   await db.admissions.update(admission.id, {
     ...next,

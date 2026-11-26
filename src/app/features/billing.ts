@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+  type ElementRef,
+} from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
@@ -6,20 +14,29 @@ import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
 import { dayInIndia, type InvoiceRow } from '../domain/operations';
+import { InpatientBilling } from './inpatient-billing';
 
 @Component({
-  imports: [NgIcon, ReactiveFormsModule, Rupees, StatusTone],
+  imports: [InpatientBilling, NgIcon, ReactiveFormsModule, Rupees, StatusTone],
   templateUrl: './billing.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Billing {
   private readonly api = inject(Api);
+  private readonly invoiceView = viewChild<ElementRef<HTMLButtonElement>>('invoiceView');
   protected readonly store = inject(SessionStore);
   protected readonly settings = signal<Awaited<ReturnType<Api['invoiceOptions']>> | undefined>(
     undefined,
   );
   protected readonly selected = signal<InvoiceRow | undefined>(undefined);
   protected readonly day = signal(dayInIndia());
+  protected readonly mode = signal<'invoices' | 'inpatient'>('invoices');
+  protected readonly inpatientAllowed = computed(
+    () => this.store.facility()?.inpatient && this.store.writeAllowed('billing'),
+  );
+  protected readonly showInpatient = computed(
+    () => this.inpatientAllowed() && this.mode() === 'inpatient',
+  );
   protected readonly reload = signal(0);
   protected readonly message = signal('');
   protected readonly error = signal('');
@@ -61,6 +78,13 @@ export class Billing {
     } catch (error) {
       this.error.set(errorMessage(error));
     }
+  }
+
+  protected inpatientIssued() {
+    this.day.set(dayInIndia());
+    this.mode.set('invoices');
+    this.message.set('Inpatient invoice issued.');
+    this.invoiceView()?.nativeElement.focus();
   }
 
   protected openPayment(row: InvoiceRow, dialog: HTMLDialogElement) {

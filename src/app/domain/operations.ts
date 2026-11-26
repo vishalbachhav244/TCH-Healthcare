@@ -1,4 +1,5 @@
 import type { FacilityAccess } from './access';
+import type { DischargePlanStatus } from './discharge';
 
 export const specialties = [
   'General Medicine',
@@ -85,15 +86,19 @@ export const observations = [
 ] as const;
 export type Observation = (typeof observations)[number];
 
-export interface Invoice {
+interface InvoiceBase {
   id: string;
   facilityId: string;
   patientId: string;
-  encounterId: string;
-  prescriptionId?: string;
   day: string;
   lines: { description: string; unitMinor: number; quantity: number }[];
 }
+
+export type Invoice = InvoiceBase &
+  (
+    | { encounterId: string; prescriptionId?: string; admissionId?: never }
+    | { admissionId: string; encounterId?: never; prescriptionId?: never }
+  );
 
 export interface Payment {
   id: string;
@@ -124,7 +129,12 @@ export interface Admission {
 
 export interface InpatientBoard {
   beds: Bed[];
-  admissions: { admission: Admission; patient: Patient; stepDownRequestedAt?: number }[];
+  admissions: {
+    admission: Admission;
+    patient: Patient;
+    stepDownRequestedAt?: number;
+    dischargeSummaryStatus?: DischargePlanStatus;
+  }[];
 }
 
 export interface Alert {
@@ -239,6 +249,8 @@ export type EventType =
   | 'TheatreCaseBooked'
   | 'TheatreCaseStatusChanged'
   | 'PatientDischarged'
+  | 'DischargeDraftSaved'
+  | 'DischargeSummarySigned'
   | 'BedReleased'
   | 'ClinicalOrderCreated'
   | 'LabStageChanged'

@@ -1,5 +1,6 @@
 import type { LabOrder } from './diagnostics';
 import type { FollowUpDetails } from './continuity';
+import type { DischargeDocument } from './discharge';
 import type { Appointment, Patient, Practitioner, Ticket } from './operations';
 
 export interface PatientPortal {
@@ -8,5 +9,12 @@ export interface PatientPortal {
   appointments: { appointment: Appointment; practitioner: Practitioner; ticket?: Ticket }[];
   records: LabOrder[];
   followUps: FollowUpDetails[];
-  invoices: { id: string; day: string; totalMinor: number; balanceMinor: number }[];
+  dischargeSummaries: DischargeDocument[];
+  invoices: {
+    id: string;
+    day: string;
+    totalMinor: number;
+    balanceMinor: number;
+    inpatient?: boolean;
+  }[];
 }

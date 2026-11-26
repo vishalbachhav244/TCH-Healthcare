@@ -7,6 +7,8 @@ import { db, initialize } from './database';
 import { appointments, checkedDay, dashboard, invoiceRows, queueDisplay } from './queries';
 import { platformData, updatePlatform } from './platform';
 import { board } from './inpatient';
+import { admissionDischargeDocument } from './discharge';
+import { inpatientBillingDetail, inpatientBillingRows } from './inpatient-billing';
 import { listLaboratory } from './laboratory';
 import { portal } from './portal';
 import { subscriptions, updateSubscription } from './subscriptions';
@@ -76,6 +78,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'quality/cases/status',
     'admissions/care-team',
     'inpatient-physician/orders/cancel',
+    'inpatient-physician/discharge-summary/sign',
     'nursing-station/tasks/start',
     'nursing-station/tasks/complete',
     'emergency/visits/status',
@@ -245,6 +248,11 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         scope(session, facilityRecord, 'D19', 'beds'),
         params.get('admissionId') ?? '',
       );
+    case 'admissions/discharge-summary':
+      return admissionDischargeDocument(
+        scope(session, facilityRecord, 'D19', 'beds'),
+        params.get('admissionId') ?? '',
+      );
     case 'emergency/patients':
       return emergencyPatients(
         scope(session, facilityRecord, 'D16', 'emergency'),
@@ -293,6 +301,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
           db.wardOrders,
           db.nursingTasks,
           db.wardObservations,
+          db.dischargePlans,
         ],
         async () =>
           path.endsWith('/detail')
@@ -306,6 +315,20 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return portal(scope(session, facilityRecord, 'D12'), session);
     case 'billing':
       return invoiceRows(scope(session, facilityRecord, 'D24'), checkedDay(params.get('day')));
+    case 'billing/inpatient':
+    case 'billing/inpatient/detail': {
+      const facility = scope(session, facilityRecord, 'D24', 'billing');
+      if (!facility.inpatient)
+        throw new ApiError(403, 'Inpatient services are disabled at this facility.');
+      return db.transaction(
+        'r',
+        [db.admissions, db.inpatientAccounts, db.bedStays, db.invoices, db.patients],
+        async () =>
+          path.endsWith('/detail')
+            ? inpatientBillingDetail(facility, params.get('admissionId') ?? '')
+            : inpatientBillingRows(facility),
+      );
+    }
     case 'billing/options': {
       const facility = scope(session, facilityRecord, 'D24', 'billing');
       const day = checkedDay(params.get('day'));

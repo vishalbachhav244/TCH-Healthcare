@@ -477,7 +477,7 @@ paths:
   '/portal':
     get:
       operationId: 'getPatientPortal'
-      summary: "Read the signed-in patient's own visits, follow-up requests, released reports and bills."
+      summary: "Read the signed-in patient's own visits, follow-up requests, released reports and discharge summaries, and bills."
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       responses:
@@ -793,7 +793,7 @@ paths:
   '/admissions/discharge':
     post:
       operationId: 'dischargePatient'
-      summary: 'Discharge after linked nursing tasks and theatre cases are closed, then mark the bed for cleaning.'
+      summary: 'Close the stay after nursing and theatre checks and required physician sign-off. Release the signed summary and finalize bed charges in the same transaction.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -3873,6 +3873,145 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /inpatient-physician/discharge-summary:
+    post:
+      operationId: saveDischargeDraft
+      summary: Save a versioned draft for an active admission assigned to the current physician.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { '$ref': '#/components/schemas/DischargePlanVersion' }
+                - { '$ref': '#/components/schemas/DischargeFields' }
+      responses:
+        '201':
+          description: Draft saved.
+          content:
+            application/json:
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /inpatient-physician/discharge-summary/sign:
+    patch:
+      operationId: signDischargeSummary
+      summary: Sign the current draft and lock its content for discharge.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { '$ref': '#/components/schemas/DischargePlanVersion' }
+      responses:
+        '200':
+          description: Signed summary saved.
+          content:
+            application/json:
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /admissions/discharge-summary:
+    get:
+      operationId: getAdmissionDischargeDocument
+      summary: Read a released discharge document within the authorized admissions facility.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - { name: admissionId, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Released discharge document.
+          content:
+            application/json:
+              schema: { '$ref': '#/components/schemas/DischargeDocument' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /billing/inpatient:
+    get:
+      operationId: listInpatientAccounts
+      summary: List accruing, finalized and invoiced bed charges at an inpatient-enabled facility.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      responses:
+        '200':
+          description: Inpatient account rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { '$ref': '#/components/schemas/InpatientBillingRow' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /billing/inpatient/detail:
+    get:
+      operationId: getInpatientAccount
+      summary: Review the itemized bed charges for a scoped admission.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - { name: admissionId, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Inpatient account with daily ledger.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { '$ref': '#/components/schemas/InpatientBillingRow' }
+                  - type: object
+                    required: [charges]
+                    properties:
+                      charges:
+                        type: array
+                        items: { '$ref': '#/components/schemas/BedCharge' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /billing/inpatient/invoices:
+    post:
+      operationId: issueInpatientInvoice
+      summary: Issue one invoice for a finalized admission ledger.
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [admissionId]
+              properties:
+                admissionId: { type: string }
+                acknowledgePartial:
+                  type: string
+                  enum: ['true', 'false']
+                  description: Required to be true for tracked segments only.
+      responses:
+        '201':
+          description: Invoice issued.
+          content:
+            application/json:
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
 components:
   securitySchemes:
     sessionToken:
@@ -4223,6 +4362,9 @@ components:
               patient: { '$ref': '#/components/schemas/Patient' }
               stepDownRequestedAt:
                 type: integer
+              dischargeSummaryStatus:
+                type: string
+                enum: [Required, Draft, Signed, Released]
     LabOrder:
       type: 'object'
       required:
@@ -4290,7 +4432,12 @@ components:
           type: 'integer'
     Invoice:
       type: 'object'
-      required: ['id', 'facilityId', 'patientId', 'encounterId', 'day', 'lines']
+      required: ['id', 'facilityId', 'patientId', 'day', 'lines']
+      oneOf:
+        - required: [encounterId]
+          not: { required: [admissionId] }
+        - required: [admissionId]
+          not: { anyOf: [{ required: [encounterId] }, { required: [prescriptionId] }] }
       properties:
         id:
           type: 'string'
@@ -4299,6 +4446,8 @@ components:
         patientId:
           type: 'string'
         encounterId:
+          type: 'string'
+        admissionId:
           type: 'string'
         day:
           type: 'string'
@@ -4355,7 +4504,7 @@ components:
                 type: 'string'
     Portal:
       type: 'object'
-      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps']
+      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps', 'dischargeSummaries']
       properties:
         patient: { '$ref': '#/components/schemas/Patient' }
         clinicians:
@@ -4376,6 +4525,9 @@ components:
         followUps:
           type: array
           items: { '$ref': '#/components/schemas/FollowUpDetails' }
+        dischargeSummaries:
+          type: array
+          items: { '$ref': '#/components/schemas/DischargeDocument' }
         invoices:
           type: 'array'
           items:
@@ -4391,6 +4543,8 @@ components:
                 type: 'integer'
               balanceMinor:
                 type: 'integer'
+              inpatient:
+                type: boolean
     QueueDisplay:
       type: object
       required:
@@ -5577,6 +5731,7 @@ components:
         - observations
         - orders
       properties:
+        dischargePlan: { '$ref': '#/components/schemas/DischargePlanView' }
         admission:
           type: object
           required:
@@ -5872,6 +6027,73 @@ components:
                 $ref: "#/components/schemas/AcutePatient"
               bed:
                 type: string
+    DischargePlanVersion:
+      type: object
+      required: [admissionId, admissionVersion, assignmentVersion, planVersion]
+      properties:
+        admissionId: { type: string }
+        admissionVersion: { type: string, pattern: '^[0-9]+$' }
+        assignmentVersion: { type: string, pattern: '^[0-9]+$' }
+        planVersion: { type: string, pattern: '^[0-9]+$' }
+    DischargeFields:
+      type: object
+      required: [destination, course, followUp]
+      properties:
+        destination: { type: string, enum: [Home, Another facility] }
+        course: { type: string, enum: [Ward care reviewed, Observation stay completed, Transferred for continued care] }
+        followUp: { type: string, enum: [Arrange outpatient review, Receiving team to coordinate, Follow-up to be confirmed] }
+    DischargePlanView:
+      allOf:
+        - { '$ref': '#/components/schemas/DischargeFields' }
+        - type: object
+          required: [version, status]
+          properties:
+            version: { type: integer }
+            status: { type: string, enum: [Draft, Signed] }
+            signedBy: { type: string }
+            signedAt: { type: integer }
+    DischargeDocument:
+      allOf:
+        - { '$ref': '#/components/schemas/DischargeFields' }
+        - type: object
+          required: [admissionId, patientId, patientName, facilityName, ward, bed, admittedAt, releasedAt, signedAt, signedBy]
+          properties:
+            admissionId: { type: string }
+            patientId: { type: string }
+            patientName: { type: string }
+            facilityName: { type: string }
+            ward: { type: string }
+            bed: { type: string }
+            admittedAt: { type: integer }
+            releasedAt: { type: integer }
+            signedAt: { type: integer }
+            signedBy: { type: string }
+    InpatientBillingRow:
+      type: object
+      required: [admissionId, patient, admittedAt, coverage, status, chargeDays, totalMinor]
+      properties:
+        admissionId: { type: string }
+        patient:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string }
+            name: { type: string }
+        admittedAt: { type: integer }
+        finalizedAt: { type: integer }
+        coverage: { type: string, enum: [Full stay, Tracked segments only] }
+        status: { type: string, enum: [Accruing, Ready to invoice, Invoiced] }
+        chargeDays: { type: integer, minimum: 0 }
+        totalMinor: { type: integer, minimum: 0 }
+        invoiceId: { type: string }
+    BedCharge:
+      type: object
+      required: [day, ward, bed, amountMinor]
+      properties:
+        day: { type: string, format: date }
+        ward: { type: string }
+        bed: { type: string }
+        amountMinor: { type: integer, minimum: 0 }
   responses:
     Error401:
       description: 'Missing or expired session.'
