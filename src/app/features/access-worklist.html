@@ -113,7 +113,12 @@
                 <strong>{{ row.practitioner.name }}</strong
                 ><small>{{ row.practitioner.specialty }}</small>
               </td>
-              <td>{{ kind === 'appointments' ? row.appointment.time : row.ticket?.number }}</td>
+              <td>
+                {{ kind === 'appointments' ? row.appointment.time : row.ticket?.number }}
+                @if (kind === 'appointments' && row.appointment.followUpId) {
+                  <small>Follow-up</small>
+                }
+              </td>
               @let status =
                 kind === 'appointments'
                   ? row.appointment.status
@@ -287,10 +292,11 @@
           id="find"
           type="search"
           [formControl]="patientSearch"
+          (input)="changeBookingPatient()"
           placeholder="Search by name or patient ID"
         />
         <label for="patient">Patient</label>
-        <select id="patient" formControlName="patientId" required>
+        <select id="patient" formControlName="patientId" required (change)="clearFollowUp()">
           <option value="">Select a patient</option>
           @if (choices.state === 'ready') {
             @for (patient of choices.data.patients; track patient.id) {
@@ -302,20 +308,88 @@
       @if (choices.state === 'error') {
         <p class="field-error" role="alert">{{ choices.message }}</p>
       }
-      <label for="clinician">Clinician</label>
-      <select id="clinician" formControlName="practitionerId" required>
-        <option value="">Select a clinician</option>
-        @if (choices.state === 'ready') {
-          @for (practitioner of choices.data.practitioners; track practitioner.id) {
-            <option [value]="practitioner.id">
-              {{ practitioner.name }} · {{ practitioner.specialty }}
-            </option>
+      @if (booking.controls.patientId.value && !bookingTarget() && !selectedFollowUp()) {
+        @let context = bookingContext();
+        @if (context.state === 'loading') {
+          <p class="subtle" role="status">Checking previous visits…</p>
+        } @else if (context.state === 'error') {
+          <p class="subtle" role="status">{{ context.message }}</p>
+        } @else {
+          @if (context.data.recentClinician; as recent) {
+            <div class="clinical-orders fields">
+              <strong>Previous clinician</strong>
+              <p>
+                {{ recent.clinician.name }} · {{ recent.clinician.specialty }}<br /><small
+                  >Seen {{ recent.signedAt | date: 'd MMM y' : '+0530' }}</small
+                >
+              </p>
+              @if (booking.controls.practitionerId.value !== recent.clinician.id) {
+                <button
+                  type="button"
+                  class="text-button"
+                  (click)="choosePreviousClinician(recent.clinician.id)"
+                >
+                  Use previous clinician
+                </button>
+              }
+            </div>
+          }
+          @for (request of context.data.followUps; track request.id) {
+            @if (request.status === 'To book') {
+              <div class="clinical-orders fields">
+                <strong>Follow-up with {{ request.clinician.name }}</strong>
+                <p>
+                  {{ request.startsOn | date: 'd MMM y' }} to {{ request.endsOn | date: 'd MMM y' }}
+                </p>
+                <button type="button" class="text-button" (click)="chooseFollowUp(request)">
+                  Book this follow-up
+                </button>
+              </div>
+            }
           }
         }
-      </select>
+      }
+      @if (bookingWindow(); as request) {
+        <div class="clinical-orders fields">
+          <strong>Follow-up with {{ request.clinician.name }}</strong>
+          <p>{{ request.startsOn | date: 'd MMM y' }} to {{ request.endsOn | date: 'd MMM y' }}</p>
+          @if (selectedFollowUp()) {
+            <button type="button" class="text-button" (click)="clearFollowUp()">
+              Switch to standard booking
+            </button>
+          }
+        </div>
+      } @else if (bookingTarget()?.appointment?.followUpId) {
+        <p class="subtle" role="status">
+          {{
+            bookingContext().state === 'error'
+              ? 'The follow-up window is unavailable.'
+              : 'Loading the follow-up window…'
+          }}
+        </p>
+      } @else {
+        <label for="clinician">Clinician</label>
+        <select id="clinician" formControlName="practitionerId" required>
+          <option value="">Select a clinician</option>
+          @if (choices.state === 'ready') {
+            @for (practitioner of choices.data.practitioners; track practitioner.id) {
+              <option [value]="practitioner.id">
+                {{ practitioner.name }} · {{ practitioner.specialty }}
+              </option>
+            }
+          }
+        </select>
+      }
       @let availability = slots();
       <div class="field-pair">
-        <label>Date<input type="date" formControlName="day" [min]="today" required /></label>
+        <label
+          >Date<input
+            type="date"
+            formControlName="day"
+            [min]="earliestBooking()"
+            [max]="latestBooking()"
+            required
+        /></label>
         <div>
           <label for="appointment-time">Time</label>
           <select id="appointment-time" formControlName="time" required>
@@ -333,7 +407,7 @@
       }
       @if (availability.state === 'ready' && !availability.data.length) {
         <p class="subtle">No times are available for this clinician on the selected date.</p>
-        @if (!bookingTarget()) {
+        @if (!bookingTarget() && !selectedFollowUp()) {
           <a
             class="button secondary"
             routerLink="/work/scheduling"
@@ -342,7 +416,7 @@
           >
         }
       }
-      @if (!bookingTarget()) {
+      @if (!bookingTarget() && !selectedFollowUp()) {
         <label for="channel">Booking type</label
         ><select id="channel" formControlName="channel">
           <option>Scheduled</option>
@@ -357,6 +431,7 @@
         type="submit"
         [disabled]="
           busy() ||
+          (!!bookingTarget()?.appointment?.followUpId && !bookingWindow()) ||
           availability.state !== 'ready' ||
           !availability.data.includes(booking.controls.time.value)
         "
@@ -485,6 +560,7 @@
         </div>
       </div>
       @if (row.encounter; as encounter) {
+        <tc-consultation-continuity [encounter]="encounter" />
         <div class="clinical-orders"><tc-clinical-prescriptions [encounter]="encounter" /></div>
       }
       @if (row.encounter?.signedAt; as signed) {

@@ -93,6 +93,39 @@
   </div>
   @switch (active()) {
     @case ('visits') {
+      @if (response.data.followUps.length) {
+        <section class="panel portal-list" aria-labelledby="portal-follow-ups">
+          <h2 id="portal-follow-ups">Follow-up requests</h2>
+          @for (request of response.data.followUps; track request.id) {
+            <article>
+              <span class="square-icon teal"><ng-icon name="calendar" /></span>
+              <div>
+                <strong>{{ request.purpose }}</strong>
+                <p>{{ request.clinician.name }} · {{ request.clinician.specialty }}</p>
+                @if (request.visit; as visit) {
+                  <p>{{ visit.day | date: 'd MMM y' }} · {{ visit.time }} IST</p>
+                } @else {
+                  <p>
+                    {{ request.startsOn | date: 'd MMM y' }} to
+                    {{ request.endsOn | date: 'd MMM y' }}
+                  </p>
+                }
+              </div>
+              @if (request.status === 'To book') {
+                <button
+                  class="text-button"
+                  type="button"
+                  (click)="openFollowUp(visitDialog, request)"
+                >
+                  Book follow-up
+                </button>
+              } @else {
+                <span [class]="request.status | statusTone">{{ request.status }}</span>
+              }
+            </article>
+          }
+        </section>
+      }
       <section class="panel portal-list">
         <h2>Appointments</h2>
         @for (visit of response.data.appointments; track visit.appointment.id) {
@@ -162,30 +195,53 @@
 }
 <dialog #visitDialog aria-labelledby="portal-booking" (close)="booking.set(false)">
   <div class="dialog-head">
-    <h2 id="portal-booking">{{ booking() && !pass() ? 'Book a visit' : 'Appointment pass' }}</h2>
+    <h2 id="portal-booking">
+      {{
+        booking() && !pass()
+          ? selectedFollowUp()
+            ? 'Book follow-up'
+            : 'Book a visit'
+          : 'Appointment pass'
+      }}
+    </h2>
     <button class="icon-button" type="button" aria-label="Close" (click)="visitDialog.close()">
       <ng-icon name="close" />
     </button>
   </div>
   @if (booking() && !pass()) {
     <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="book()">
-      <label for="portal-clinician">Find a clinician</label
-      ><select id="portal-clinician" formControlName="practitionerId" required>
-        <option value="">Select a clinician</option>
-        @if (response.state === 'ready') {
-          @for (clinician of response.data.clinicians; track clinician.id) {
-            <option [value]="clinician.id">{{ clinician.name }} · {{ clinician.specialty }}</option>
+      @if (selectedFollowUp(); as request) {
+        <div class="clinical-orders fields">
+          <strong>{{ request.purpose }}</strong>
+          <p>{{ request.clinician.name }} · {{ request.clinician.specialty }}</p>
+          <p>{{ request.startsOn | date: 'd MMM y' }} to {{ request.endsOn | date: 'd MMM y' }}</p>
+        </div>
+      } @else {
+        <label for="portal-clinician">Find a clinician</label>
+        <select id="portal-clinician" formControlName="practitionerId" required>
+          <option value="">Select a clinician</option>
+          @if (response.state === 'ready') {
+            @for (clinician of response.data.clinicians; track clinician.id) {
+              <option [value]="clinician.id">
+                {{ clinician.name }} · {{ clinician.specialty }}
+              </option>
+            }
           }
-        }
-      </select>
+        </select>
+      }
       @let availability = slots();
       <div class="field-pair">
         <label
-          >Date<input type="date" formControlName="day" [min]="today" [max]="latest" required
+          >Date<input
+            type="date"
+            formControlName="day"
+            [min]="earliestBooking()"
+            [max]="latestBooking()"
+            required
         /></label>
-        <label
-          >Time
-          <select formControlName="time" required>
+        <div>
+          <label for="portal-appointment-time">Time</label>
+          <select id="portal-appointment-time" formControlName="time" required>
             <option value="">Choose an available time</option>
             @if (availability.state === 'ready') {
               @for (time of availability.data; track time) {
@@ -193,7 +249,7 @@
               }
             }
           </select>
-        </label>
+        </div>
       </div>
       @if (availability.state === 'error') {
         <p class="field-error" role="alert">{{ availability.message }}</p>

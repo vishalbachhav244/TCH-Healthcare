@@ -78,7 +78,10 @@ export async function assertAvailable(
 
 export async function bookAppointment(
   facility: Facility,
-  fields: Pick<Appointment, 'patientId' | 'practitionerId' | 'day' | 'time' | 'channel'>,
+  fields: Pick<
+    Appointment,
+    'patientId' | 'practitionerId' | 'day' | 'time' | 'channel' | 'followUpId'
+  >,
 ) {
   const { patientId, practitionerId, day, time } = fields;
   await assertAvailable(facility, patientId, practitionerId, day, time);
@@ -102,6 +105,9 @@ export async function availability(
 ) {
   const day = bookingDay(value);
   await facilityPractitioner(facility, practitionerId);
+  if (patientId && (await db.patients.get(patientId))?.tenantId !== facility.tenantId) {
+    throw new ApiError(404, 'Patient is unavailable at this facility.');
+  }
   const [appointments, blocks] = await Promise.all([
     db.appointments
       .where('[facilityId+day]')

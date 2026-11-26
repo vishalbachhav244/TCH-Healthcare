@@ -10,6 +10,8 @@ import {
   type Session,
 } from '../domain/operations';
 import type { SchedulingDay } from '../domain/scheduling';
+import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
+import type { PatientPortal } from '../domain/portal';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import { db, initialize } from './database';
 import { handle } from './rest';
@@ -51,6 +53,241 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('consultation continuity', () => {
+  const facility = 'mer-central';
+  const patientId = 'TC-MERIDIAN-01001';
+  const practitionerId = 'mer-central-DR-1';
+
+  it('limits history to assigned care and keeps the returning-clinician hint free of clinical notes', async () => {
+    const [clinician, reception, executive] = await Promise.all([
+      login('clinician'),
+      login('reception'),
+      login('executive'),
+    ]);
+    const lookup = 'appointments/patient-context?patientId=' + patientId;
+    const previous = (await get(lookup, reception, facility)) as BookingContext;
+    expect(previous.recentClinician).toMatchObject({
+      clinician: { id: expect.stringMatching(/^mer-central-DR-/) },
+      signedAt: expect.any(Number),
+    });
+    expect(Object.keys(previous.recentClinician!).sort()).toEqual(['clinician', 'signedAt']);
+    await expect(get(lookup, executive, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(lookup, reception, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    await expect(
+      get('appointments/patient-context?patientId=TC-SUNRISE-01001', reception, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    const other = await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.practitionerId !== practitionerId && !!row.signedAt)
+      .first();
+    await expect(
+      get('clinical/patient-context?encounterId=' + other!.id, clinician, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    const own = await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.practitionerId === practitionerId && !!row.signedAt)
+      .first();
+    const appointment = (await db.appointments.get(own!.appointmentId))!;
+    const desk = (await get(
+      `appointments?day=${appointment.day}&q=${appointment.patientId}`,
+      reception,
+      facility,
+    )) as AppointmentPage;
+    const visible = desk.items.find((row) => row.appointment.id === appointment.id);
+    expect(visible).toBeDefined();
+    expect(visible).not.toHaveProperty('encounter');
+    await expect(
+      get('clinical/patient-context?encounterId=' + own!.id, reception, facility),
+    ).rejects.toMatchObject({ status: 403 });
+    const context = (await get(
+      'clinical/patient-context?encounterId=' + own!.id,
+      clinician,
+      facility,
+    )) as ClinicalContinuity;
+    expect(context.history.length).toBeLessThanOrEqual(12);
+    for (const row of context.history) {
+      expect(row.id).not.toBe(own!.id);
+      expect(await db.encounters.get(row.id)).toMatchObject({
+        facilityId: facility,
+        patientId: own!.patientId,
+        signedAt: expect.any(Number),
+      });
+    }
+  });
+
+  it('requests a follow-up after signing, claims it once across roles and reopens it after cancellation', async () => {
+    const [clinician, reception, patient] = await Promise.all([
+      login('clinician'),
+      login('reception'),
+      login('patient'),
+    ]);
+    const today = dayInIndia();
+    const booking = (await post(
+      'appointments',
+      { patientId, practitionerId, day: today, time: '16:15' },
+      reception,
+      facility,
+    )) as { id: string; pass: string };
+    await post('queue/check-in', { pass: booking.pass }, reception, facility);
+    await post('queue/call', { appointmentId: booking.id }, reception, facility);
+    const { id: encounterId } = (await post(
+      'clinical/start',
+      { appointmentId: booking.id },
+      clinician,
+      facility,
+    )) as { id: string };
+    const startsOn = shiftDay(today, 7);
+    const endsOn = shiftDay(today, 10);
+    const fields = { encounterId, startsOn, endsOn, purpose: 'Review care plan' };
+    await expect(post('clinical/follow-ups', fields, clinician, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    await post(
+      'clinical/complete',
+      { appointmentId: booking.id, observation: 'Observation completed. Follow-up discussed.' },
+      clinician,
+      facility,
+    );
+    await expect(
+      post('clinical/follow-ups', { ...fields, endsOn: today }, clinician, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const first = (await post('clinical/follow-ups', fields, clinician, facility)) as {
+      id: string;
+    };
+    await expect(post('clinical/follow-ups', fields, clinician, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(
+      patch(
+        'clinical/follow-ups/withdraw',
+        { followUpId: first.id, version: '0' },
+        clinician,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await patch(
+      'clinical/follow-ups/withdraw',
+      { followUpId: first.id, version: '1' },
+      clinician,
+      facility,
+    );
+    const { id: followUpId } = (await post('clinical/follow-ups', fields, clinician, facility)) as {
+      id: string;
+    };
+    const lookup = 'appointments/patient-context?patientId=' + patientId;
+    const context = (await get(lookup, reception, facility)) as BookingContext;
+    expect(context.recentClinician?.clinician.id).toBe(practitionerId);
+    expect(context.followUps.find((item) => item.id === followUpId)).not.toHaveProperty('purpose');
+    expect(
+      ((await get('portal', patient, facility)) as PatientPortal).followUps.find(
+        (item) => item.id === followUpId,
+      ),
+    ).toMatchObject({ status: 'To book', purpose: fields.purpose });
+    const claim = { followUpId, version: '1', day: startsOn, time: '09:00' };
+    await expect(
+      post('portal/follow-ups/book', { ...claim, day: shiftDay(startsOn, -1) }, patient, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const results = await Promise.allSettled([
+      post('portal/follow-ups/book', claim, patient, facility),
+      post('appointments/follow-ups/book', { ...claim, patientId }, reception, facility),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results).toContainEqual(
+      expect.objectContaining({
+        status: 'rejected',
+        reason: expect.objectContaining({ status: 409 }),
+      }),
+    );
+    const linked = (await db.followUps.get(followUpId))!;
+    const appointment = (await db.appointments.get(linked.appointmentId!))!;
+    expect(appointment).toMatchObject({
+      followUpId,
+      day: startsOn,
+      time: '09:00',
+      patientId,
+      practitionerId,
+    });
+    await expect(
+      patch(
+        'appointments/reschedule',
+        {
+          appointmentId: appointment.id,
+          version: '0',
+          practitionerId,
+          day: shiftDay(endsOn, 1),
+          time: '09:15',
+        },
+        reception,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 422 });
+    await patch(
+      'appointments/reschedule',
+      { appointmentId: appointment.id, version: '0', practitionerId, day: endsOn, time: '09:15' },
+      reception,
+      facility,
+    );
+    expect(
+      ((await get('portal', patient, facility)) as PatientPortal).followUps.find(
+        (row) => row.id === followUpId,
+      ),
+    ).toMatchObject({ status: 'Booked', visit: { day: endsOn, time: '09:15' } });
+    await patch(
+      'appointments/cancel',
+      { appointmentId: appointment.id, version: '1' },
+      reception,
+      facility,
+    );
+    const reopened = (
+      (await get(
+        'appointments/patient-context?patientId=' + patientId,
+        reception,
+        facility,
+      )) as BookingContext
+    ).followUps.find((row) => row.id === followUpId)!;
+    expect(reopened).toMatchObject({ status: 'To book', version: 3 });
+    expect(await db.appointments.get(appointment.id)).toMatchObject({
+      status: 'Cancelled',
+      followUpId,
+    });
+    await expect(post('portal/follow-ups/book', claim, patient, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+  }, 60_000);
+
+  it('keeps another patient’s follow-up off the portal and denies identifier replay', async () => {
+    const [clinician, patient] = await Promise.all([login('clinician'), login('patient')]);
+    const encounter = await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter(
+        (row) =>
+          row.patientId !== patientId && row.practitionerId === practitionerId && !!row.signedAt,
+      )
+      .first();
+    const day = shiftDay(dayInIndia(), 5);
+    const { id } = (await post(
+      'clinical/follow-ups',
+      { encounterId: encounter!.id, startsOn: day, endsOn: day, purpose: 'Review progress' },
+      clinician,
+      facility,
+    )) as { id: string };
+    expect(
+      ((await get('portal', patient, facility)) as PatientPortal).followUps.map((row) => row.id),
+    ).not.toContain(id);
+    await expect(
+      post(
+        'portal/follow-ups/book',
+        { followUpId: id, version: '1', day, time: '09:00' },
+        patient,
+        facility,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+});
 
 describe('facility governance', () => {
   const facility = 'mer-central';

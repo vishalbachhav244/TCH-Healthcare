@@ -477,7 +477,7 @@ paths:
   '/portal':
     get:
       operationId: 'getPatientPortal'
-      summary: "Read the signed-in patient's own visits, released reports and bills."
+      summary: "Read the signed-in patient's own visits, follow-up requests, released reports and bills."
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       responses:
@@ -1298,7 +1298,7 @@ paths:
   /appointments/availability:
     get:
       operationId: getAppointmentAvailability
-      summary: List available times for the clinician and date.
+      summary: List available times for the clinician and date, excluding conflicts for an optional patient.
       parameters:
         - $ref: '#/components/parameters/Facility'
         - in: query
@@ -1314,6 +1314,11 @@ paths:
           required: true
         - in: query
           name: appointmentId
+          schema:
+            type: string
+          required: false
+        - in: query
+          name: patientId
           schema:
             type: string
           required: false
@@ -1341,7 +1346,7 @@ paths:
   /appointments/reschedule:
     patch:
       operationId: rescheduleAppointment
-      summary: Move a booked appointment to an available slot and rotate its pass.
+      summary: Move a booked appointment to an available slot and rotate its pass. A linked follow-up retains its requested clinician and date window.
       parameters:
         - $ref: '#/components/parameters/Facility'
       requestBody:
@@ -1390,8 +1395,7 @@ paths:
   /appointments/cancel:
     patch:
       operationId: cancelAppointment
-      summary: Cancel a booked appointment at the expected version and invalidate its
-        pass.
+      summary: Cancel a booked appointment at the expected version, invalidate its pass and release any linked follow-up request.
       parameters:
         - $ref: '#/components/parameters/Facility'
       requestBody:
@@ -2692,6 +2696,256 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /appointments/patient-context:
+    get:
+      operationId: getBookingContext
+      summary: Read a patient’s most recent completed clinician and permitted
+        follow-up scheduling metadata.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: patientId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingContext"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/patient-context:
+    get:
+      operationId: getClinicalContinuity
+      summary: Read recent signed history and follow-up status for the assigned
+        encounter and facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: encounterId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalContinuity"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/follow-ups:
+    post:
+      operationId: requestConsultationFollowUp
+      summary: Request a date window for a follow-up after completing a signed
+        consultation.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - encounterId
+                - startsOn
+                - endsOn
+                - purpose
+              properties:
+                encounterId:
+                  type: string
+                startsOn:
+                  type: string
+                  format: date
+                endsOn:
+                  type: string
+                  format: date
+                purpose:
+                  type: string
+                  enum:
+                    - Review progress
+                    - Review test results
+                    - Review care plan
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/follow-ups/withdraw:
+    patch:
+      operationId: withdrawConsultationFollowUp
+      summary: Withdraw a current unbooked follow-up request at its expected version.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - followUpId
+                - version
+              properties:
+                followUpId:
+                  type: string
+                version:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /appointments/follow-ups/book:
+    post:
+      operationId: bookFollowUpAtReception
+      summary: Book the requested clinician within the date window and issue an
+        appointment pass.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - followUpId
+                - version
+                - day
+                - time
+                - patientId
+              properties:
+                followUpId:
+                  type: string
+                version:
+                  type: string
+                day:
+                  type: string
+                  format: date
+                time:
+                  type: string
+                patientId:
+                  type: string
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/follow-ups/book:
+    post:
+      operationId: bookPatientFollowUp
+      summary: Book a patient-owned follow-up within its window and issue an
+        appointment pass.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - followUpId
+                - version
+                - day
+                - time
+              properties:
+                followUpId:
+                  type: string
+                version:
+                  type: string
+                day:
+                  type: string
+                  format: date
+                time:
+                  type: string
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -2830,6 +3084,8 @@ components:
           enum: ['Booked', 'Checked in', 'In consultation', 'Completed', 'Cancelled']
         version:
           type: integer
+        followUpId:
+          type: string
     Ticket:
       type: 'object'
       required: ['id', 'facilityId', 'appointmentId', 'number', 'arrivedAt', 'status']
@@ -3170,7 +3426,7 @@ components:
                 type: 'string'
     Portal:
       type: 'object'
-      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices']
+      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices', 'followUps']
       properties:
         patient: { '$ref': '#/components/schemas/Patient' }
         clinicians:
@@ -3188,6 +3444,9 @@ components:
         records:
           type: 'array'
           items: { '$ref': '#/components/schemas/LabOrder' }
+        followUps:
+          type: array
+          items: { '$ref': '#/components/schemas/FollowUpDetails' }
         invoices:
           type: 'array'
           items:
@@ -4018,6 +4277,161 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ScheduleException"
+    ContinuityClinician:
+      type: object
+      required:
+        - id
+        - name
+        - specialty
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        specialty:
+          type: string
+    FollowUpSummary:
+      type: object
+      required:
+        - id
+        - clinician
+        - startsOn
+        - endsOn
+        - status
+        - version
+      properties:
+        id:
+          type: string
+        clinician:
+          $ref: "#/components/schemas/ContinuityClinician"
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+            - To book
+            - Booked
+            - Completed
+            - Withdrawn
+            - Expired
+        version:
+          type: integer
+          minimum: 0
+        visit:
+          type: object
+          required:
+            - day
+            - time
+          properties:
+            day:
+              type: string
+              format: date
+            time:
+              type: string
+    FollowUpDetails:
+      type: object
+      required:
+        - id
+        - clinician
+        - startsOn
+        - endsOn
+        - status
+        - version
+        - purpose
+      properties:
+        id:
+          type: string
+        clinician:
+          $ref: "#/components/schemas/ContinuityClinician"
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+            - To book
+            - Booked
+            - Completed
+            - Withdrawn
+            - Expired
+        version:
+          type: integer
+          minimum: 0
+        purpose:
+          type: string
+          enum:
+            - Review progress
+            - Review test results
+            - Review care plan
+        visit:
+          type: object
+          required:
+            - day
+            - time
+          properties:
+            day:
+              type: string
+              format: date
+            time:
+              type: string
+    BookingContext:
+      type: object
+      required:
+        - recentClinician
+        - followUps
+      properties:
+        recentClinician:
+          anyOf:
+            - type: object
+              required:
+                - clinician
+                - signedAt
+              properties:
+                clinician:
+                  $ref: "#/components/schemas/ContinuityClinician"
+                signedAt:
+                  type: integer
+                  minimum: 0
+            - type: "null"
+        followUps:
+          type: array
+          items:
+            $ref: "#/components/schemas/FollowUpSummary"
+    ClinicalContinuity:
+      type: object
+      required:
+        - history
+        - followUp
+      properties:
+        history:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - clinician
+              - signedAt
+            properties:
+              id:
+                type: string
+              clinician:
+                $ref: "#/components/schemas/ContinuityClinician"
+              signedAt:
+                type: integer
+                minimum: 0
+              observation:
+                type: string
+        followUp:
+          anyOf:
+            - $ref: "#/components/schemas/FollowUpDetails"
+            - type: "null"
   responses:
     Error401:
       description: 'Missing or expired session.'

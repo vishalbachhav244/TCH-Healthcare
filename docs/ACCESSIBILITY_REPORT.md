@@ -6,4 +6,6 @@ A mobile table initially failed keyboard scroll access. Scroll regions now have 
 
 Reception scheduling also passed automated axe and reflow checks at 390 px in a separate touch-enabled Chromium context. The mobile waitlist scrolls within its labelled table region. [Mobile scheduling screenshot](screenshots/scheduling-390.png)
 
+The consultation history and follow-up dialog and the patient’s follow-up view passed automated axe checks. The Chromium journey checks both workspaces at 390, 768, 1024 and 1440 px. [Consultation screenshot](screenshots/consultation-continuity-desktop.png) · [Mobile follow-up screenshot](screenshots/follow-up-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

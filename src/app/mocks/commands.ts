@@ -10,6 +10,12 @@ import { ApiError, patientSubject, requireSession, scope } from './access';
 import { db } from './database';
 import { assertAvailable, bookAppointment, bookingDay, facilityPractitioner } from './scheduling';
 import { updateException, updateWaitlist } from './scheduling-workspace';
+import {
+  bookFollowUp,
+  changeFollowUpAppointment,
+  requestFollowUp,
+  withdrawFollowUp,
+} from './continuity';
 import { createPatient } from './seed';
 import { inpatientCommand } from './inpatient';
 import { laboratoryCommand } from './laboratory';
@@ -76,6 +82,7 @@ export async function command(
       db.qualityCases,
       db.waitlist,
       db.scheduleExceptions,
+      db.followUps,
     ],
     async () => {
       const session = await requireSession(token);
@@ -143,6 +150,7 @@ export async function command(
           if (field(payload, 'version') !== String(version))
             throw new ApiError(409, 'This appointment has changed. Refresh and try again.');
           if (path.endsWith('/cancel')) {
+            await changeFollowUpAppointment(appointment);
             await db.appointments.update(appointment.id, {
               status: 'Cancelled',
               pass: undefined,
@@ -160,6 +168,7 @@ export async function command(
             ) {
               throw new ApiError(409, 'Choose a different appointment slot or clinician.');
             }
+            await changeFollowUpAppointment(appointment, { day, practitionerId });
             await assertAvailable(
               facility,
               appointment.patientId,
@@ -178,6 +187,33 @@ export async function command(
             });
             changed = event(facility, 'AppointmentRescheduled', appointment.id);
           }
+          break;
+        }
+        case 'clinical/follow-ups':
+        case 'clinical/follow-ups/withdraw': {
+          const facility = scope(session, facilityRecord, 'D13', 'clinical');
+          const withdrawing = path.endsWith('/withdraw');
+          const id = withdrawing
+            ? await withdrawFollowUp(facility, session, payload)
+            : await requestFollowUp(facility, session, payload);
+          changed = {
+            ...event(facility, withdrawing ? 'FollowUpWithdrawn' : 'FollowUpRequested', id),
+            actor: session.account,
+          };
+          break;
+        }
+        case 'appointments/follow-ups/book':
+        case 'portal/follow-ups/book': {
+          const selfService = path === 'portal/follow-ups/book';
+          const facility = selfService
+            ? scope(session, facilityRecord, 'D12', 'portal')
+            : scope(session, facilityRecord, 'D10', 'appointments');
+          const appointment = await bookFollowUp(facility, session, payload, selfService);
+          pass = appointment.pass;
+          changed = {
+            ...event(facility, 'FollowUpBooked', appointment.id),
+            actor: session.account,
+          };
           break;
         }
         case 'queue/check-in': {

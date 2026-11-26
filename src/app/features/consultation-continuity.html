@@ -1,0 +1,124 @@
+@let state = response();
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@if (error()) {
+  <p class="field-error" role="alert">{{ error() }}</p>
+}
+<details class="clinical-orders">
+  <summary>Previous consultations</summary>
+  @if (state.state === 'loading') {
+    <p class="subtle" role="status">Loading consultation history…</p>
+  } @else if (state.state === 'error') {
+    <p class="field-error" role="alert">{{ state.message }}</p>
+    <button type="button" class="text-button" (click)="refresh.set(refresh() + 1)">
+      Retry history
+    </button>
+  } @else if (state.data.history.length) {
+    <div class="fields">
+      <p class="subtle">Recent signed visits at this facility</p>
+      <label for="history-specialty">Specialty</label>
+      <select id="history-specialty" [formControl]="specialtyFilter">
+        <option value="">All specialties</option>
+        @for (item of specialties(); track item) {
+          <option [value]="item">{{ item }}</option>
+        }
+      </select>
+    </div>
+    <ul class="continuity-history">
+      @for (item of history(); track item.id) {
+        <li>
+          <strong>{{ item.clinician.specialty }}</strong>
+          <small>{{ item.signedAt | date: 'd MMM y' : '+0530' }} · {{ item.clinician.name }}</small>
+          @if (item.observation) {
+            <p>{{ item.observation }}</p>
+          }
+        </li>
+      } @empty {
+        <li>No previous consultations match this specialty.</li>
+      }
+    </ul>
+  } @else {
+    <p class="subtle">There are no prior signed visits for this patient at this facility.</p>
+  }
+</details>
+@if (encounter().signedAt) {
+  <section class="clinical-orders fields" aria-labelledby="consultation-follow-up-title">
+    <h3 id="consultation-follow-up-title">Follow-up</h3>
+    @if (state.state === 'loading') {
+      <p class="subtle" role="status">Loading follow-up status…</p>
+    } @else if (state.state === 'error') {
+      <p class="field-error" role="alert">{{ state.message }}</p>
+      <button type="button" class="text-button" (click)="refresh.set(refresh() + 1)">
+        Retry follow-up
+      </button>
+    } @else {
+      @if (state.data.followUp; as request) {
+        <div>
+          <strong>{{ request.purpose }}</strong>
+          <span [class]="request.status | statusTone">{{ request.status }}</span>
+          <p>{{ request.startsOn | date: 'd MMM y' }} to {{ request.endsOn | date: 'd MMM y' }}</p>
+          @if (request.visit; as visit) {
+            <p>Visit on {{ visit.day | date: 'd MMM y' }} at {{ visit.time }} IST</p>
+          }
+        </div>
+        @if (request.status === 'To book') {
+          @if (confirming()) {
+            <p>Withdraw this request from the patient’s booking options?</p>
+            <button type="button" class="button secondary" (click)="confirming.set(false)">
+              Keep request
+            </button>
+            <button
+              type="button"
+              class="button secondary"
+              [disabled]="busy()"
+              (click)="withdraw(request)"
+            >
+              Confirm withdrawal
+            </button>
+          } @else {
+            <button type="button" class="text-button" (click)="confirming.set(true)">
+              Withdraw follow-up
+            </button>
+          }
+        }
+      }
+      @if (!state.data.followUp || ['Withdrawn', 'Expired'].includes(state.data.followUp.status)) {
+        @if (editor()) {
+          <form class="fields" [formGroup]="form" (ngSubmit)="request()">
+            <label for="follow-up-purpose">Purpose</label>
+            <select id="follow-up-purpose" formControlName="purpose" required>
+              <option value="">Choose a purpose</option>
+              @for (purpose of purposes; track purpose) {
+                <option [value]="purpose">{{ purpose }}</option>
+              }
+            </select>
+            <div class="field-pair">
+              <label
+                >Earliest date<input
+                  type="date"
+                  formControlName="startsOn"
+                  [min]="today"
+                  [max]="latest"
+                  required
+              /></label>
+              <label
+                >Latest date<input
+                  type="date"
+                  formControlName="endsOn"
+                  [min]="form.controls.startsOn.value || today"
+                  [max]="latest"
+                  required
+              /></label>
+            </div>
+            <button type="submit" class="button primary" [disabled]="busy() || form.invalid">
+              Send follow-up request
+            </button>
+          </form>
+        } @else {
+          <button type="button" class="button secondary" (click)="open()">Request follow-up</button>
+        }
+      }
+    }
+  </section>
+}

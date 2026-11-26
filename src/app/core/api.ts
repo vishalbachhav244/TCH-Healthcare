@@ -30,6 +30,12 @@ import type {
 } from '../domain/interoperability';
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
 import type { ScheduleException, SchedulingDay, WaitlistEntry } from '../domain/scheduling';
+import type {
+  BookingContext,
+  ClinicalContinuity,
+  FollowUpRequest,
+  FollowUpSummary,
+} from '../domain/continuity';
 
 interface CommandResult {
   id: string;
@@ -181,11 +187,13 @@ export class Api {
     day: string,
     practitionerId: string,
     appointmentId: string,
+    patientId = '',
   ) {
     return this.get('appointments/availability', token, facility, {
       day,
       practitionerId,
       appointmentId,
+      ...(patientId ? { patientId } : {}),
     }).pipe(map(timeSlots));
   }
 
@@ -193,6 +201,66 @@ export class Api {
     return this.get('portal/availability', token, facility, { day, practitionerId }).pipe(
       map(timeSlots),
     );
+  }
+
+  bookingContext(token: string, facility: string, patientId: string) {
+    return this.get('appointments/patient-context', token, facility, { patientId }).pipe(
+      map((value) => objectShape<BookingContext>(value, ['recentClinician', 'followUps'])),
+    );
+  }
+
+  clinicalContinuity(token: string, facility: string, encounterId: string) {
+    return this.get('clinical/patient-context', token, facility, { encounterId }).pipe(
+      map((value) => objectShape<ClinicalContinuity>(value, ['history', 'followUp'])),
+    );
+  }
+
+  requestFollowUp(
+    token: string,
+    facility: string,
+    fields: Pick<FollowUpRequest, 'encounterId' | 'startsOn' | 'endsOn' | 'purpose'>,
+  ) {
+    return this.execute('clinical/follow-ups', token, facility, fields);
+  }
+
+  withdrawFollowUp(
+    token: string,
+    facility: string,
+    request: Pick<FollowUpRequest, 'id' | 'version'>,
+  ) {
+    return this.execute(
+      'clinical/follow-ups/withdraw',
+      token,
+      facility,
+      { followUpId: request.id, version: String(request.version) },
+      'PATCH',
+    );
+  }
+
+  bookFollowUp(
+    token: string,
+    facility: string,
+    request: Pick<FollowUpSummary, 'id' | 'version'>,
+    fields: { day: string; time: string; patientId?: string },
+  ) {
+    const path = fields.patientId ? 'appointments/follow-ups/book' : 'portal/follow-ups/book';
+    return this.execute(path, token, facility, {
+      followUpId: request.id,
+      version: String(request.version),
+      ...fields,
+    });
+  }
+
+  bookPortalVisit(
+    token: string,
+    facility: string,
+    fields: { practitionerId: string; day: string; time: string },
+  ) {
+    return this.execute('portal/appointments', token, facility, fields);
+  }
+
+  issuePortalPass(token: string, facility: string, appointmentId: string) {
+    return this.execute('portal/passes', token, facility, { appointmentId });
   }
 
   schedulingDay(token: string, facility: string, day: string) {
@@ -292,6 +360,7 @@ export class Api {
           'clinicians',
           'appointments',
           'records',
+          'followUps',
           'invoices',
         ]),
       ),

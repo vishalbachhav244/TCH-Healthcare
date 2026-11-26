@@ -2,10 +2,11 @@ import { invoiceTotal, type Facility, type Session } from '../domain/operations'
 import type { PatientPortal } from '../domain/portal';
 import { ApiError, patientSubject } from './access';
 import { db } from './database';
+import { followUpsForPatient } from './continuity';
 
 export async function portal(facility: Facility, session: Session): Promise<PatientPortal> {
   const patientId = patientSubject(session);
-  const [patient, appointments, clinicians, records, invoices] = await Promise.all([
+  const [patient, appointments, clinicians, records, invoices, followUps] = await Promise.all([
     db.patients.get(patientId),
     db.appointments
       .where('facilityId')
@@ -23,6 +24,7 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
       .equals(facility.id)
       .filter((row) => row.patientId === patientId)
       .toArray(),
+    followUpsForPatient(facility, patientId),
   ]);
   if (patient?.tenantId !== facility.tenantId)
     throw new ApiError(404, 'Patient profile unavailable.');
@@ -40,6 +42,7 @@ export async function portal(facility: Facility, session: Session): Promise<Pati
     patient,
     clinicians,
     records: records.sort((a, b) => b.changedAt - a.changedAt),
+    followUps,
     appointments: appointments
       .sort((a, b) => b.day.localeCompare(a.day) || b.time.localeCompare(a.time))
       .flatMap(({ pass: _pass, ...appointment }) => {

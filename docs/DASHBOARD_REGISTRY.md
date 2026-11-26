@@ -13,7 +13,7 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D07 | Medical Director | `/work/clinical-governance` | Partial | Peer review, additional clinical indicators and approvals |
 | D08 | Quality & Compliance | `/work/quality` | Partial | Corrective actions, escalations and wider compliance audit |
 | D09 | Front Desk & Reception | `/work/patients` | Partial | Duplicate adjudication, contact data boundary and appointment history |
-| D10 | Appointments & Scheduling | `/work/appointments`, `/work/scheduling` | Partial | Recurring schedules, calendar views and returning-clinician suggestions |
+| D10 | Appointments & Scheduling | `/work/appointments`, `/work/scheduling` | Partial | Recurring schedules, calendar views and resource availability |
 | D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility` | Partial | Recall, skip, transfer, delays and performance reports |
 | D12 | Patient & Family | `/work/portal` | Partial | Family access, consent, secure uploads, notifications and discovery |
 | D13 | Doctor / OPD Workspace | `/work/clinical` | Partial | Clinical history and vitals, prescriptions, referrals and follow-up |

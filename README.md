@@ -25,13 +25,13 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `medicaldirector` | Clinical documentation indicators, flagged laboratory report reviews and referrals |
 | `quality` | Case intake, investigation ownership, resolution and history |
 | `reception` | Patient registration, appointments, waitlist, arrival verification and queue |
-| `clinician` | Assigned consultations, laboratory orders, and prescription drafting and signing |
+| `clinician` | Assigned consultations, signed visit history, follow-up requests, laboratory orders and prescriptions |
 | `pharmacy` | Signed prescriptions, stock lots, dispensing and medication charges |
 | `admissions` | Admission requests, bed allocation, transfer and release |
 | `lab` | Laboratory specimen processing and result entry |
 | `labreview` | Laboratory authorisation and publication |
 | `cashier` | Consultation invoices and local settlement |
-| `patient` | Own appointments, QR passes, published laboratory reports and billing balances |
+| `patient` | Own appointments and follow-up booking, QR passes, published laboratory reports and billing balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
 Registration accepts evaluation codes such as `REG-1001` that generate a fictional profile. A new appointment yields a QR image and opaque code for same-date reception check-in. Booking, check-in, consultation, laboratory and invoice records persist in this browser across role sign-ins.
@@ -41,6 +41,8 @@ To exercise records exchange, use separate tabs on the same browser profile. In 
 To exercise clinical governance, refer a flagged report as `medicaldirector`. Open the resulting case as `quality`, take ownership and choose a resolution. The Medical Director’s worklist reflects the new case status.
 
 In **Scheduling**, `reception` can add a patient to a clinician’s waitlist and book an available time. At the same facility, `executive` can block and release clinician time. A separate `patient` tab shows how those changes affect available times in **Book a visit**.
+
+In **Appointments**, `reception` can select an existing patient and use their previous clinician at the current facility. After signing a consultation, `clinician` can open **View note** and request a follow-up with a date window. For the demonstration patient, the `patient` tab can book that request under **Follow-up requests**. Reception can also book the request from the patient’s appointment form.
 
 ## Verify
 

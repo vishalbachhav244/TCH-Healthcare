@@ -59,13 +59,23 @@ export async function queueDisplay(facilityId: string | null): Promise<QueueDisp
   };
 }
 
-async function hydrate(facility: Facility, appointments: Appointment[]): Promise<AppointmentRow[]> {
+async function hydrate(
+  facility: Facility,
+  appointments: Appointment[],
+  includeEncounters = false,
+): Promise<AppointmentRow[]> {
   const ids = appointments.map((row) => row.id);
   const [patients, providers, tickets, encounters] = await Promise.all([
     db.patients.bulkGet(appointments.map((row) => row.patientId)),
     db.practitioners.bulkGet(appointments.map((row) => row.practitionerId)),
     db.tickets.where('appointmentId').anyOf(ids).toArray(),
-    db.encounters.where('appointmentId').anyOf(ids).toArray(),
+    includeEncounters
+      ? db.encounters
+          .where('appointmentId')
+          .anyOf(ids)
+          .filter((row) => row.facilityId === facility.id)
+          .toArray()
+      : [],
   ]);
   const ticketByAppointment = new Map(tickets.map((ticket) => [ticket.appointmentId, ticket]));
   const encounterByAppointment = new Map(encounters.map((row) => [row.appointmentId, row]));
@@ -76,13 +86,16 @@ async function hydrate(facility: Facility, appointments: Appointment[]): Promise
       return [];
     // Passes are delivered by the dedicated pass endpoint.
     const { pass: _pass, ...publicAppointment } = appointment;
+    const encounter = encounterByAppointment.get(appointment.id);
     return [
       {
         appointment: publicAppointment,
         patient,
         practitioner,
         ticket: ticketByAppointment.get(appointment.id),
-        encounter: encounterByAppointment.get(appointment.id),
+        ...(encounter?.patientId === patient.id && encounter.practitionerId === practitioner.id
+          ? { encounter }
+          : {}),
       },
     ];
   });
@@ -98,7 +111,7 @@ export async function appointments(
   let appointmentList = await dailyAppointments(facility, day);
   if (mode === 'clinical')
     appointmentList = appointmentList.filter((item) => item.practitionerId === practitionerId);
-  let rows = await hydrate(facility, appointmentList);
+  let rows = await hydrate(facility, appointmentList, mode === 'clinical');
   if (mode === 'queue')
     rows = rows.filter((row) => row.ticket && row.ticket.status !== 'Completed');
   if (mode === 'clinical') rows = rows.filter((row) => row.ticket);

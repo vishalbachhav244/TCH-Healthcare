@@ -9,6 +9,7 @@ import { SessionStore } from '../core/session';
 import { Rupees, StatusTone } from '../design-system/format';
 import { dayInIndia, shiftDay } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
+import type { FollowUpDetails } from '../domain/continuity';
 import { PatientSharing } from './patient-sharing';
 
 @Component({
@@ -29,6 +30,12 @@ export class Portal {
   protected readonly pass = signal('');
   protected readonly qr = signal('');
   protected readonly booking = signal(false);
+  protected readonly selectedFollowUp = signal<FollowUpDetails | undefined>(undefined);
+  protected readonly earliestBooking = computed(() => {
+    const start = this.selectedFollowUp()?.startsOn;
+    return start && start > this.today ? start : this.today;
+  });
+  protected readonly latestBooking = computed(() => this.selectedFollowUp()?.endsOn ?? this.latest);
   protected readonly reload = signal(0);
   protected readonly form = inject(NonNullableFormBuilder).group({
     practitionerId: ['', Validators.required],
@@ -76,12 +83,20 @@ export class Portal {
 
   protected open(dialog: HTMLDialogElement, id?: string) {
     this.booking.set(!id);
+    this.selectedFollowUp.set(undefined);
     this.form.reset();
     this.error.set('');
     this.pass.set('');
     this.qr.set('');
     dialog.showModal();
-    if (id) void this.requestPass('portal/passes', { appointmentId: id });
+    if (id)
+      void this.requestPass((token, facility) => this.api.issuePortalPass(token, facility, id));
+  }
+
+  protected openFollowUp(dialog: HTMLDialogElement, request: FollowUpDetails) {
+    this.open(dialog);
+    this.selectedFollowUp.set(request);
+    this.form.patchValue({ day: this.earliestBooking(), practitionerId: request.clinician.id });
   }
 
   protected async book() {
@@ -94,7 +109,24 @@ export class Portal {
       this.error.set('Choose a clinician, date and time.');
       return;
     }
-    await this.requestPass('portal/appointments', this.form.getRawValue(), 'Appointment booked.');
+    const fields = this.form.getRawValue();
+    if (fields.day < this.earliestBooking() || fields.day > this.latestBooking()) {
+      this.error.set('Choose a date within the available booking window.');
+      return;
+    }
+    const request = this.selectedFollowUp();
+    if (request) {
+      await this.requestPass(
+        (token, facility) =>
+          this.api.bookFollowUp(token, facility, request, { day: fields.day, time: fields.time }),
+        'Follow-up booked.',
+      );
+    } else {
+      await this.requestPass(
+        (token, facility) => this.api.bookPortalVisit(token, facility, fields),
+        'Appointment booked.',
+      );
+    }
   }
 
   protected showReport(report: LabOrder, dialog: HTMLDialogElement) {
@@ -102,13 +134,16 @@ export class Portal {
     dialog.showModal();
   }
 
-  private async requestPass(path: string, body: Record<string, string>, message?: string) {
+  private async requestPass(
+    command: (token: string, facility: string) => Promise<{ id: string; pass?: string }>,
+    message?: string,
+  ) {
     if (this.busy()) return;
     const { token, facility } = this.scope();
     this.busy.set(true);
     this.error.set('');
     try {
-      const result = await this.api.execute(path, token, facility, body);
+      const result = await command(token, facility);
       if (message) this.message.set(message);
       if (result.pass) {
         this.pass.set(result.pass);

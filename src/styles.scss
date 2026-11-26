@@ -430,6 +430,9 @@ ng-icon {
   padding: 11px 0;
   border-bottom: 1px solid var(--line);
 }
+.portal-list + .portal-list {
+  margin-block-start: 0.875rem;
+}
 .portal-list article:last-child {
   border: 0;
 }
@@ -1028,6 +1031,25 @@ tbody tr:nth-child(3n) .table-initials {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #f5f9f7;
+}
+.clinical-orders > summary {
+  color: var(--teal-hover);
+  cursor: pointer;
+  font-weight: 650;
+}
+.continuity-history {
+  padding-inline-start: 1.25rem;
+  margin-block-end: 0;
+}
+.continuity-history li + li {
+  margin-block-start: 0.75rem;
+}
+.continuity-history small {
+  display: block;
+  color: var(--muted);
+}
+.continuity-history p {
+  margin-block: 0.2rem 0;
 }
 .pipeline {
   display: grid;

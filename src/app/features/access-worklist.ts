@@ -9,9 +9,11 @@ import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
-import { dayInIndia, observations, type AppointmentRow } from '../domain/operations';
+import { dayInIndia, observations, shiftDay, type AppointmentRow } from '../domain/operations';
 import { labCatalogue } from '../domain/diagnostics';
+import type { FollowUpSummary } from '../domain/continuity';
 import { ClinicalPrescriptions } from './clinical-prescriptions';
+import { ConsultationContinuity } from './consultation-continuity';
 
 const headings = {
   appointments: 'Appointments',
@@ -30,7 +32,15 @@ const states = {
 };
 
 @Component({
-  imports: [ClinicalPrescriptions, DatePipe, NgIcon, ReactiveFormsModule, RouterLink, StatusTone],
+  imports: [
+    ClinicalPrescriptions,
+    ConsultationContinuity,
+    DatePipe,
+    NgIcon,
+    ReactiveFormsModule,
+    RouterLink,
+    StatusTone,
+  ],
   templateUrl: './access-worklist.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -44,6 +54,7 @@ export class AccessWorklist {
   protected readonly description = descriptions[this.kind];
   protected readonly statuses = states[this.kind];
   protected readonly today = dayInIndia();
+  protected readonly latest = shiftDay(this.today, 90);
   private readonly dateParam = this.route.snapshot.queryParamMap.get('day');
   protected readonly day = signal(
     this.dateParam && /^\d{4}-\d{2}-\d{2}$/.test(this.dateParam) ? this.dateParam : this.today,
@@ -82,6 +93,7 @@ export class AccessWorklist {
   protected readonly clinicalFeedback = signal('');
   protected readonly bookingOpen = signal(false);
   protected readonly bookingTarget = signal<AppointmentRow | undefined>(undefined);
+  protected readonly selectedFollowUp = signal<FollowUpSummary | undefined>(undefined);
   protected readonly cancellationTarget = signal<AppointmentRow | undefined>(undefined);
   protected readonly transferTarget = signal<AppointmentRow | undefined>(undefined);
   protected readonly destination = this.fb.control('', Validators.required);
@@ -111,6 +123,39 @@ export class AccessWorklist {
   protected readonly options = facilityQuery(this.choiceParams, ({ token, facility, q }) =>
     this.api.patients('appointments/options', token, facility, q),
   );
+  private readonly patientId = toSignal(this.booking.controls.patientId.valueChanges, {
+    initialValue: '',
+  });
+  private readonly contextParams = computed(() => ({
+    ...this.scope(),
+    facility:
+      this.bookingOpen() &&
+      this.patientId() &&
+      (!this.bookingTarget() || this.bookingTarget()?.appointment.followUpId) &&
+      !this.pass()
+        ? this.scope().facility
+        : '',
+    patientId: this.patientId(),
+  }));
+  protected readonly bookingContext = facilityQuery(
+    this.contextParams,
+    ({ token, facility, patientId }) => this.api.bookingContext(token, facility, patientId),
+  );
+  protected readonly bookingWindow = computed(() => {
+    const existing = this.bookingTarget()?.appointment.followUpId;
+    const context = this.bookingContext();
+    return (
+      this.selectedFollowUp() ??
+      (existing && context.state === 'ready'
+        ? context.data.followUps.find((item) => item.id === existing)
+        : undefined)
+    );
+  });
+  protected readonly earliestBooking = computed(() => {
+    const start = this.bookingWindow()?.startsOn;
+    return start && start > this.today ? start : this.today;
+  });
+  protected readonly latestBooking = computed(() => this.bookingWindow()?.endsOn ?? this.latest);
   private readonly slotProvider = toSignal(this.booking.controls.practitionerId.valueChanges, {
     initialValue: '',
   });
@@ -124,11 +169,12 @@ export class AccessWorklist {
     day: this.slotDay(),
     practitionerId: this.slotProvider(),
     appointmentId: this.bookingTarget()?.appointment.id ?? '',
+    patientId: this.patientId(),
   }));
   protected readonly slots = facilityQuery(
     this.slotParams,
-    ({ token, facility, day, practitionerId, appointmentId }) =>
-      this.api.availableTimes(token, facility, day, practitionerId, appointmentId),
+    ({ token, facility, day, practitionerId, appointmentId, patientId }) =>
+      this.api.availableTimes(token, facility, day, practitionerId, appointmentId, patientId),
   );
   private readonly transferParams = computed(() => ({
     ...this.scope(),
@@ -142,6 +188,7 @@ export class AccessWorklist {
     this.pass.set('');
     this.qr.set('');
     this.dialogFailure.set('');
+    this.selectedFollowUp.set(undefined);
     this.bookingTarget.set(row);
     this.booking.reset({
       patientId: row?.appointment.patientId ?? '',
@@ -155,6 +202,32 @@ export class AccessWorklist {
     dialog.showModal();
   }
 
+  protected choosePreviousClinician(id: string) {
+    this.booking.controls.practitionerId.setValue(id);
+    this.booking.controls.time.reset('');
+  }
+
+  protected chooseFollowUp(request: FollowUpSummary) {
+    this.selectedFollowUp.set(request);
+    this.booking.patchValue({
+      practitionerId: request.clinician.id,
+      day: this.earliestBooking(),
+      time: '',
+      channel: 'Scheduled',
+    });
+  }
+
+  protected clearFollowUp() {
+    if (!this.selectedFollowUp()) return;
+    this.selectedFollowUp.set(undefined);
+    this.booking.controls.time.reset('');
+  }
+
+  protected changeBookingPatient() {
+    this.booking.controls.patientId.reset();
+    this.clearFollowUp();
+  }
+
   protected async saveBooking() {
     if (this.booking.invalid) {
       this.booking.markAllAsTouched();
@@ -162,7 +235,12 @@ export class AccessWorklist {
       return;
     }
     const slot = this.booking.getRawValue();
+    if (slot.day < this.earliestBooking() || slot.day > this.latestBooking()) {
+      this.dialogFailure.set('Choose a date within the available booking window.');
+      return;
+    }
     const current = this.bookingTarget()?.appointment;
+    const followUp = this.selectedFollowUp();
     const result = current
       ? await this.execute(
           'appointments/reschedule',
@@ -171,7 +249,18 @@ export class AccessWorklist {
           true,
           'PATCH',
         )
-      : await this.execute('appointments', slot, 'Appointment booked.', true);
+      : followUp
+        ? await this.runCommand(
+            (token, facility) =>
+              this.api.bookFollowUp(token, facility, followUp, {
+                patientId: slot.patientId,
+                day: slot.day,
+                time: slot.time,
+              }),
+            'Follow-up booked.',
+            true,
+          )
+        : await this.execute('appointments', slot, 'Appointment booked.', true);
     if (result?.pass) {
       this.day.set(slot.day);
       this.offset.set(0);
@@ -339,12 +428,24 @@ export class AccessWorklist {
     );
   }
 
-  private async execute(
+  private execute(
     path: string,
     body: Record<string, string>,
     message: string,
     inDialog: boolean,
     method: 'POST' | 'PATCH' = 'POST',
+  ) {
+    return this.runCommand(
+      (token, facility) => this.api.execute(path, token, facility, body, method),
+      message,
+      inDialog,
+    );
+  }
+
+  private async runCommand(
+    command: (token: string, facility: string) => Promise<{ id: string; pass?: string }>,
+    message: string,
+    inDialog: boolean,
   ) {
     if (this.busy()) return;
     const { token, facility } = this.scope();
@@ -353,7 +454,7 @@ export class AccessWorklist {
     this.dialogFailure.set('');
     this.message.set('');
     try {
-      const result = await this.api.execute(path, token, facility, body, method);
+      const result = await command(token, facility);
       this.message.set(message);
       return result;
     } catch (error) {

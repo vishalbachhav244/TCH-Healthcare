@@ -8,7 +8,7 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-02 | Shared | `/denied`, `/unavailable` | Conditional access and inactive release |
 | TC-LOCAL-03 | D06 | `/work/overview` | Filters, metrics, trend, CSV and operational alerts |
 | TC-LOCAL-04 | D09 | `/work/patients` | Registry search and registration dialog |
-| TC-LOCAL-05 | D10 | `/work/appointments` | Worklist, available slots, booking, reschedule, cancellation and QR pass |
+| TC-LOCAL-05 | D10 | `/work/appointments` | Worklist, prior-clinician suggestion, follow-up booking, reschedule, cancellation and QR pass |
 | TC-LOCAL-06 | D11 | `/work/queue` | Ticket worklist, QR verification, recall, skip, requeue and transfer |
 | TC-LOCAL-07 | D12 | `/work/portal` | Appointment history, own pass, reports and bills |
 | TC-LOCAL-08 | D13 | `/work/clinical` | Assigned worklist, test order and consultation note dialog |
@@ -27,3 +27,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-21 | D07 | `/work/clinical-governance` | Seven-day indicators, flagged report worklist, review and referral |
 | TC-LOCAL-22 | D08 | `/work/quality` | Case intake, status filter, ownership, resolution and case history |
 | TC-LOCAL-23 | D10 | `/work/scheduling` | Date and clinician filters, appointment waitlist, slot conversion, withdrawals and schedule blocks |
+| TC-LOCAL-24 | D13 | `/work/clinical` → Consultation | Assigned patient’s signed history, specialty filter and follow-up request lifecycle |
+| TC-LOCAL-25 | D12 | `/work/portal` → Appointments | Own follow-up requests, date-window booking, appointment pass and visit status |

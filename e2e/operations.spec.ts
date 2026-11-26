@@ -25,6 +25,131 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('uses prior care in booking and hands a signed follow-up to the patient and reception', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(160_000);
+  const patientId = 'TC-MERIDIAN-01001';
+  const startsOn = shiftDay(dayInIndia(), 1);
+  const endsOn = shiftDay(dayInIndia(), 3);
+  const patient = await page.context().newPage();
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Appointment pass', exact: true }).click();
+  const pass = patient.getByRole('dialog', { name: 'Appointment pass' });
+  const code = await pass.locator('code').innerText();
+  await pass.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await signIn(page, 'reception');
+  const selectPatient = async () => {
+    await page.getByRole('button', { name: 'New appointment' }).click();
+    const dialog = page.getByRole('dialog', { name: 'New appointment' });
+    await dialog.getByLabel('Find patient').fill(patientId);
+    await dialog.getByLabel('Patient', { exact: true }).selectOption(patientId);
+    return dialog;
+  };
+  const standard = await selectPatient();
+  await standard.getByRole('button', { name: 'Use previous clinician' }).click();
+  await expect(standard.getByLabel('Clinician', { exact: true })).toHaveValue(/^mer-central-DR-/);
+  await expect(standard.getByText('History reviewed and findings documented.')).toHaveCount(0);
+  await standard.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await page
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  await page.getByRole('button', { name: 'Verify arrival' }).click();
+  const check = page.getByRole('dialog', { name: 'Verify arrival' });
+  await check.getByLabel('Appointment pass code').fill(code);
+  await check.getByRole('button', { name: 'Check in patient' }).click();
+  await page.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  await page
+    .getByRole('row', { name: new RegExp(patientId) })
+    .getByRole('button', { name: 'Call token' })
+    .click();
+
+  const clinician = await page.context().newPage();
+  await signIn(clinician, 'clinician');
+  await clinician.getByRole('searchbox', { name: 'Search appointments' }).fill(patientId);
+  const clinicalRow = clinician.getByRole('row', { name: new RegExp(patientId) });
+  await clinicalRow.getByRole('button', { name: 'Start consultation' }).click();
+  await clinicalRow.getByRole('button', { name: 'Review consultation' }).click();
+  const visit = clinician.getByRole('dialog', { name: 'Consultation' });
+  await expect(visit.getByRole('button', { name: 'Request follow-up' })).toHaveCount(0);
+  await visit.getByText('Previous consultations', { exact: true }).click();
+  const specialty = visit.getByLabel('Specialty', { exact: true });
+  await expect(specialty).toBeVisible();
+  const selectedSpecialty = await specialty.locator('option').nth(1).getAttribute('value');
+  await specialty.selectOption(selectedSpecialty!);
+  for (const row of await visit.locator('.continuity-history li').all())
+    await expect(row).toContainText(selectedSpecialty!);
+  await visit
+    .getByLabel('Consultation observation')
+    .selectOption('Observation completed. Follow-up discussed.');
+  await visit.getByRole('button', { name: 'Sign and complete' }).click();
+  await clinicalRow.getByRole('button', { name: 'View note' }).click();
+  await visit.getByRole('button', { name: 'Request follow-up' }).click();
+  await visit.getByLabel('Purpose', { exact: true }).selectOption('Review care plan');
+  await visit.getByLabel('Earliest date').fill(startsOn);
+  await visit.getByLabel('Latest date').fill(endsOn);
+  await visit.getByRole('button', { name: 'Send follow-up request' }).click();
+  await expect(visit.getByText('To book', { exact: true })).toBeVisible();
+  await visit.getByText('Previous consultations', { exact: true }).click();
+  await visit.getByLabel('Specialty', { exact: true }).selectOption(selectedSpecialty!);
+  await checkReflow(clinician);
+  expect(
+    (
+      await new AxeBuilder({ page: clinician })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await clinician.screenshot({
+    path: testInfo.outputPath('consultation-continuity-desktop.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+
+  const plan = patient.getByRole('region', { name: 'Follow-up requests' });
+  await checkReflow(patient);
+  await patient.setViewportSize({ width: 390, height: 844 });
+  await plan.getByRole('button', { name: 'Book follow-up' }).click();
+  const booking = patient.getByRole('dialog', { name: 'Book follow-up' });
+  await expect(booking.getByLabel('Date', { exact: true })).toHaveValue(startsOn);
+  await expect(booking.getByLabel('Date', { exact: true })).toHaveAttribute('max', endsOn);
+  await booking.getByLabel('Time', { exact: true }).selectOption('14:00', { timeout: 12_000 });
+  await booking.getByRole('button', { name: 'Book appointment' }).click();
+  await expect(pass.locator('code')).toHaveText(/^[\da-f-]{36}$/);
+  await pass.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(plan.getByText('Booked', { exact: true })).toBeVisible();
+  await expect(visit.getByText('Booked', { exact: true })).toBeVisible();
+
+  await page.goto('/work/appointments?day=' + startsOn);
+  const scheduled = page.getByRole('row', { name: new RegExp(patientId) });
+  await expect(scheduled).toContainText('Follow-up');
+  await scheduled.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect(plan.getByRole('button', { name: 'Book follow-up' })).toBeVisible();
+  const followUpDesk = await selectPatient();
+  await expect(followUpDesk.getByText('Review care plan', { exact: true })).toHaveCount(0);
+  await followUpDesk.getByRole('button', { name: 'Book this follow-up' }).click();
+  await followUpDesk.getByLabel('Time', { exact: true }).selectOption('14:15', { timeout: 12_000 });
+  await followUpDesk.getByRole('button', { name: 'Book appointment' }).click();
+  await expect(plan.getByText('14:15 IST', { exact: false })).toBeVisible();
+  await patient.reload();
+  await expect(plan.getByText('Booked', { exact: true })).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page: patient }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await patient.screenshot({
+    path: testInfo.outputPath('follow-up-390.png'),
+    animations: 'disabled',
+    fullPage: true,
+  });
+  await clinician.close();
+  await patient.close();
+});
+
 test('shares clinician availability across waitlist, scheduling and patient booking', async ({
   page,
 }, testInfo) => {

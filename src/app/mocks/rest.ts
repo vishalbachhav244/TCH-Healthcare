@@ -12,6 +12,7 @@ import { portal } from './portal';
 import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
 import { schedulingDay } from './scheduling-workspace';
+import { bookingContext, clinicalContinuity } from './continuity';
 import { clinicalPrescriptions, pharmacyData } from './pharmacy';
 import { platformOperations, updateIncident } from './platform-operations';
 import {
@@ -67,6 +68,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'subscriptions',
     'appointments/reschedule',
     'appointments/cancel',
+    'clinical/follow-ups/withdraw',
     'scheduling/waitlist/status',
     'scheduling/exceptions/release',
     'quality/cases/status',
@@ -168,6 +170,17 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         session,
         params.get('encounterId') ?? '',
       );
+    case 'clinical/patient-context':
+      return clinicalContinuity(
+        scope(session, facilityRecord, 'D13', 'clinical'),
+        session,
+        params.get('encounterId') ?? '',
+      );
+    case 'appointments/patient-context':
+      return bookingContext(
+        scope(session, facilityRecord, 'D10', 'appointments'),
+        params.get('patientId') ?? '',
+      );
     case 'pharmacy':
       return pharmacyData(scope(session, facilityRecord, 'D22'));
     case 'patients':
@@ -205,7 +218,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         params.get('practitionerId') ?? '',
         params.get('day') ?? '',
         selfService ? undefined : (params.get('appointmentId') ?? undefined),
-        selfService ? patientSubject(session) : undefined,
+        selfService ? patientSubject(session) : params.get('patientId') || undefined,
       );
     }
     case 'queue/options': {

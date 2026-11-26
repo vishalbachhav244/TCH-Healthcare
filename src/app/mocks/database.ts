@@ -33,6 +33,7 @@ import type {
 import { initialConnectors, initialSharingReport } from './interoperability-seed';
 import type { ClinicalReview, QualityCase } from '../domain/governance';
 import type { ScheduleException, WaitlistEntry } from '../domain/scheduling';
+import type { FollowUpRequest } from '../domain/continuity';
 import { initialQualityCases } from './governance-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
@@ -59,6 +60,7 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   qualityCases: EntityTable<QualityCase, 'id'>;
   waitlist: EntityTable<WaitlistEntry, 'id'>;
   scheduleExceptions: EntityTable<ScheduleException, 'id'>;
+  followUps: EntityTable<FollowUpRequest, 'id'>;
   organisations: EntityTable<Organisation, 'id'>;
   invoices: EntityTable<Invoice, 'id'>;
   payments: EntityTable<Payment, 'id'>;
@@ -276,6 +278,11 @@ db.version(12)
 db.version(13).stores({
   waitlist: 'id, [facilityId+day]',
   scheduleExceptions: 'id, [facilityId+day], [facilityId+practitionerId+day]',
+});
+
+db.version(14).stores({
+  encounters: 'id, facilityId, &appointmentId, [facilityId+patientId]',
+  followUps: 'id, [facilityId+patientId], encounterId, &appointmentId',
 });
 
 export function initialize() {

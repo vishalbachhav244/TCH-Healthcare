@@ -47,6 +47,7 @@ export interface Appointment {
   status: 'Booked' | 'Checked in' | 'In consultation' | 'Completed' | 'Cancelled';
   pass?: string;
   version?: number;
+  followUpId?: string;
 }
 
 export interface Ticket {
@@ -213,6 +214,9 @@ export type EventType =
   | 'QueueTicketTransferred'
   | 'EncounterStarted'
   | 'EncounterCompleted'
+  | 'FollowUpRequested'
+  | 'FollowUpBooked'
+  | 'FollowUpWithdrawn'
   | 'InvoiceCreated'
   | 'PaymentRecorded'
   | 'AlertAcknowledged'

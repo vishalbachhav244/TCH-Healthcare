@@ -2,8 +2,8 @@
 
 | Brief workflow | Implemented sequence | Outstanding |
 | --- | --- | --- |
-| 1 New patient consultation | Registration code → available slot → pass → check-in → call → assigned consultation → signed observation or prescription → consultation invoice → local settlement | Referrals and follow-up |
-| 2 Returning patient | Search existing tenant identity → choose a slot or add a clinician/date waitlist request → book a released slot or withdraw | Previous-clinician suggestion and recurring schedules |
+| 1 New patient consultation | Registration code → slot → pass → check-in → call → assigned consultation → documentation, orders and invoice → local settlement → follow-up request → linked booking | Specialist referrals and broader clinic record |
+| 2 Returning patient | Search patient → suggest the most recent completed clinician at the facility → check slots → book, or add a waitlist request | Recurring schedules and authorized cross-facility continuity |
 | 3 QR check-in | Issue opaque QR → decode an image or enter code → verify facility and date → issue one ticket → update token-only display | Camera, kiosk, patient notifications and enhanced identity checks |
 | 4 Connected records | View published laboratory results → choose a report for a recipient → grant or revoke access → review access history | Uploads, document classification, and expanded report types |
 | 5 Inpatient | Request → allocate → transfer → discharge → cleaning → available | Nursing, daily charges, orders and discharge documentation |
@@ -14,7 +14,7 @@
 | 10 Procurement | Open | Requisition, purchase order, goods receipt and ledger |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
 | 12 Integration | Configure connector → redeem patient code → request report → grant one published version → verify provenance and consent → audit access | Real external transport, verified partner identities and additional record formats |
-| 13 Patient application | Clinician selection → booking → pass → queue status → published reports, consent requests and bills | Public discovery, family and follow-up |
+| 13 Patient application | Clinician selection → booking → pass → queue status → published reports → consent or follow-up request → patient-owned follow-up booking | Public discovery, family access and reminders |
 | 14 CRM and marketing | Open | Conversion, engagement and campaigns |
 | 15 AI documentation | Open | Draft, review and audit |
 

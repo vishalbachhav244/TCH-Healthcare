@@ -8,9 +8,9 @@ The supplied brief provides the 28-module baseline count, the 36-dashboard list 
 | Interoperability | D04 | Connector lifecycle, recipient matching, patient grants, report provenance and audited access |
 | Leadership | D05–D06 | Scoped facility comparison, branch drill-down, derived KPIs, alerts and summary exports |
 | Clinical governance and quality | D07–D08 | Flagged report reviews, de-identified referrals and facility case lifecycle |
-| Patient access | D09, D10, D11 | Registration, slot checks, booking changes, waitlists, clinician schedule blocks, QR arrivals and token transfers |
-| Patient portal | D12 | Own-patient visits, pass and arrival, published reports, record sharing and balances |
-| Outpatient consultation | D13 | Assigned encounters, observation signing and laboratory orders |
+| Patient access | D09, D10, D11 | Registration, returning-clinician suggestions, follow-up booking, slot checks, waitlists, schedule blocks and QR arrivals |
+| Patient portal | D12 | Own appointments, follow-up booking, passes, published reports, record sharing and balances |
+| Outpatient consultation | D13 | Assigned encounters, signed history by specialty, follow-up requests, observation signing and laboratory orders |
 | Inpatient | D19 | Bed board and admission state transitions |
 | Diagnostics and medication | D20, D22 | Laboratory order lifecycle, signed prescriptions, dispensing and stock movements |
 | Patient finance | D24 | Outpatient and medication invoices with local settlement |
