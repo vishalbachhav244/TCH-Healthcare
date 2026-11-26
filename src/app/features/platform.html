@@ -1,0 +1,200 @@
+@let state = data();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> PLATFORM ADMINISTRATION</p>
+    <h1>Organizations</h1>
+    <p>Manage subscriptions, facilities and module access.</p>
+  </div>
+  <button class="button primary" type="button" (click)="open('organizations', editor)">
+    <ng-icon name="plus" /> Create organization
+  </button>
+</section>
+@if (feedback()) {
+  <p class="inline-notice success" role="status">{{ feedback() }}</p>
+}
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading organizations…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="platform-grid">
+    <section class="panel" aria-labelledby="directory-title">
+      <div class="panel-heading">
+        <div>
+          <h2 id="directory-title">Organization directory</h2>
+          <p>{{ state.data.organisations.length }} organizations</p>
+        </div>
+      </div>
+      <div class="organization-list">
+        @for (row of state.data.organisations; track row.id) {
+          <button
+            type="button"
+            class="alert-row"
+            [attr.aria-pressed]="current()?.id === row.id"
+            (click)="active.set(row.id)"
+          >
+            <span class="square-icon teal"><ng-icon name="building" /></span>
+            <span class="alert-copy"
+              ><strong>{{ row.name }}</strong
+              ><small>{{ row.plan }} plan</small></span
+            >
+            <ng-icon name="next" />
+          </button>
+        } @empty {
+          <p class="state-panel">No organizations have been configured.</p>
+        }
+      </div>
+    </section>
+    @if (current(); as tenant) {
+      <section class="panel table-panel" aria-labelledby="facility-heading">
+        <div class="panel-heading">
+          <div>
+            <h2 id="facility-heading">{{ tenant.name }}</h2>
+            <p>{{ tenant.plan }} subscription · {{ facilities().length }} facilities</p>
+          </div>
+          <button class="button secondary" type="button" (click)="open('facilities', editor)">
+            <ng-icon name="plus" /> Add facility
+          </button>
+        </div>
+        @if (facilities().length) {
+          <div
+            class="table-scroll"
+            tabindex="0"
+            role="region"
+            aria-label="Organization facilities table"
+          >
+            <table>
+              <caption class="sr-only">
+                Organization facilities
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Facility</th>
+                  <th scope="col">Inpatient operations</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (facility of facilities(); track facility.id) {
+                  <tr>
+                    <td>
+                      <strong>{{ facility.name }}</strong
+                      ><small>{{ facility.city }}</small>
+                    </td>
+                    <td>
+                      <span [class]="(facility.inpatient ? 'Enabled' : 'Disabled') | statusTone">{{
+                        facility.inpatient ? 'Enabled' : 'Disabled'
+                      }}</span>
+                    </td>
+                    <td>
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open('entitlements', editor, facility)"
+                      >
+                        Edit entitlement
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="state-panel">
+            This organization has no facilities. Add a facility to configure its access.
+          </p>
+        }
+      </section>
+    }
+  </div>
+  <section class="panel table-panel" aria-labelledby="changes-heading">
+    <div class="panel-heading"><h2 id="changes-heading">Configuration history</h2></div>
+    @if (state.data.activity.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Configuration history table">
+        <table>
+          <caption class="sr-only">
+            Recent organization changes
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Change</th>
+              <th scope="col">Organization or facility</th>
+              <th scope="col">Account</th>
+              <th scope="col">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (event of state.data.activity; track event.entityId + '-' + event.occurredAt) {
+              <tr>
+                <td>{{ eventName(event) }}</td>
+                <td>{{ eventEntity(event) }}</td>
+                <td>{{ event.actor }}</td>
+                <td>{{ event.occurredAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">No configuration changes have been recorded.</p>
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="platform-editor">
+  <div class="dialog-head">
+    <h2 id="platform-editor">{{ actions[task()] }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editor.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @switch (task()) {
+    @case ('organizations') {
+      <form class="dialog-body fields" [formGroup]="organisationForm" (ngSubmit)="save(editor)">
+        <label for="org-name">Organization name</label
+        ><input id="org-name" formControlName="name" maxlength="65" required />
+        <label for="org-plan">Subscription plan</label
+        ><select id="org-plan" formControlName="plan">
+          @for (plan of plans; track plan) {
+            <option>{{ plan }}</option>
+          }
+        </select>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">
+          Create organization
+        </button>
+      </form>
+    }
+    @case ('facilities') {
+      <form class="dialog-body fields" [formGroup]="facilityForm" (ngSubmit)="save(editor)">
+        <label for="facility-name">Facility name</label
+        ><input id="facility-name" formControlName="name" maxlength="65" required />
+        <label for="facility-city">City</label
+        ><input id="facility-city" formControlName="city" maxlength="65" required />
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">Add facility</button>
+      </form>
+    }
+    @case ('entitlements') {
+      <form class="dialog-body fields" (submit)="$event.preventDefault(); save(editor)">
+        <p>{{ activeFacility()?.name }}</p>
+        <label for="inpatient-entitlement">Inpatient operations</label
+        ><select id="inpatient-entitlement" [formControl]="inpatient">
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">Save entitlement</button>
+      </form>
+    }
+  }
+</dialog>

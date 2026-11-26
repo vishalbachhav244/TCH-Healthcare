@@ -1,0 +1,254 @@
+@let response = data();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> INPATIENT OPERATIONS</p>
+    <h1>Bed Management</h1>
+    <p>Review ward capacity, admissions and bed readiness.</p>
+  </div>
+  @if (store.writeAllowed('beds')) {
+    <button class="button primary" type="button" (click)="open('request', admissionDialog)">
+      <ng-icon name="plus" /> Request admission
+    </button>
+  }
+</section>
+@if (feedback()) {
+  <p class="inline-notice success" role="status">{{ feedback() }}</p>
+}
+@if (failure()) {
+  <p class="inline-notice" role="alert">{{ failure() }}</p>
+}
+@if (response.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading wards and admissions…</p>
+} @else if (response.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ response.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="view-controls" aria-label="Inpatient views">
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="mode() === 'beds'"
+      (click)="mode.set('beds')"
+    >
+      <ng-icon name="bed" /> Bed board
+    </button>
+    @if (store.writeAllowed('beds')) {
+      <button
+        class="button secondary"
+        type="button"
+        [attr.aria-pressed]="mode() === 'admissions'"
+        (click)="mode.set('admissions')"
+      >
+        <ng-icon name="clipboard" /> Admissions
+      </button>
+    }
+  </div>
+  @if (mode() === 'beds') {
+    <section aria-label="Bed board">
+      <div class="filter-bar panel">
+        <label class="select-control"
+          ><span class="sr-only">Filter by ward</span
+          ><select
+            #wardFilter
+            [value]="ward()"
+            (change)="ward.set(wardFilter.value); visible.set(24)"
+          >
+            <option value="">All wards</option>
+            @for (name of wards(); track name) {
+              <option [value]="name">{{ name }}</option>
+            }
+          </select></label
+        >
+        <label class="select-control"
+          ><span class="sr-only">Filter by bed status</span
+          ><select
+            #statusFilter
+            [value]="status()"
+            (change)="status.set(statusFilter.value); visible.set(24)"
+          >
+            <option value="">All statuses</option>
+            <option>Available</option>
+            <option>Occupied</option>
+            <option>Cleaning</option>
+            <option>Maintenance</option>
+          </select></label
+        >
+        <span class="subtle" aria-live="polite">{{ beds().length }} beds</span>
+      </div>
+      <div class="bed-grid">
+        @for (bed of beds().slice(0, visible()); track bed.id) {
+          <article class="panel bed-card">
+            <span class="square-icon blue"><ng-icon name="bed" /></span>
+            <div>
+              <h2>{{ bed.label }}</h2>
+              <p>{{ bed.ward }}</p>
+            </div>
+            @if (bed.status === 'Cleaning' && store.writeAllowed('beds')) {
+              <button
+                class="text-button"
+                type="button"
+                [disabled]="busy()"
+                [attr.aria-label]="'Release bed ' + bed.label"
+                (click)="release(bed.id)"
+              >
+                Release
+              </button>
+            }
+            <span [class]="bed.status | statusTone">{{ bed.status }}</span>
+          </article>
+        } @empty {
+          <p class="state-panel">No beds match these filters.</p>
+        }
+      </div>
+      @if (beds().length > visible()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="visible.set(visible() + 24)">
+            Show more beds
+          </button>
+        </div>
+      }
+    </section>
+  } @else {
+    <section class="panel table-panel" aria-label="Admissions">
+      <div class="filter-bar">
+        <label class="search-field"
+          ><ng-icon name="search" /><span class="sr-only">Find admission</span
+          ><input type="search" [formControl]="search" placeholder="Search by patient name or ID"
+        /></label>
+      </div>
+      @if (admissions().length) {
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Admissions table">
+          <table>
+            <caption class="sr-only">
+              Admissions
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Patient</th>
+                <th scope="col">Requested</th>
+                <th scope="col">Bed</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of admissions().slice(0, visible()); track row.admission.id) {
+                <tr>
+                  <td>
+                    <strong>{{ row.patient.name }}</strong
+                    ><small>{{ row.patient.id }}</small>
+                  </td>
+                  <td>{{ row.admission.requestedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+                  <td>{{ location(row.admission.bedId) }}</td>
+                  <td>
+                    <span [class]="row.admission.status | statusTone">{{
+                      row.admission.status
+                    }}</span>
+                  </td>
+                  <td>
+                    @if (row.admission.status !== 'Discharged') {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open('allocate', admissionDialog, row)"
+                      >
+                        {{ row.admission.bedId ? 'Transfer bed' : 'Allocate bed' }}
+                      </button>
+                    }
+                    @if (row.admission.status === 'Admitted') {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open('discharge', admissionDialog, row)"
+                      >
+                        Discharge
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (admissions().length > visible()) {
+          <div class="table-footer">
+            <button class="button secondary" type="button" (click)="visible.set(visible() + 24)">
+              Show more admissions
+            </button>
+          </div>
+        }
+      } @else {
+        <p class="state-panel">No admissions match this search.</p>
+      }
+    </section>
+  }
+}
+<dialog #admissionDialog (close)="task.set(undefined)" aria-labelledby="admission-dialog-title">
+  <div class="dialog-head">
+    <h2 id="admission-dialog-title">
+      {{
+        task() === 'request'
+          ? 'Request admission'
+          : task() === 'allocate'
+            ? 'Assign bed'
+            : 'Discharge patient'
+      }}
+    </h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="admissionDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" (submit)="$event.preventDefault(); submit(admissionDialog)">
+    @if (selected(); as row) {
+      <p>
+        <strong>{{ row.patient.name }}</strong> · {{ row.patient.id }}
+      </p>
+    }
+    @if (task() === 'request') {
+      <label for="find-patient">Find patient</label
+      ><input
+        type="search"
+        id="find-patient"
+        [formControl]="patientSearch"
+        placeholder="Search name or patient ID"
+      />
+      @let patients = options();
+      <label for="admit-patient">Patient</label
+      ><select id="admit-patient" [formControl]="selectedId" required>
+        <option value="">Select a patient</option>
+        @if (patients.state === 'ready') {
+          @for (patient of patients.data.patients; track patient.id) {
+            <option [value]="patient.id">{{ patient.name }} · {{ patient.id }}</option>
+          }
+        }
+      </select>
+      @if (patients.state === 'error') {
+        <p class="field-error" role="alert">{{ patients.message }}</p>
+      }
+    } @else if (task() === 'allocate') {
+      <label for="bed-pick">Available bed</label
+      ><select id="bed-pick" [formControl]="selectedBed" required>
+        <option value="">Select a bed</option>
+        @for (bed of available(); track bed.id) {
+          <option [value]="bed.id">{{ bed.ward }} · {{ bed.label }}</option>
+        }
+      </select>
+    } @else {
+      <p class="subtle">The current bed will move to cleaning after discharge.</p>
+    }
+    @if (dialogFailure()) {
+      <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+    }
+    <button class="button primary" type="submit" [disabled]="busy()">
+      {{
+        task() === 'request'
+          ? 'Request admission'
+          : task() === 'allocate'
+            ? 'Confirm bed allocation'
+            : 'Confirm discharge'
+      }}
+    </button>
+  </form>
+</dialog>

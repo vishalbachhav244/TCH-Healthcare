@@ -1,0 +1,81 @@
+<main class="sign-in">
+  <aside class="sign-in-story">
+    <tc-brand />
+    <div class="story-content">
+      <p class="story-label"><span></span> HEALTHCARE OPERATIONS</p>
+      <h2>A clearer view<br />of care.</h2>
+      <p>Connect patient access, clinical teams and hospital operations in one workspace.</p>
+      <ul class="story-workflow" aria-label="Care journey">
+        <li>
+          <span><ng-icon name="calendar" /></span>Appointments
+        </li>
+        <li>
+          <span><ng-icon name="scan" /></span>Patient check-in
+        </li>
+        <li>
+          <span><ng-icon name="heart" /></span>Clinical care
+        </li>
+      </ul>
+    </div>
+    <div class="story-footer"><ng-icon name="shield" /> Account and facility access</div>
+  </aside>
+  <section class="sign-in-form">
+    <tc-brand class="mobile-brand" />
+    <div class="sign-in-inner">
+      <span class="square-icon teal login-icon"><ng-icon name="door" /></span>
+      <h1>Welcome to TrueCare</h1>
+      <p>Sign in with your organization account.</p>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <label for="account">Account ID</label>
+        <input
+          id="account"
+          formControlName="account"
+          autocomplete="username"
+          autocapitalize="none"
+          required
+          [attr.aria-invalid]="
+            form.controls.account.touched && form.controls.account.invalid ? 'true' : null
+          "
+          [attr.aria-describedby]="
+            form.controls.account.touched && form.controls.account.invalid ? 'account-error' : null
+          "
+        />
+        @if (form.controls.account.touched && form.controls.account.invalid) {
+          <p id="account-error" class="field-error">Enter your account ID in lowercase letters.</p>
+        }
+        <label for="password">Password</label>
+        <div class="password-field">
+          <input
+            id="password"
+            [type]="reveal() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+            required
+          />
+          <button type="button" (click)="reveal.set(!reveal())">
+            {{ reveal() ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary sign-in-submit" type="submit" [disabled]="busy()">
+          {{ busy() ? 'Signing in…' : 'Sign in' }} <ng-icon name="arrow" />
+        </button>
+      </form>
+      <button
+        class="text-button sign-in-help"
+        type="button"
+        [attr.aria-expanded]="help()"
+        (click)="help.set(!help())"
+      >
+        <ng-icon name="help" /> Need help signing in?
+      </button>
+      @if (help()) {
+        <p class="subtle callout">
+          Contact your organization administrator for account access or a password reset.
+        </p>
+      }
+    </div>
+  </section>
+</main>

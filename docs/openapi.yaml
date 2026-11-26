@@ -1,0 +1,1698 @@
+openapi: '3.1.0'
+info:
+  title: 'TrueCare evaluation API'
+  version: '0.1.0'
+  description: 'Browser-local contract. Dates use Asia/Kolkata, timestamps are
+    Unix milliseconds, and currency is INR in integer minor units.'
+servers:
+  - url: '/api/v1'
+security:
+  - sessionToken: []
+paths:
+  '/session':
+    post:
+      operationId: 'createSession'
+      summary: 'Authenticate an evaluation account.'
+      security: []
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['account', 'password']
+              properties:
+                account:
+                  type: 'string'
+                password:
+                  type: 'string'
+                  format: 'password'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Session' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+    get:
+      operationId: 'getSession'
+      summary: 'Restore a valid session.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Session' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+    delete:
+      operationId: 'endSession'
+      summary: 'End the session.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema:
+                type: 'object'
+                required: ['signedOut']
+                properties:
+                  signedOut:
+                    type: 'boolean'
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/facilities':
+    get:
+      operationId: 'listFacilities'
+      summary: 'List assigned facilities.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema:
+                type: 'array'
+                items: { '$ref': '#/components/schemas/Facility' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/overview':
+    get:
+      operationId: 'getOverview'
+      summary: 'Read hospital metrics and activity.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+        - name: 'range'
+          in: 'query'
+          schema:
+            type: 'integer'
+            enum: [7, 14]
+          description: 'Number of dates in the trend.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Dashboard' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/patients':
+    get:
+      operationId: 'findPatients'
+      summary: 'Search up to 35 tenant patients.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AccessOptions' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+    post:
+      operationId: 'registerPatient'
+      summary: 'Register a fictional patient from an issued code.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['registrationCode']
+              properties:
+                registrationCode:
+                  type: 'string'
+                  pattern: '^REG-[0-9]{4}$'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/appointments/options':
+    get:
+      operationId: 'getBookingOptions'
+      summary: 'Read available patient and clinician choices.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AccessOptions' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/admissions/options':
+    get:
+      operationId: 'getAdmissionOptions'
+      summary: 'Read eligible patient choices.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AccessOptions' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/appointments':
+    get:
+      operationId: 'listAppointments'
+      summary: 'List appointments for a facility and date.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+        - name: 'status'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Filter by lifecycle state.'
+        - name: 'offset'
+          in: 'query'
+          schema:
+            type: 'integer'
+          description: 'Zero-based offset. Returns up to 12 rows.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AppointmentPage' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+    post:
+      operationId: 'bookAppointment'
+      summary: 'Reserve a slot and issue an opaque pass.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['patientId', 'practitionerId', 'time', 'day']
+              properties:
+                patientId:
+                  type: 'string'
+                practitionerId:
+                  type: 'string'
+                time:
+                  type: 'string'
+                day:
+                  type: 'string'
+                  format: 'date'
+                channel:
+                  type: 'string'
+                  enum: ['Scheduled', 'Walk-in']
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/queue':
+    get:
+      operationId: 'listQueue'
+      summary: 'List current queue tickets.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+        - name: 'status'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Filter by lifecycle state.'
+        - name: 'offset'
+          in: 'query'
+          schema:
+            type: 'integer'
+          description: 'Zero-based offset. Returns up to 12 rows.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AppointmentPage' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/clinical':
+    get:
+      operationId: 'listConsultations'
+      summary: 'List assigned consultations.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+        - name: 'status'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Filter by lifecycle state.'
+        - name: 'offset'
+          in: 'query'
+          schema:
+            type: 'integer'
+          description: 'Zero-based offset. Returns up to 12 rows.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/AppointmentPage' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/beds':
+    get:
+      operationId: 'getBedBoard'
+      summary: 'Read ward beds and permitted admissions.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/InpatientBoard' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/laboratory':
+    get:
+      operationId: 'listLaboratory'
+      summary: 'Read stage counts and specimen worklist.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'q'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Case-insensitive search.'
+        - name: 'status'
+          in: 'query'
+          schema:
+            type: 'string'
+          description: 'Filter by lifecycle state.'
+        - name: 'offset'
+          in: 'query'
+          schema:
+            type: 'integer'
+          description: 'Zero-based offset. Returns up to 12 rows.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/LabPage' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/billing':
+    get:
+      operationId: 'listInvoices'
+      summary: 'List up to 200 invoices for a date.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema:
+                type: 'array'
+                items: { '$ref': '#/components/schemas/InvoiceRow' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/billing/options':
+    get:
+      operationId: 'getInvoiceOptions'
+      summary: 'Read signed encounters and billable services.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+        - name: 'day'
+          in: 'query'
+          schema:
+            type: 'string'
+            format: 'date'
+          description: 'Defaults to today in Asia/Kolkata.'
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/BillingOptions' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/portal':
+    get:
+      operationId: 'getPatientPortal'
+      summary: "Read the signed-in patient's own visits, released reports and bills."
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      responses:
+        '200':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Portal' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/portal/appointments':
+    post:
+      operationId: 'bookMyAppointment'
+      summary: 'Reserve a slot for the signed-in patient.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['practitionerId', 'time', 'day']
+              properties:
+                practitionerId:
+                  type: 'string'
+                time:
+                  type: 'string'
+                day:
+                  type: 'string'
+                  format: 'date'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/portal/passes':
+    post:
+      operationId: 'issueMyPass'
+      summary: 'Issue or retrieve a scoped appointment pass.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['appointmentId']
+              properties:
+                appointmentId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/queue/check-in':
+    post:
+      operationId: 'checkInPatient'
+      summary: 'Redeem a facility and date-scoped pass once.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['pass']
+              properties:
+                pass:
+                  type: 'string'
+                  format: 'uuid'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/queue/call':
+    post:
+      operationId: 'callToken'
+      summary: 'Call a waiting token.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['appointmentId']
+              properties:
+                appointmentId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/clinical/start':
+    post:
+      operationId: 'startConsultation'
+      summary: "Start the clinician's assigned consultation."
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['appointmentId']
+              properties:
+                appointmentId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/clinical/complete':
+    post:
+      operationId: 'completeConsultation'
+      summary: 'Sign an observation and complete the encounter.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['appointmentId', 'observation']
+              properties:
+                appointmentId:
+                  type: 'string'
+                observation:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/clinical/lab-orders':
+    post:
+      operationId: 'orderLabTest'
+      summary: 'Order a test from an open assigned encounter.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['encounterId', 'test']
+              properties:
+                encounterId:
+                  type: 'string'
+                test:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/laboratory/advance':
+    post:
+      operationId: 'advanceLabOrder'
+      summary: 'Move a specimen to the next authorised stage.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['orderId', 'version']
+              properties:
+                orderId:
+                  type: 'string'
+                version:
+                  type: 'string'
+                finding:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/admissions':
+    post:
+      operationId: 'requestAdmission'
+      summary: 'Open an admission request.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['patientId']
+              properties:
+                patientId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/admissions/allocate':
+    post:
+      operationId: 'allocateBed'
+      summary: 'Place or transfer to an available bed.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['admissionId', 'version', 'bedId']
+              properties:
+                admissionId:
+                  type: 'string'
+                version:
+                  type: 'string'
+                bedId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/admissions/discharge':
+    post:
+      operationId: 'dischargePatient'
+      summary: 'Discharge and mark a bed for cleaning.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['admissionId', 'version']
+              properties:
+                admissionId:
+                  type: 'string'
+                version:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/beds/release':
+    post:
+      operationId: 'releaseBed'
+      summary: 'Mark a cleaned bed available.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['bedId']
+              properties:
+                bedId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/billing/invoices':
+    post:
+      operationId: 'issueInvoice'
+      summary: 'Issue one invoice per signed outpatient encounter.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['encounterId', 'service']
+              properties:
+                encounterId:
+                  type: 'string'
+                service:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/billing/payments':
+    post:
+      operationId: 'recordSettlement'
+      summary: 'Record local settlement for an outstanding invoice.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['invoiceId']
+              properties:
+                invoiceId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  '/alerts/acknowledge':
+    post:
+      operationId: 'acknowledgeAlert'
+      summary: 'Acknowledge a facility alert.'
+      parameters:
+        - { '$ref': '#/components/parameters/Facility' }
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: 'object'
+              required: ['alertId']
+              properties:
+                alertId:
+                  type: 'string'
+      responses:
+        '201':
+          description: 'Success.'
+          content:
+            'application/json':
+              schema: { '$ref': '#/components/schemas/Command' }
+        '401': { '$ref': '#/components/responses/Error401' }
+        '403': { '$ref': '#/components/responses/Error403' }
+        '404': { '$ref': '#/components/responses/Error404' }
+        '409': { '$ref': '#/components/responses/Error409' }
+        '422': { '$ref': '#/components/responses/Error422' }
+        '503': { '$ref': '#/components/responses/Error503' }
+  /queue-display:
+    get:
+      operationId: getQueueDisplay
+      summary: Read public token numbers for an approved facility.
+      security: []
+      parameters:
+        - name: facility
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Token-only signage response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueDisplay'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform:
+    get:
+      operationId: getPlatform
+      summary: Read the platform directory and configuration activity.
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformData'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform/organizations:
+    post:
+      operationId: createOrganisation
+      summary: Create an organization with a subscription plan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - plan
+              properties:
+                name:
+                  type: string
+                plan:
+                  type: string
+                  enum:
+                    - Clinic
+                    - Hospital
+                    - Network
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform/facilities:
+    post:
+      operationId: createFacility
+      summary: Create a facility for an organization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - name
+                - city
+              properties:
+                tenantId: &a1
+                  type: string
+                name: *a1
+                city: *a1
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /platform/entitlements:
+    patch:
+      operationId: setInpatientEntitlement
+      summary: Change inpatient access using an expected configuration version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - facilityId
+                - version
+                - inpatient
+              properties:
+                facilityId:
+                  type: string
+                version:
+                  source: a1
+                inpatient:
+                  type: string
+                  enum:
+                    - 'true'
+                    - 'false'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Command'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+components:
+  securitySchemes:
+    sessionToken:
+      type: 'http'
+      scheme: 'bearer'
+      bearerFormat: 'opaque evaluation token'
+  parameters:
+    Facility:
+      name: 'X-Facility-Id'
+      in: 'header'
+      required: true
+      schema:
+        type: 'string'
+  schemas:
+    Error:
+      type: 'object'
+      required: ['message']
+      properties:
+        message:
+          type: 'string'
+    Command:
+      type: 'object'
+      required: ['id']
+      properties:
+        id:
+          type: 'string'
+        pass:
+          type: 'string'
+          format: 'uuid'
+    Session:
+      type: 'object'
+      required: ['token', 'account', 'name', 'workspaces', 'writes', 'facilityIds', 'expiresAt']
+      properties:
+        token:
+          type: 'string'
+          format: 'uuid'
+        account:
+          type: 'string'
+        name:
+          type: 'string'
+        workspaces:
+          type: 'array'
+          items:
+            type: 'string'
+        writes:
+          type: 'array'
+          items:
+            type: 'string'
+        facilityIds:
+          type: 'array'
+          items:
+            type: 'string'
+        expiresAt:
+          type: 'integer'
+    Facility:
+      type: 'object'
+      required: ['id', 'tenantId', 'name', 'city', 'inpatient']
+      properties:
+        id:
+          type: 'string'
+        tenantId:
+          type: 'string'
+        name:
+          type: 'string'
+        city:
+          type: 'string'
+        inpatient:
+          type: 'boolean'
+        publicQueue:
+          type: boolean
+        configurationVersion:
+          type: integer
+    Patient:
+      type: 'object'
+      required: ['id', 'tenantId', 'name', 'initials', 'age']
+      properties:
+        id:
+          type: 'string'
+        tenantId:
+          type: 'string'
+        name:
+          type: 'string'
+        initials:
+          type: 'string'
+        age:
+          type: 'integer'
+    Practitioner:
+      type: 'object'
+      required: ['id', 'facilityId', 'name', 'specialty']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        name:
+          type: 'string'
+        specialty:
+          type: 'string'
+    Appointment:
+      type: 'object'
+      required:
+        ['id', 'facilityId', 'patientId', 'practitionerId', 'time', 'day', 'channel', 'status']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        patientId:
+          type: 'string'
+        practitionerId:
+          type: 'string'
+        time:
+          type: 'string'
+        day:
+          type: 'string'
+          format: 'date'
+        channel:
+          type: 'string'
+          enum: ['Scheduled', 'Walk-in']
+        status:
+          type: 'string'
+          enum: ['Booked', 'Checked in', 'In consultation', 'Completed', 'Cancelled']
+    Ticket:
+      type: 'object'
+      required: ['id', 'facilityId', 'appointmentId', 'number', 'arrivedAt', 'status']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        appointmentId:
+          type: 'string'
+        number:
+          type: 'integer'
+        arrivedAt:
+          type: 'integer'
+        status:
+          type: 'string'
+          enum: ['Waiting', 'Called', 'In consultation', 'Completed', 'Skipped']
+        calledAt:
+          type: 'integer'
+    Encounter:
+      type: 'object'
+      required: ['id', 'facilityId', 'appointmentId', 'patientId', 'practitionerId', 'startedAt']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        appointmentId:
+          type: 'string'
+        patientId:
+          type: 'string'
+        practitionerId:
+          type: 'string'
+        startedAt:
+          type: 'integer'
+        signedAt:
+          type: 'integer'
+        observation:
+          type: 'string'
+    AppointmentRow:
+      type: 'object'
+      required: ['appointment', 'patient', 'practitioner']
+      properties:
+        appointment: { '$ref': '#/components/schemas/Appointment' }
+        patient: { '$ref': '#/components/schemas/Patient' }
+        practitioner: { '$ref': '#/components/schemas/Practitioner' }
+        ticket: { '$ref': '#/components/schemas/Ticket' }
+        encounter: { '$ref': '#/components/schemas/Encounter' }
+    AppointmentPage:
+      type: 'object'
+      required: ['items', 'total']
+      properties:
+        items:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/AppointmentRow' }
+        total:
+          type: 'integer'
+    AccessOptions:
+      type: 'object'
+      required: ['practitioners', 'patients']
+      properties:
+        practitioners:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/Practitioner' }
+        patients:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/Patient' }
+    Alert:
+      type: 'object'
+      required: ['id', 'facilityId', 'title', 'detail', 'time', 'severity', 'acknowledged']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        title:
+          type: 'string'
+        detail:
+          type: 'string'
+        time:
+          type: 'string'
+        severity:
+          type: 'string'
+          enum: ['Priority', 'Attention', 'Information']
+        acknowledged:
+          type: 'boolean'
+    Dashboard:
+      type: 'object'
+      required: ['days', 'metrics', 'departments', 'alerts', 'appointments']
+      properties:
+        days:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['day', 'scheduled', 'walkIn']
+            properties:
+              day:
+                type: 'string'
+                format: 'date'
+              scheduled:
+                type: 'integer'
+              walkIn:
+                type: 'integer'
+        metrics:
+          type: 'object'
+          required:
+            [
+              'appointments',
+              'priorAppointments',
+              'activeQueue',
+              'averageWait',
+              'bedCapacity',
+              'bedsOccupied',
+              'revenueMinor',
+              'priorRevenueMinor',
+            ]
+          properties:
+            appointments:
+              type: 'integer'
+            priorAppointments:
+              type: 'integer'
+            activeQueue:
+              type: 'integer'
+            averageWait:
+              type: 'integer'
+            bedCapacity:
+              type: 'integer'
+            bedsOccupied:
+              type: 'integer'
+            revenueMinor:
+              type: 'integer'
+            priorRevenueMinor:
+              type: 'integer'
+        departments:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['name', 'appointments', 'completed', 'waiting']
+            properties:
+              name:
+                type: 'string'
+              appointments:
+                type: 'integer'
+              completed:
+                type: 'integer'
+              waiting:
+                type: 'integer'
+        alerts:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/Alert' }
+        appointments:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/AppointmentRow' }
+    Bed:
+      type: 'object'
+      required: ['id', 'facilityId', 'label', 'ward', 'status']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        label:
+          type: 'string'
+        ward:
+          type: 'string'
+        status:
+          type: 'string'
+          enum: ['Available', 'Occupied', 'Cleaning', 'Maintenance']
+    Admission:
+      type: 'object'
+      required: ['id', 'facilityId', 'patientId', 'requestedAt', 'status', 'version']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        patientId:
+          type: 'string'
+        requestedAt:
+          type: 'integer'
+        status:
+          type: 'string'
+          enum: ['Requested', 'Admitted', 'Discharged']
+        version:
+          type: 'integer'
+        admittedAt:
+          type: 'integer'
+        dischargedAt:
+          type: 'integer'
+        bedId:
+          type: 'string'
+    InpatientBoard:
+      type: 'object'
+      required: ['beds', 'admissions']
+      properties:
+        beds:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/Bed' }
+        admissions:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['admission', 'patient']
+            properties:
+              admission: { '$ref': '#/components/schemas/Admission' }
+              patient: { '$ref': '#/components/schemas/Patient' }
+    LabOrder:
+      type: 'object'
+      required:
+        [
+          'id',
+          'facilityId',
+          'encounterId',
+          'patientId',
+          'test',
+          'status',
+          'orderedAt',
+          'changedAt',
+          'version',
+        ]
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        encounterId:
+          type: 'string'
+        patientId:
+          type: 'string'
+        test:
+          type: 'string'
+        status:
+          type: 'string'
+          enum: ['Ordered', 'Collected', 'Processing', 'Entered', 'Authorised', 'Published']
+        orderedAt:
+          type: 'integer'
+        changedAt:
+          type: 'integer'
+        version:
+          type: 'integer'
+        accession:
+          type: 'string'
+        finding:
+          type: 'string'
+        authorisedBy:
+          type: 'string'
+    LabPage:
+      type: 'object'
+      required: ['statuses', 'items', 'total']
+      properties:
+        statuses:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['status', 'count']
+            properties:
+              status:
+                type: 'string'
+                enum: ['Ordered', 'Collected', 'Processing', 'Entered', 'Authorised', 'Published']
+              count:
+                type: 'integer'
+        items:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['order', 'patient']
+            properties:
+              order: { '$ref': '#/components/schemas/LabOrder' }
+              patient: { '$ref': '#/components/schemas/Patient' }
+        total:
+          type: 'integer'
+    Invoice:
+      type: 'object'
+      required: ['id', 'facilityId', 'patientId', 'encounterId', 'day', 'lines']
+      properties:
+        id:
+          type: 'string'
+        facilityId:
+          type: 'string'
+        patientId:
+          type: 'string'
+        encounterId:
+          type: 'string'
+        day:
+          type: 'string'
+          format: 'date'
+        lines:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['description', 'unitMinor', 'quantity']
+            properties:
+              description:
+                type: 'string'
+              unitMinor:
+                type: 'integer'
+              quantity:
+                type: 'integer'
+    InvoiceRow:
+      type: 'object'
+      required: ['invoice', 'patient', 'totalMinor', 'balanceMinor']
+      properties:
+        invoice: { '$ref': '#/components/schemas/Invoice' }
+        patient: { '$ref': '#/components/schemas/Patient' }
+        totalMinor:
+          type: 'integer'
+        balanceMinor:
+          type: 'integer'
+    BillingOptions:
+      type: 'object'
+      required: ['services', 'encounters']
+      properties:
+        services:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['description', 'unitMinor']
+            properties:
+              description:
+                type: 'string'
+              unitMinor:
+                type: 'integer'
+        encounters:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['id', 'name', 'patientId']
+            properties:
+              id:
+                type: 'string'
+              name:
+                type: 'string'
+              patientId:
+                type: 'string'
+    Portal:
+      type: 'object'
+      required: ['patient', 'clinicians', 'appointments', 'records', 'invoices']
+      properties:
+        patient: { '$ref': '#/components/schemas/Patient' }
+        clinicians:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/Practitioner' }
+        appointments:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['appointment', 'practitioner']
+            properties:
+              appointment: { '$ref': '#/components/schemas/Appointment' }
+              practitioner: { '$ref': '#/components/schemas/Practitioner' }
+              ticket: { '$ref': '#/components/schemas/Ticket' }
+        records:
+          type: 'array'
+          items: { '$ref': '#/components/schemas/LabOrder' }
+        invoices:
+          type: 'array'
+          items:
+            type: 'object'
+            required: ['id', 'day', 'totalMinor', 'balanceMinor']
+            properties:
+              id:
+                type: 'string'
+              day:
+                type: 'string'
+                format: 'date'
+              totalMinor:
+                type: 'integer'
+              balanceMinor:
+                type: 'integer'
+    QueueDisplay:
+      type: object
+      required:
+        - facility
+        - calling
+        - waiting
+      properties:
+        facility:
+          type: string
+        waiting:
+          type: integer
+        calling:
+          type: array
+          items:
+            type: object
+            required:
+              - number
+              - specialty
+            properties:
+              number:
+                type: integer
+              specialty:
+                type: string
+    Organisation:
+      type: object
+      required:
+        - id
+        - name
+        - plan
+      properties:
+        id: &a1
+          type: string
+        name: *a1
+        plan:
+          type: string
+          enum:
+            - Clinic
+            - Hospital
+            - Network
+    PlatformEvent:
+      type: object
+      required:
+        - type
+        - facilityId
+        - entityId
+        - occurredAt
+      properties:
+        type: &a1
+          type: string
+        facilityId: *a1
+        entityId: *a1
+        occurredAt:
+          type: integer
+        actor: *a1
+    PlatformData:
+      type: object
+      required:
+        - organisations
+        - facilities
+        - activity
+      properties:
+        organisations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organisation'
+        facilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Facility'
+        activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlatformEvent'
+  responses:
+    Error401:
+      description: 'Missing or expired session.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }
+    Error403:
+      description: 'Scope or action denied.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }
+    Error404:
+      description: 'Resource unavailable.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }
+    Error409:
+      description: 'Conflict or stale state.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }
+    Error422:
+      description: 'Invalid fields.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }
+    Error503:
+      description: 'Evaluation unavailable.'
+      content:
+        'application/json':
+          schema: { '$ref': '#/components/schemas/Error' }

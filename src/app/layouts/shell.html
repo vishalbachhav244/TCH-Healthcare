@@ -1,0 +1,123 @@
+<a href="#main-content" class="skip-link">Skip to content</a>
+<div class="app-shell" [class.portal-shell]="patientLayout()">
+  <aside
+    class="sidebar"
+    [class.sidebar-open]="menu()"
+    [cdkTrapFocus]="menu()"
+    [cdkTrapFocusAutoCapture]="menu()"
+    (keydown.escape)="closeMenu()"
+  >
+    <div class="sidebar-brand">
+      <a routerLink="/" aria-label="TrueCare home"><tc-brand /></a>
+      <button
+        class="icon-button mobile-only"
+        aria-label="Close navigation"
+        cdkFocusInitial
+        (click)="closeMenu()"
+      >
+        <ng-icon name="close" />
+      </button>
+    </div>
+    @if (store.facility(); as facility) {
+      <div class="facility-tile">
+        <span class="facility-icon"><ng-icon name="building" /></span>
+        <div>
+          <strong>{{ facility.name }}</strong
+          ><small>{{ facility.city }}</small>
+        </div>
+      </div>
+    }
+    <nav id="workspace-navigation" aria-label="Workspace">
+      <p class="nav-label">WORKSPACE</p>
+      @for (entry of store.entries(); track entry.resource) {
+        <a
+          [routerLink]="['/work', entry.resource]"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          (click)="closeMenu()"
+        >
+          <ng-icon [name]="entry.icon" /> <span>{{ entry.title }}</span>
+        </a>
+      }
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-profile">
+        <span class="initials">{{ initials() }}</span>
+        <div>
+          <strong>{{ store.session()?.name }}</strong
+          ><small>Organization account</small>
+        </div>
+      </div>
+      <button class="icon-button" aria-label="Sign out" (click)="signOut()">
+        <ng-icon name="logout" />
+      </button>
+    </div>
+  </aside>
+  @if (menu()) {
+    <button
+      class="nav-scrim"
+      tabindex="-1"
+      aria-label="Close navigation"
+      (click)="closeMenu()"
+    ></button>
+  }
+  <div class="shell-content">
+    <header class="topbar">
+      @if (patientLayout()) {
+        <a routerLink="/" aria-label="TrueCare home"><tc-brand /></a>
+      } @else {
+        <div class="breadcrumbs">
+          <button
+            #menuToggle
+            class="icon-button mobile-only"
+            aria-label="Open navigation"
+            aria-controls="workspace-navigation"
+            [attr.aria-expanded]="menu()"
+            (click)="menu.set(!menu())"
+          >
+            <ng-icon name="menu" />
+          </button>
+          <span class="breadcrumb-root">Workspace</span
+          ><ng-icon class="breadcrumb-root" name="next" /><strong>{{ current() }}</strong>
+        </div>
+      }
+      <div class="topbar-actions">
+        @if (store.facilities().length > 1) {
+          <label class="facility-select">
+            <ng-icon name="hospital" /><span class="sr-only">Facility</span>
+            <select
+              #facilitySelect
+              aria-label="Facility"
+              [value]="store.facility()?.id"
+              (change)="store.selectFacility(facilitySelect.value)"
+            >
+              @for (facility of store.facilities(); track facility.id) {
+                <option [value]="facility.id">{{ facility.name }}</option>
+              }
+            </select>
+            <ng-icon name="chevron" />
+          </label>
+        }
+        @if (store.allowed('overview')) {
+          <a
+            class="icon-button topbar-bell"
+            aria-label="Operational alerts"
+            routerLink="/work/overview"
+            fragment="alerts"
+            ><ng-icon name="bell"
+          /></a>
+        }
+        <details class="profile-menu">
+          <summary class="initials" aria-label="Account menu">{{ initials() }}</summary>
+          <div class="profile-dropdown">
+            <strong>{{ store.session()?.name }}</strong
+            ><button class="text-button" type="button" (click)="signOut()">
+              <ng-icon name="logout" /> Sign out
+            </button>
+          </div>
+        </details>
+      </div>
+    </header>
+    <main id="main-content" tabindex="-1" class="page"><router-outlet /></main>
+  </div>
+</div>

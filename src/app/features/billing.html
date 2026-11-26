@@ -1,0 +1,158 @@
+@let response = data();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> PATIENT FINANCE</p>
+    <h1>Revenue Cycle</h1>
+    <p>Issue consultation invoices and reconcile balances.</p>
+  </div>
+  <div class="page-actions">
+    <label class="date-filter"
+      ><ng-icon name="calendar" /><span class="sr-only">Invoice date</span
+      ><input #date type="date" [value]="day()" (change)="date.value && day.set(date.value)"
+    /></label>
+    @if (store.writeAllowed('billing')) {
+      <button class="button primary" type="button" (click)="newInvoice(invoiceDialog)">
+        <ng-icon name="plus" /> New invoice
+      </button>
+    }
+  </div>
+</section>
+@if (message()) {
+  <p class="inline-notice success" role="status">{{ message() }}</p>
+}
+@if (response.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading invoices…</p>
+} @else if (response.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ response.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="metric-grid compact">
+    <article class="panel metric">
+      <p>Invoices issued</p>
+      <strong>{{ totals().count }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Total invoiced</p>
+      <strong>{{ totals().total | rupees }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Outstanding</p>
+      <strong>{{ totals().due | rupees }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-label="Invoices">
+    <div class="panel-heading"><h2>Invoices</h2></div>
+    @if (response.data.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Invoices table">
+        <table>
+          <caption class="sr-only">
+            Invoices for the selected date
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Patient</th>
+              <th scope="col">Total</th>
+              <th scope="col">Balance</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of response.data; track row.invoice.id) {
+              @let status = row.balanceMinor ? 'Outstanding' : 'Paid';
+              <tr>
+                <td>
+                  <strong>{{ row.patient.name }}</strong
+                  ><small>{{ row.patient.id }}</small>
+                </td>
+                <td>{{ row.totalMinor | rupees }}</td>
+                <td>{{ row.balanceMinor | rupees }}</td>
+                <td>
+                  <span [class]="status | statusTone">{{ status }}</span>
+                </td>
+                <td>
+                  @if (row.balanceMinor && store.writeAllowed('billing')) {
+                    <button class="text-button" (click)="openPayment(row, paymentDialog)">
+                      Record settlement
+                    </button>
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="state-panel">There are no invoices for the selected date.</p>
+    }
+  </section>
+}
+<dialog #invoiceDialog aria-labelledby="invoice-title">
+  <div class="dialog-head">
+    <h2 id="invoice-title">Issue invoice</h2>
+    <button class="icon-button" aria-label="Close" (click)="invoiceDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form [formGroup]="form" class="dialog-body fields" (ngSubmit)="create(invoiceDialog)">
+    @if (settings(); as options) {
+      @if (options.encounters.length) {
+        <label for="encounter">Signed encounter</label
+        ><select id="encounter" formControlName="encounterId">
+          <option value="">Select encounter</option>
+          @for (row of options.encounters; track row.id) {
+            <option [value]="row.id">{{ row.name }} · {{ row.patientId }}</option>
+          }
+        </select>
+        <label for="service">Service</label
+        ><select id="service" formControlName="service">
+          <option value="">Select service</option>
+          @for (item of options.services; track item.description) {
+            <option>{{ item.description }}</option>
+          }
+        </select>
+        <button class="button primary" type="submit" [disabled]="busy()">Issue invoice</button>
+      } @else {
+        <p class="subtle">No signed encounters are awaiting an invoice today.</p>
+      }
+    } @else if (!error()) {
+      <p role="status">Loading signed encounters…</p>
+    }
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+  </form>
+</dialog>
+<dialog #paymentDialog aria-labelledby="payment-title">
+  <div class="dialog-head">
+    <h2 id="payment-title">Record settlement</h2>
+    <button class="icon-button" aria-label="Close" (click)="paymentDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as row) {
+    <div class="dialog-body fields">
+      <p>
+        <strong>{{ row.patient.name }}</strong> · {{ row.balanceMinor | rupees }}
+      </p>
+      <p class="subtle">
+        This records a local settlement entry. Electronic payment processing is unavailable.
+      </p>
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button
+        class="button primary"
+        type="button"
+        [disabled]="busy()"
+        (click)="settle(paymentDialog)"
+      >
+        Confirm settlement
+      </button>
+    </div>
+  }
+</dialog>

@@ -1,0 +1,227 @@
+@let response = data();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> PATIENT PORTAL</p>
+    <h1>My care</h1>
+    <p>{{ store.facility()?.name }}</p>
+  </div>
+  <button
+    class="button primary"
+    type="button"
+    [disabled]="response.state !== 'ready'"
+    (click)="open(visitDialog)"
+  >
+    <ng-icon name="calendar" /> Book a visit
+  </button>
+</section>
+@if (message()) {
+  <p class="inline-notice success" role="status">{{ message() }}</p>
+}
+@if (response.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading your care information…</p>
+} @else if (response.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ response.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <section class="portal-next panel">
+    <span class="square-icon teal"><ng-icon name="calendar" /></span>
+    <div>
+      <h2>Your next appointment</h2>
+      @if (next(); as visit) {
+        <p>{{ visit.practitioner.name }} · {{ visit.practitioner.specialty }}</p>
+        <p>
+          {{ visit.appointment.day + 'T12:00:00Z' | date: 'EEE, d MMM y' : 'UTC' }} ·
+          {{ visit.appointment.time }} IST
+        </p>
+        @if (visit.ticket) {
+          <p>
+            <span [class]="visit.ticket.status | statusTone">{{ visit.ticket.status }}</span> Token
+            {{ visit.ticket.number }}
+          </p>
+        }
+      } @else {
+        <p>You have no upcoming appointments.</p>
+      }
+    </div>
+    @if (next(); as visit) {
+      @if (visit.appointment.status === 'Booked') {
+        <button
+          class="button secondary"
+          type="button"
+          (click)="open(visitDialog, visit.appointment.id)"
+        >
+          <ng-icon name="scan" /> Appointment pass
+        </button>
+      }
+    }
+  </section>
+  <div class="view-controls portal-controls" aria-label="My care views">
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="active() === 'visits'"
+      (click)="active.set('visits')"
+    >
+      Appointments
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="active() === 'records'"
+      (click)="active.set('records')"
+    >
+      Reports
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="active() === 'billing'"
+      (click)="active.set('billing')"
+    >
+      Bills
+    </button>
+  </div>
+  @switch (active()) {
+    @case ('visits') {
+      <section class="panel portal-list">
+        <h2>Appointments</h2>
+        @for (visit of response.data.appointments; track visit.appointment.id) {
+          <article>
+            <span class="square-icon teal"><ng-icon name="calendar" /></span>
+            <div>
+              <strong>{{ visit.practitioner.specialty }}</strong>
+              <p>
+                {{ visit.appointment.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} ·
+                {{ visit.appointment.time }} IST · {{ visit.practitioner.name }}
+              </p>
+            </div>
+            <span [class]="visit.appointment.status | statusTone">{{
+              visit.appointment.status
+            }}</span>
+          </article>
+        } @empty {
+          <p class="subtle">There are no visits in your appointment history.</p>
+        }
+      </section>
+    }
+    @case ('records') {
+      <section class="panel portal-list">
+        <h2>Released laboratory reports</h2>
+        @for (item of response.data.records; track item.id) {
+          <article>
+            <span class="square-icon blue"><ng-icon name="flask" /></span>
+            <div>
+              <strong>{{ item.test }}</strong>
+              <p>{{ item.changedAt | date: 'd MMM y' : '+0530' }} · {{ item.accession }}</p>
+            </div>
+            <button class="text-button" type="button" (click)="showReport(item, recordDialog)">
+              View report <ng-icon name="next" />
+            </button>
+          </article>
+        } @empty {
+          <p class="subtle">There are no published reports in your record.</p>
+        }
+      </section>
+    }
+    @case ('billing') {
+      <section class="panel portal-list">
+        <h2>Bills and balances</h2>
+        @for (bill of response.data.invoices; track bill.id) {
+          <article>
+            <span class="square-icon amber"><ng-icon name="wallet" /></span>
+            <div>
+              <strong>{{ bill.totalMinor | rupees }}</strong>
+              <p>
+                {{ bill.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} · Balance
+                {{ bill.balanceMinor | rupees }}
+              </p>
+            </div>
+            <span [class]="(bill.balanceMinor ? 'Outstanding' : 'Paid') | statusTone">{{
+              bill.balanceMinor ? 'Outstanding' : 'Paid'
+            }}</span>
+          </article>
+        } @empty {
+          <p class="subtle">There are no bills for this facility.</p>
+        }
+      </section>
+    }
+  }
+}
+<dialog #visitDialog aria-labelledby="portal-booking">
+  <div class="dialog-head">
+    <h2 id="portal-booking">{{ booking() && !pass() ? 'Book a visit' : 'Appointment pass' }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="visitDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (booking() && !pass()) {
+    <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="book()">
+      <label for="portal-clinician">Find a clinician</label
+      ><select id="portal-clinician" formControlName="practitionerId" required>
+        <option value="">Select a clinician</option>
+        @if (response.state === 'ready') {
+          @for (clinician of response.data.clinicians; track clinician.id) {
+            <option [value]="clinician.id">{{ clinician.name }} · {{ clinician.specialty }}</option>
+          }
+        }
+      </select>
+      <div class="field-pair">
+        <label>Date<input type="date" formControlName="day" [min]="today" required /></label
+        ><label
+          >Time<input
+            type="time"
+            formControlName="time"
+            min="09:00"
+            max="16:45"
+            step="900"
+            required
+        /></label>
+      </div>
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="busy()">Book appointment</button>
+    </form>
+  } @else {
+    <div class="dialog-body pass-body">
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      } @else if (pass()) {
+        <p>Show this pass at reception on the appointment date.</p>
+        @if (qr()) {
+          <img
+            [src]="qr()"
+            width="192"
+            height="192"
+            alt="QR appointment pass with the equivalent code below."
+          />
+        }
+        <code>{{ pass() }}</code>
+      } @else {
+        <p role="status">Preparing your appointment pass…</p>
+      }
+    </div>
+  }
+</dialog>
+<dialog #recordDialog aria-labelledby="record-title">
+  <div class="dialog-head">
+    <h2 id="record-title">{{ report()?.test }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="recordDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (report(); as item) {
+    <div class="dialog-body fields">
+      <p>
+        <strong>{{ store.facility()?.name }}</strong>
+      </p>
+      <p>{{ item.finding }}</p>
+      <p class="subtle">
+        Accession {{ item.accession }} · Published
+        {{ item.changedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST
+      </p>
+    </div>
+  }
+</dialog>

@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "application-shell",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/index.html",
+          "/main-*.js",
+          "/styles-*.css",
+          "/truecare.svg",
+          "/manifest.webmanifest",
+          "/media/*.woff2"
+        ]
+      }
+    },
+    {
+      "name": "visited-workspaces",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": { "files": ["/chunk-*.js"] }
+    }
+  ],
+  "navigationUrls": ["/**", "!/api/**", "!/**/*.*"]
+}

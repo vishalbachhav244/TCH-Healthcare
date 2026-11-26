@@ -1,0 +1,100 @@
+@let response = data();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> PATIENT ACCESS</p>
+    <h1>Patient Registry</h1>
+    <p>Find an existing patient or issue a new patient ID.</p>
+  </div>
+  <div class="page-actions">
+    @if (store.allowed('appointments')) {
+      <a class="button secondary" routerLink="/work/appointments"
+        ><ng-icon name="calendar" /> Appointments</a
+      >
+    }
+    @if (store.writeAllowed('patients')) {
+      <button class="button primary" (click)="open(registration)">
+        <ng-icon name="plus" /> Register patient
+      </button>
+    }
+  </div>
+</section>
+@if (registered()) {
+  <p class="inline-notice success" role="status">{{ registered() }}</p>
+}
+<section class="panel table-panel" aria-label="Patient lookup">
+  <div class="filter-bar">
+    <label class="search-field"
+      ><ng-icon name="search" /><span class="sr-only">Search patients</span
+      ><input type="search" [formControl]="search" placeholder="Search by patient name or ID"
+    /></label>
+  </div>
+  @if (response.state === 'loading') {
+    <p class="state-panel" role="status">Loading the patient registry…</p>
+  } @else if (response.state === 'error') {
+    <div class="state-panel">
+      <p role="alert">{{ response.message }}</p>
+      <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+    </div>
+  } @else if (!response.data.patients.length) {
+    <p class="state-panel">No patients match this search.</p>
+  } @else {
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Registered patients table">
+      <table>
+        <caption class="sr-only">
+          Registered patients
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Patient</th>
+            <th scope="col">Patient ID</th>
+            <th scope="col">Age</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (patient of response.data.patients; track patient.id) {
+            <tr>
+              <td>
+                <div class="identity">
+                  <span class="table-initials">{{ patient.initials }}</span
+                  ><strong>{{ patient.name }}</strong>
+                </div>
+              </td>
+              <td>{{ patient.id }}</td>
+              <td>{{ patient.age }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (response.data.patients.length === 35) {
+      <p class="table-footer">
+        Showing the first 35 matches. Search by name or ID to refine results.
+      </p>
+    }
+  }
+</section>
+<dialog #registration aria-labelledby="registration-heading">
+  <div class="dialog-head">
+    <h2 id="registration-heading">Register patient</h2>
+    <button class="icon-button" aria-label="Close" (click)="registration.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" (submit)="$event.preventDefault(); register(registration)">
+    <label for="registration-code">Issued registration code</label
+    ><input
+      id="registration-code"
+      [formControl]="code"
+      autocomplete="off"
+      placeholder="REG-1001"
+      required
+    />
+    <p class="subtle">
+      The registration code assigns a profile and prevents duplicate registration.
+    </p>
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+    <button type="submit" class="button primary" [disabled]="busy()">Register patient</button>
+  </form>
+</dialog>

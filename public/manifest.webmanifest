@@ -1,0 +1,13 @@
+{
+  "name": "TrueCare",
+  "short_name": "TrueCare",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f8f7",
+  "theme_color": "#176b65",
+  "icons": [
+    { "src": "/truecare.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

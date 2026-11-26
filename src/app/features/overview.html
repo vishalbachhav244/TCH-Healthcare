@@ -1,0 +1,280 @@
+@let current = result();
+<section class="page-intro overview-intro">
+  <div>
+    <p class="eyebrow"><span></span> HOSPITAL OPERATIONS</p>
+    <h1>Hospital Overview</h1>
+    <p>
+      {{ store.facility()?.name }} <span class="middot">·</span>
+      {{ day() + 'T12:00:00Z' | date: 'EEEE, d MMMM y' : 'UTC' }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <label class="date-filter"
+      ><ng-icon name="calendar" /><span class="sr-only">Reporting date</span>
+      <input #date type="date" [value]="day()" (change)="date.value && day.set(date.value)" />
+    </label>
+    <button
+      class="button primary"
+      type="button"
+      [disabled]="current.state !== 'ready'"
+      (click)="current.state === 'ready' && exportSummary(current.data)"
+    >
+      <ng-icon name="download" /> Export summary
+    </button>
+  </div>
+</section>
+@if (current.state === 'loading') {
+  <div class="panel state-panel" role="status">Loading hospital activity…</div>
+} @else if (current.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ current.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  @let data = current.data;
+  @let metrics = data.metrics;
+  @let visitsChange = difference(metrics.appointments, metrics.priorAppointments);
+  @let occupancy = percentage(metrics.bedsOccupied, metrics.bedCapacity);
+  @let revenueChange = difference(metrics.revenueMinor, metrics.priorRevenueMinor);
+  <div class="metric-grid enter">
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon teal"><ng-icon name="calendar" /></span>
+        @if (visitsChange !== null) {
+          <span class="trend-tag" [class.trend-down]="visitsChange < 0"
+            ><ng-icon [name]="visitsChange >= 0 ? 'up' : 'down'" /> {{ visitsChange }}%</span
+          >
+        }
+      </div>
+      <p>Appointments</p>
+      <strong>{{ metrics.appointments | number }}</strong
+      ><small>Compared with previous day</small>
+    </article>
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon violet"><ng-icon name="clock" /></span
+        ><span class="metric-note">{{ metrics.activeQueue }} active</span>
+      </div>
+      <p>Average wait time</p>
+      <strong>{{ metrics.averageWait }} <em>min</em></strong
+      ><small>Arrival to first call</small>
+    </article>
+    @if (store.facility()?.inpatient) {
+      <article class="panel metric">
+        <div class="metric-top">
+          <span class="square-icon blue"><ng-icon name="bed" /></span>
+        </div>
+        <p>Bed occupancy</p>
+        <strong>{{ occupancy }}<em>%</em></strong
+        ><small>{{ metrics.bedsOccupied }} of {{ metrics.bedCapacity }} serviceable beds</small>
+      </article>
+    }
+    <article class="panel metric">
+      <div class="metric-top">
+        <span class="square-icon amber"><ng-icon name="wallet" /></span>
+        @if (revenueChange !== null) {
+          <span class="trend-tag" [class.trend-down]="revenueChange < 0"
+            ><ng-icon [name]="revenueChange >= 0 ? 'up' : 'down'" /> {{ revenueChange }}%</span
+          >
+        }
+      </div>
+      <p>Collections</p>
+      <strong>{{ metrics.revenueMinor | rupees: false }}</strong
+      ><small>Payments recorded on selected day</small>
+    </article>
+  </div>
+
+  <div class="overview-grid enter">
+    <section class="panel flow-panel" aria-labelledby="flow-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="flow-heading">Patient flow</h2>
+          <p>Scheduled appointments and walk-ins</p>
+        </div>
+        <label class="select-control"
+          ><span class="sr-only">Trend period</span>
+          <select #period [value]="range()" (change)="range.set(+period.value)">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart-legend">
+        <span><i></i>Scheduled</span><span><i></i>Walk-ins</span>
+      </div>
+      <tc-trend [days]="data.days" />
+      <details class="chart-details">
+        <summary>View trend data</summary>
+        <table>
+          <caption class="sr-only">
+            Patient flow per day
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Scheduled</th>
+              <th scope="col">Walk-ins</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (point of data.days; track point.day) {
+              <tr>
+                <td>{{ point.day + 'T12:00:00Z' | date: 'd MMM' : 'UTC' }}</td>
+                <td>{{ point.scheduled }}</td>
+                <td>{{ point.walkIn }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </details>
+    </section>
+
+    <section id="alerts" class="panel alerts-panel" aria-labelledby="alert-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="alert-heading">Operational alerts</h2>
+          <p>Items for facility review</p>
+        </div>
+        <span class="alert-count">{{ newAlerts() }} open</span>
+      </div>
+      <p class="sr-only" role="status">{{ feedback() }}</p>
+      <div class="alert-list">
+        @for (alert of data.alerts; track alert.id) {
+          <button
+            type="button"
+            class="alert-row"
+            (click)="selectedAlert.set(selectedAlert()?.id === alert.id ? undefined : alert)"
+            [attr.aria-expanded]="selectedAlert()?.id === alert.id"
+          >
+            <span
+              class="square-icon"
+              [class.rose]="alert.severity === 'Priority'"
+              [class.amber]="alert.severity === 'Attention'"
+              [class.blue]="alert.severity === 'Information'"
+              ><ng-icon
+                [name]="
+                  alert.severity === 'Priority'
+                    ? 'alert'
+                    : alert.severity === 'Attention'
+                      ? 'clock'
+                      : 'clipboard'
+                "
+            /></span>
+            <span class="alert-copy"
+              ><strong>{{ alert.title }}</strong
+              ><small>{{ alert.acknowledged ? 'Acknowledged' : alert.detail }}</small></span
+            >
+            <ng-icon name="next" />
+          </button>
+          @if (selectedAlert()?.id === alert.id) {
+            <div class="alert-detail">
+              <span [class]="(alert.acknowledged ? 'Acknowledged' : alert.severity) | statusTone">{{
+                alert.acknowledged ? 'Acknowledged' : alert.severity
+              }}</span>
+              <span>{{ alert.time }} IST</span>
+              @if (!alert.acknowledged && store.writeAllowed('overview')) {
+                <button
+                  class="button secondary"
+                  type="button"
+                  [disabled]="!!busy()"
+                  (click)="acknowledge()"
+                >
+                  Acknowledge
+                </button>
+              }
+              @if (feedback()) {
+                <span class="field-error">{{ feedback() }}</span>
+              }
+            </div>
+          }
+        } @empty {
+          <p class="subtle callout">No facility alerts.</p>
+        }
+      </div>
+      @if (store.allowed('queue')) {
+        <a class="panel-link" routerLink="/work/queue"
+          ><ng-icon name="list" /> Open consultation queue <ng-icon name="arrow"
+        /></a>
+      }
+    </section>
+  </div>
+
+  <div class="overview-grid overview-bottom enter">
+    <section class="panel table-panel" aria-labelledby="appointments-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="appointments-heading">Appointment activity</h2>
+          <p>Patient arrivals and consultations</p>
+        </div>
+        @if (store.allowed('appointments')) {
+          <a class="text-button" routerLink="/work/appointments" [queryParams]="{ day: day() }"
+            >View schedule <ng-icon name="arrow"
+          /></a>
+        }
+      </div>
+      @if (data.appointments.length) {
+        <div
+          class="table-scroll"
+          tabindex="0"
+          role="region"
+          aria-label="Appointment activity table"
+        >
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Patient</th>
+                <th scope="col">Department</th>
+                <th scope="col">Time</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of data.appointments; track row.appointment.id) {
+                <tr>
+                  <td>
+                    <div class="identity">
+                      <span class="table-initials">{{ row.patient.initials }}</span
+                      ><strong>{{ row.patient.name }}</strong>
+                    </div>
+                  </td>
+                  <td>{{ row.practitioner.specialty }}</td>
+                  <td>{{ row.appointment.time }}</td>
+                  <td>
+                    <span [class]="row.appointment.status | statusTone">{{
+                      row.appointment.status
+                    }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="state-panel">There are no appointments for the selected date.</div>
+      }
+    </section>
+    <section class="panel departments" aria-labelledby="departments-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="departments-heading">Department activity</h2>
+          <p>Completed consultations</p>
+        </div>
+      </div>
+      @for (department of data.departments; track department.name) {
+        <div class="department-row">
+          <div>
+            <span>{{ department.name }}</span
+            ><strong
+              >{{ department.completed }} <small>/ {{ department.appointments }}</small></strong
+            >
+          </div>
+          <progress
+            [value]="department.completed"
+            [max]="department.appointments || 1"
+            [attr.aria-label]="department.name + ' completed consultations'"
+          ></progress>
+        </div>
+      }
+    </section>
+  </div>
+}

@@ -1,0 +1,233 @@
+export const specialties = [
+  'General Medicine',
+  'Cardiology',
+  'Orthopaedics',
+  'Paediatrics',
+  'Dermatology',
+  'ENT',
+] as const;
+export type Specialty = (typeof specialties)[number];
+
+export interface Facility {
+  id: string;
+  tenantId: string;
+  name: string;
+  city: string;
+  inpatient: boolean;
+  publicQueue?: boolean;
+  configurationVersion?: number;
+}
+
+export interface Patient {
+  id: string;
+  tenantId: string;
+  name: string;
+  initials: string;
+  age: number;
+}
+
+export interface Practitioner {
+  id: string;
+  facilityId: string;
+  name: string;
+  specialty: Specialty;
+}
+
+export interface Appointment {
+  id: string;
+  facilityId: string;
+  patientId: string;
+  practitionerId: string;
+  day: string;
+  time: string;
+  channel: 'Scheduled' | 'Walk-in';
+  status: 'Booked' | 'Checked in' | 'In consultation' | 'Completed' | 'Cancelled';
+  pass?: string;
+}
+
+export interface Ticket {
+  id: string;
+  facilityId: string;
+  appointmentId: string;
+  number: number;
+  arrivedAt: number;
+  calledAt?: number;
+  status: 'Waiting' | 'Called' | 'In consultation' | 'Completed' | 'Skipped';
+}
+
+export interface QueueDisplayData {
+  facility: string;
+  calling: { number: number; specialty: Specialty }[];
+  waiting: number;
+}
+
+export interface Encounter {
+  id: string;
+  facilityId: string;
+  appointmentId: string;
+  patientId: string;
+  practitionerId: string;
+  startedAt: number;
+  signedAt?: number;
+  observation?: Observation;
+}
+
+export const observations = [
+  'History reviewed and findings documented.',
+  'Observation completed. Follow-up discussed.',
+  'Records reviewed. Diagnostic review requested.',
+] as const;
+export type Observation = (typeof observations)[number];
+
+export interface Invoice {
+  id: string;
+  facilityId: string;
+  patientId: string;
+  encounterId: string;
+  day: string;
+  lines: { description: string; unitMinor: number; quantity: number }[];
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  day: string;
+  amountMinor: number;
+}
+
+export interface Bed {
+  id: string;
+  facilityId: string;
+  label: string;
+  ward: string;
+  status: 'Available' | 'Occupied' | 'Cleaning' | 'Maintenance';
+}
+
+export interface Admission {
+  id: string;
+  facilityId: string;
+  patientId: string;
+  requestedAt: number;
+  admittedAt?: number;
+  dischargedAt?: number;
+  bedId?: string;
+  status: 'Requested' | 'Admitted' | 'Discharged';
+  version: number;
+}
+
+export interface InpatientBoard {
+  beds: Bed[];
+  admissions: { admission: Admission; patient: Patient }[];
+}
+
+export interface Alert {
+  id: string;
+  facilityId: string;
+  title: string;
+  detail: string;
+  severity: 'Priority' | 'Attention' | 'Information';
+  time: string;
+  acknowledged: boolean;
+}
+
+export interface Session {
+  token: string;
+  account: string;
+  name: string;
+  workspaces: string[];
+  writes: string[];
+  facilityIds: string[];
+  expiresAt: number;
+}
+
+export interface AppointmentRow {
+  appointment: Appointment;
+  patient: Patient;
+  practitioner: Practitioner;
+  ticket?: Ticket;
+  encounter?: Encounter;
+}
+
+export interface DashboardData {
+  days: { day: string; scheduled: number; walkIn: number }[];
+  metrics: {
+    appointments: number;
+    priorAppointments: number;
+    activeQueue: number;
+    averageWait: number;
+    bedCapacity: number;
+    bedsOccupied: number;
+    revenueMinor: number;
+    priorRevenueMinor: number;
+  };
+  departments: { name: Specialty; appointments: number; completed: number; waiting: number }[];
+  alerts: Alert[];
+  appointments: AppointmentRow[];
+}
+
+export interface AppointmentPage {
+  items: AppointmentRow[];
+  total: number;
+}
+
+export interface AccessOptions {
+  practitioners: Practitioner[];
+  patients: Patient[];
+}
+
+export interface InvoiceRow {
+  invoice: Invoice;
+  patient: Patient;
+  balanceMinor: number;
+  totalMinor: number;
+}
+
+export type EventType =
+  | 'PatientRegistered'
+  | 'AppointmentBooked'
+  | 'PatientCheckedIn'
+  | 'QueueTicketCalled'
+  | 'EncounterStarted'
+  | 'EncounterCompleted'
+  | 'InvoiceCreated'
+  | 'PaymentRecorded'
+  | 'AlertAcknowledged'
+  | 'AdmissionRequested'
+  | 'BedAllocated'
+  | 'PatientAdmitted'
+  | 'PatientDischarged'
+  | 'BedReleased'
+  | 'ClinicalOrderCreated'
+  | 'LabStageChanged'
+  | 'LabResultAuthorized'
+  | 'LabResultPublished'
+  | 'AppointmentPassIssued'
+  | 'OrganisationCreated'
+  | 'FacilityCreated'
+  | 'ModuleConfigurationChanged';
+
+export interface DomainEvent {
+  type: EventType;
+  facilityId: string;
+  entityId: string;
+  occurredAt: number;
+  actor?: string;
+}
+
+export const dayInIndia = (value = Date.now()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+
+export function shiftDay(day: string, amount: number) {
+  const date = new Date(day + 'T00:00:00.000Z');
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+export function invoiceTotal(invoice: Invoice) {
+  return invoice.lines.reduce((total, line) => total + line.unitMinor * line.quantity, 0);
+}

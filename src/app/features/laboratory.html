@@ -1,0 +1,159 @@
+@let data = result();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow"><span></span> DIAGNOSTICS</p>
+    <h1>Laboratory Worklist</h1>
+    <p>Track specimens, diagnostic review and report publication.</p>
+  </div>
+</section>
+@if (feedback()) {
+  <p class="inline-notice success" role="status">{{ feedback() }}</p>
+}
+@if (data.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading the laboratory…</p>
+} @else if (data.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ data.message }}</p>
+    <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  <div class="pipeline" aria-label="Laboratory stages">
+    @for (step of data.data.statuses; track step.status) {
+      <button
+        class="panel pipeline-step"
+        type="button"
+        [attr.aria-pressed]="step.status === state()"
+        (click)="state.set(step.status === state() ? '' : step.status); offset.set(0)"
+      >
+        <ng-icon name="flask" /><span>{{ step.status }}</span
+        ><strong>{{ step.count }}</strong>
+      </button>
+    }
+  </div>
+  <section class="panel table-panel" aria-label="Specimen and result worklist">
+    <div class="filter-bar">
+      <label class="search-field"
+        ><ng-icon name="search" /><span class="sr-only">Search laboratory orders</span
+        ><input
+          type="search"
+          [formControl]="search"
+          (input)="offset.set(0)"
+          placeholder="Search patient, test or accession"
+      /></label>
+      @if (state()) {
+        <button class="text-button" type="button" (click)="state.set(''); offset.set(0)">
+          Clear stage <ng-icon name="close" />
+        </button>
+      }
+    </div>
+    @if (data.data.items.length) {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Laboratory orders table">
+        <table>
+          <caption class="sr-only">
+            Laboratory orders
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Test</th>
+              <th scope="col">Patient</th>
+              <th scope="col">Accession</th>
+              <th scope="col">Order time</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of data.data.items; track row.order.id) {
+              <tr>
+                <td>
+                  <strong>{{ row.order.test }}</strong>
+                </td>
+                <td>
+                  {{ row.patient.name }}<small>{{ row.patient.id }}</small>
+                </td>
+                <td>{{ row.order.accession || '—' }}</td>
+                <td>{{ row.order.orderedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</td>
+                <td>
+                  <span [class]="row.order.status | statusTone">{{ row.order.status }}</span>
+                </td>
+                <td>
+                  <button class="text-button" type="button" (click)="open(row, orderDialog)">
+                    {{ action(row.order.status) || 'View order' }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span
+          >{{ offset() + 1 }}–{{ offset() + data.data.items.length }} of {{ data.data.total }}</span
+        >
+        <div>
+          <button
+            class="icon-button"
+            type="button"
+            aria-label="Previous page"
+            [disabled]="offset() === 0"
+            (click)="offset.set(offset() - 12)"
+          >
+            <ng-icon name="previous" />
+          </button>
+          <button
+            class="icon-button"
+            type="button"
+            aria-label="Next page"
+            [disabled]="offset() + 12 >= data.data.total"
+            (click)="offset.set(offset() + 12)"
+          >
+            <ng-icon name="next" />
+          </button>
+        </div>
+      </div>
+    } @else {
+      <p class="state-panel">No orders match this worklist.</p>
+    }
+  </section>
+}
+<dialog #orderDialog aria-labelledby="lab-order-title">
+  <div class="dialog-head">
+    <h2 id="lab-order-title">{{ selected()?.order?.test }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="orderDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as row) {
+    <form class="dialog-body fields" (submit)="$event.preventDefault(); advance(orderDialog)">
+      <div class="identity">
+        <span class="table-initials">{{ row.patient.initials }}</span>
+        <div>
+          <strong>{{ row.patient.name }}</strong
+          ><small>{{ row.patient.id }}</small>
+        </div>
+      </div>
+      <p>
+        <span [class]="row.order.status | statusTone">{{ row.order.status }}</span>
+        {{ row.order.accession }}
+      </p>
+      @if (row.order.finding) {
+        <p>{{ row.order.finding }}</p>
+      }
+      @if (action(row.order.status); as label) {
+        @if (row.order.status === 'Processing') {
+          <label for="result-entry">Result</label
+          ><select id="result-entry" [formControl]="finding" required>
+            <option value="">Select the recorded result</option>
+            @for (value of findings; track value) {
+              <option>{{ value }}</option>
+            }
+          </select>
+        }
+        @if (failure()) {
+          <p class="field-error" role="alert">{{ failure() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">{{ label }}</button>
+      }
+    </form>
+  }
+</dialog>

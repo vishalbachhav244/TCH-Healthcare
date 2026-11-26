@@ -1,0 +1,145 @@
+export type Resource =
+  | 'platform'
+  | 'overview'
+  | 'appointments'
+  | 'patients'
+  | 'queue'
+  | 'clinical'
+  | 'beds'
+  | 'billing'
+  | 'laboratory'
+  | 'portal';
+
+interface Workspace {
+  id: string;
+  title: string;
+  group: string;
+  icon: string;
+  resource?: Resource;
+  inpatient?: boolean;
+}
+
+export const workspaces: readonly Workspace[] = [
+  {
+    id: 'D01',
+    title: 'SaaS Super Admin',
+    group: 'Platform',
+    icon: 'building',
+    resource: 'platform',
+  },
+  { id: 'D02', title: 'Customer Success & Subscriptions', group: 'Platform', icon: 'users' },
+  { id: 'D03', title: 'Platform Operations', group: 'Platform', icon: 'activity' },
+  { id: 'D04', title: 'Interoperability & Integration', group: 'Platform', icon: 'network' },
+  { id: 'D05', title: 'Healthcare Network Executive', group: 'Governance', icon: 'network' },
+  {
+    id: 'D06',
+    title: 'Hospital Overview',
+    group: 'Governance',
+    icon: 'layout',
+    resource: 'overview',
+  },
+  { id: 'D07', title: 'Medical Director', group: 'Governance', icon: 'stethoscope' },
+  { id: 'D08', title: 'Quality & Compliance', group: 'Governance', icon: 'shield' },
+  {
+    id: 'D09',
+    title: 'Front Desk & Reception',
+    group: 'Patient access',
+    icon: 'users',
+    resource: 'patients',
+  },
+  {
+    id: 'D10',
+    title: 'Appointments & Scheduling',
+    group: 'Patient access',
+    icon: 'calendar',
+    resource: 'appointments',
+  },
+  {
+    id: 'D11',
+    title: 'Smart Queue Command Center',
+    group: 'Patient access',
+    icon: 'list',
+    resource: 'queue',
+  },
+  {
+    id: 'D12',
+    title: 'Patient & Family',
+    group: 'Patient access',
+    icon: 'heart',
+    resource: 'portal',
+  },
+  {
+    id: 'D13',
+    title: 'Doctor / OPD Workspace',
+    group: 'Clinical',
+    icon: 'stethoscope',
+    resource: 'clinical',
+  },
+  {
+    id: 'D14',
+    title: 'IPD Physician Workspace',
+    group: 'Clinical',
+    icon: 'clipboard',
+    inpatient: true,
+  },
+  { id: 'D15', title: 'Nursing Station', group: 'Clinical', icon: 'heart', inpatient: true },
+  {
+    id: 'D16',
+    title: 'Emergency / Casualty',
+    group: 'Clinical',
+    icon: 'activity',
+    inpatient: true,
+  },
+  { id: 'D17', title: 'ICU & Critical Care', group: 'Clinical', icon: 'monitor', inpatient: true },
+  { id: 'D18', title: 'Operation Theatre', group: 'Clinical', icon: 'clipboard', inpatient: true },
+  {
+    id: 'D19',
+    title: 'Admission, Bed & Discharge',
+    group: 'Clinical',
+    icon: 'bed',
+    resource: 'beds',
+    inpatient: true,
+  },
+  {
+    id: 'D20',
+    title: 'Laboratory / LIMS',
+    group: 'Diagnostics',
+    icon: 'flask',
+    resource: 'laboratory',
+  },
+  { id: 'D21', title: 'Radiology & Imaging', group: 'Diagnostics', icon: 'monitor' },
+  { id: 'D22', title: 'Pharmacy', group: 'Diagnostics', icon: 'cross' },
+  { id: 'D23', title: 'Blood Bank', group: 'Diagnostics', icon: 'heart' },
+  {
+    id: 'D24',
+    title: 'Patient Billing & Cashier',
+    group: 'Finance',
+    icon: 'wallet',
+    resource: 'billing',
+  },
+  { id: 'D25', title: 'Finance & Revenue', group: 'Finance', icon: 'chart' },
+  { id: 'D26', title: 'Insurance & TPA', group: 'Finance', icon: 'shield' },
+  { id: 'D27', title: 'Inventory & Stores', group: 'Operations', icon: 'box' },
+  { id: 'D28', title: 'Procurement', group: 'Operations', icon: 'clipboard' },
+  { id: 'D29', title: 'HR & Workforce', group: 'Operations', icon: 'users' },
+  { id: 'D30', title: 'Asset & Biomedical Engineering', group: 'Operations', icon: 'settings' },
+  { id: 'D31', title: 'Hospital Support Services', group: 'Operations', icon: 'layers' },
+  { id: 'D32', title: 'Ambulance & Patient Transport', group: 'Operations', icon: 'activity' },
+  { id: 'D33', title: 'Healthcare CRM & Contact Center', group: 'Engagement', icon: 'users' },
+  { id: 'D34', title: 'Marketing & Engagement', group: 'Engagement', icon: 'heart' },
+  { id: 'D35', title: 'Enterprise Analytics & BI', group: 'Intelligence', icon: 'chart' },
+  { id: 'D36', title: 'AI & Automation Control Center', group: 'Intelligence', icon: 'settings' },
+];
+
+export const navigation = [
+  { title: 'Organizations', resource: 'platform', icon: 'building', workspace: 'D01' },
+  { title: 'Overview', resource: 'overview', icon: 'layout', workspace: 'D06' },
+  { title: 'Appointments', resource: 'appointments', icon: 'calendar', workspace: 'D10' },
+  { title: 'Patients', resource: 'patients', icon: 'users', workspace: 'D09' },
+  { title: 'Consultation queue', resource: 'queue', icon: 'list', workspace: 'D11' },
+  { title: 'Clinical workspace', resource: 'clinical', icon: 'stethoscope', workspace: 'D13' },
+  { title: 'Bed management', resource: 'beds', icon: 'bed', workspace: 'D19' },
+  { title: 'Laboratory', resource: 'laboratory', icon: 'flask', workspace: 'D20' },
+  { title: 'Revenue cycle', resource: 'billing', icon: 'wallet', workspace: 'D24' },
+  { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
+] as const;

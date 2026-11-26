@@ -1,0 +1,128 @@
+import { inject } from '@angular/core';
+import { Router, type CanActivateFn, type Routes } from '@angular/router';
+import { evaluationAvailable } from './core/evaluation';
+import { SessionStore } from './core/session';
+import type { Resource } from './domain/workspaces';
+
+const workspaceAccess: CanActivateFn = async (route) => {
+  const router = inject(Router);
+  const store = inject(SessionStore);
+  if (!evaluationAvailable) return router.parseUrl('/unavailable');
+  await store.restore();
+  if (!store.session()) return router.parseUrl('/sign-in');
+  const resource = route.data['resource'] as Resource | undefined;
+  if (resource && !store.allowed(resource)) return router.parseUrl('/denied');
+  return true;
+};
+
+const entry: CanActivateFn = async () => {
+  const router = inject(Router);
+  const store = inject(SessionStore);
+  if (!evaluationAvailable) return router.parseUrl('/unavailable');
+  await store.restore();
+  return router.parseUrl(store.session() ? '/work/' + store.initialRoute() : '/sign-in');
+};
+
+export const routes: Routes = [
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [entry],
+    loadComponent: () => import('./layouts/boundary').then((m) => m.Boundary),
+  },
+  {
+    path: 'sign-in',
+    loadComponent: () => import('./features/sign-in').then((m) => m.SignIn),
+    title: 'Sign in · TrueCare',
+  },
+  {
+    path: 'unavailable',
+    data: { unavailable: true },
+    loadComponent: () => import('./layouts/boundary').then((m) => m.Boundary),
+  },
+  { path: 'denied', loadComponent: () => import('./layouts/boundary').then((m) => m.Boundary) },
+  {
+    path: 'display/:facility',
+    loadComponent: () => import('./features/queue-display').then((m) => m.QueueDisplay),
+    title: 'Queue Display · TrueCare',
+  },
+  {
+    path: 'work',
+    canActivate: [workspaceAccess],
+    loadComponent: () => import('./layouts/shell').then((m) => m.Shell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: '/' },
+      {
+        path: 'platform',
+        data: { resource: 'platform' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/platform').then((m) => m.Platform),
+        title: 'Organizations · TrueCare',
+      },
+      {
+        path: 'overview',
+        data: { resource: 'overview' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/overview').then((m) => m.Overview),
+        title: 'Hospital Overview · TrueCare',
+      },
+      {
+        path: 'appointments',
+        data: { resource: 'appointments' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/access-worklist').then((m) => m.AccessWorklist),
+        title: 'Appointments · TrueCare',
+      },
+      {
+        path: 'queue',
+        data: { resource: 'queue' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/access-worklist').then((m) => m.AccessWorklist),
+        title: 'Consultation Queue · TrueCare',
+      },
+      {
+        path: 'clinical',
+        data: { resource: 'clinical' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/access-worklist').then((m) => m.AccessWorklist),
+        title: 'Clinical Workspace · TrueCare',
+      },
+      {
+        path: 'patients',
+        data: { resource: 'patients' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/patients').then((m) => m.Patients),
+        title: 'Patient Registry · TrueCare',
+      },
+      {
+        path: 'beds',
+        data: { resource: 'beds' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/beds').then((m) => m.Beds),
+        title: 'Bed Management · TrueCare',
+      },
+      {
+        path: 'laboratory',
+        data: { resource: 'laboratory' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/laboratory').then((m) => m.Laboratory),
+        title: 'Laboratory · TrueCare',
+      },
+      {
+        path: 'portal',
+        data: { resource: 'portal' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/portal').then((m) => m.Portal),
+        title: 'My Care · TrueCare',
+      },
+      {
+        path: 'billing',
+        data: { resource: 'billing' },
+        canActivate: [workspaceAccess],
+        loadComponent: () => import('./features/billing').then((m) => m.Billing),
+        title: 'Revenue Cycle · TrueCare',
+      },
+    ],
+  },
+  { path: '**', redirectTo: '' },
+];

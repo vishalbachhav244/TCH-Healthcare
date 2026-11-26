@@ -1,0 +1,346 @@
+@let data = result();
+<section class="page-intro">
+  <div>
+    <p class="eyebrow">
+      <span></span> {{ kind === 'clinical' ? 'CLINICAL CARE' : 'PATIENT ACCESS' }}
+    </p>
+    <h1>{{ heading }}</h1>
+    <p>{{ description }}</p>
+  </div>
+  <div class="page-actions">
+    @if (kind === 'queue' && displayEnabled()) {
+      <a class="button secondary" [routerLink]="['/display', store.facility()?.id]"
+        ><ng-icon name="list" /> Open queue display</a
+      >
+    }
+    @if (kind === 'appointments' && store.writeAllowed(kind)) {
+      <button class="button primary" (click)="openBooking(bookingDialog)">
+        <ng-icon name="plus" /> New appointment
+      </button>
+    } @else if (kind === 'queue' && store.writeAllowed(kind)) {
+      <button class="button primary" (click)="openCheckIn(checkInDialog)">
+        <ng-icon name="scan" /> Verify arrival
+      </button>
+    }
+  </div>
+</section>
+<p class="sr-only" role="status">{{ message() }}</p>
+@if (failure()) {
+  <p class="inline-notice" role="alert">{{ failure() }}</p>
+}
+<section class="panel table-panel" aria-label="Worklist">
+  <div class="filter-bar">
+    <label class="search-field"
+      ><ng-icon name="search" /><span class="sr-only">Search appointments</span
+      ><input
+        type="search"
+        placeholder="Search patient or clinician"
+        [formControl]="search"
+        (input)="offset.set(0)"
+    /></label>
+    <div class="inline-filters">
+      <label class="date-filter"
+        ><ng-icon name="calendar" /><span class="sr-only">Appointment date</span
+        ><input
+          #on
+          type="date"
+          [value]="day()"
+          (change)="on.value && day.set(on.value); offset.set(0)"
+      /></label>
+      <label class="select-control"
+        ><span class="sr-only">Filter by status</span
+        ><select #filter [value]="state()" (change)="state.set(filter.value); offset.set(0)">
+          <option value="">All statuses</option>
+          @for (status of statuses; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select></label
+      >
+    </div>
+  </div>
+  @if (data.state === 'loading') {
+    <p class="state-panel" role="status">Loading {{ heading.toLowerCase() }}…</p>
+  } @else if (data.state === 'error') {
+    <div class="state-panel">
+      <p role="alert">{{ data.message }}</p>
+      <button class="button secondary" (click)="refresh.set(refresh() + 1)">Retry</button>
+    </div>
+  } @else if (!data.data.items.length) {
+    <p class="state-panel">
+      {{
+        search.value || state()
+          ? 'No records match these filters.'
+          : 'There are no records for the selected day.'
+      }}
+    </p>
+  } @else {
+    <div class="table-scroll" tabindex="0" role="region" [attr.aria-label]="heading + ' table'">
+      <table>
+        <caption class="sr-only">
+          {{
+            heading
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Patient</th>
+            <th scope="col">Clinician</th>
+            <th scope="col">{{ kind === 'appointments' ? 'Time' : 'Token' }}</th>
+            <th scope="col">Status</th>
+            @if (store.writeAllowed(kind) && kind !== 'appointments') {
+              <th scope="col">Action</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of data.data.items; track row.appointment.id) {
+            <tr>
+              <td>
+                <div class="identity">
+                  <span class="table-initials">{{ row.patient.initials }}</span>
+                  <div>
+                    <strong>{{ row.patient.name }}</strong
+                    ><small>{{ row.patient.id }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <strong>{{ row.practitioner.name }}</strong
+                ><small>{{ row.practitioner.specialty }}</small>
+              </td>
+              <td>{{ kind === 'appointments' ? row.appointment.time : row.ticket?.number }}</td>
+              @let status =
+                kind === 'appointments'
+                  ? row.appointment.status
+                  : row.ticket?.status || row.appointment.status;
+              <td>
+                <span [class]="status | statusTone">{{ status }}</span>
+              </td>
+              @if (store.writeAllowed(kind) && kind !== 'appointments') {
+                <td>
+                  @if (kind === 'queue' && row.ticket?.status === 'Waiting') {
+                    <button
+                      class="text-button"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="action('queue/call', row)"
+                    >
+                      Call token
+                    </button>
+                  } @else if (kind === 'clinical' && row.ticket?.status === 'Called') {
+                    <button
+                      class="text-button"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="action('clinical/start', row)"
+                    >
+                      Start consultation
+                    </button>
+                  } @else if (kind === 'clinical' && row.encounter) {
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="openConsultation(row, consultationDialog)"
+                    >
+                      {{ row.encounter.signedAt ? 'View note' : 'Review consultation' }}
+                    </button>
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span
+        >{{ offset() + 1 }}–{{ offset() + data.data.items.length }} of {{ data.data.total }}</span
+      >
+      <div>
+        <button
+          class="icon-button"
+          type="button"
+          aria-label="Previous page"
+          [disabled]="offset() === 0"
+          (click)="offset.set(offset() - 12)"
+        >
+          <ng-icon name="previous" />
+        </button>
+        <button
+          class="icon-button"
+          type="button"
+          aria-label="Next page"
+          [disabled]="offset() + 12 >= data.data.total"
+          (click)="offset.set(offset() + 12)"
+        >
+          <ng-icon name="next" />
+        </button>
+      </div>
+    </div>
+  }
+</section>
+
+<dialog #bookingDialog aria-labelledby="booking-heading" (close)="bookingOpen.set(false)">
+  <div class="dialog-head">
+    <h2 id="booking-heading">{{ pass() ? 'Appointment pass' : 'New appointment' }}</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="bookingDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (pass()) {
+    <div class="dialog-body pass-body">
+      <p>Show this pass at reception on the appointment date.</p>
+      @if (qr()) {
+        <img
+          [src]="qr()"
+          alt="Scannable appointment pass. The equivalent code is shown below."
+          width="192"
+          height="192"
+        />
+      }
+      <code>{{ pass() }}</code>
+      <button type="button" class="button primary" (click)="bookingDialog.close()">Done</button>
+    </div>
+  } @else {
+    <form class="dialog-body fields" [formGroup]="booking" (ngSubmit)="saveBooking()">
+      <label for="find">Find patient</label
+      ><input
+        id="find"
+        type="search"
+        [formControl]="patientSearch"
+        placeholder="Search by name or patient ID"
+      />
+      @let choices = options();
+      <label for="patient">Patient</label>
+      <select id="patient" formControlName="patientId" required>
+        <option value="">Select a patient</option>
+        @if (choices.state === 'ready') {
+          @for (patient of choices.data.patients; track patient.id) {
+            <option [value]="patient.id">{{ patient.name }} · {{ patient.id }}</option>
+          }
+        }
+      </select>
+      @if (choices.state === 'error') {
+        <p class="field-error" role="alert">{{ choices.message }}</p>
+      }
+      <label for="clinician">Clinician</label>
+      <select id="clinician" formControlName="practitionerId" required>
+        <option value="">Select a clinician</option>
+        @if (choices.state === 'ready') {
+          @for (practitioner of choices.data.practitioners; track practitioner.id) {
+            <option [value]="practitioner.id">
+              {{ practitioner.name }} · {{ practitioner.specialty }}
+            </option>
+          }
+        }
+      </select>
+      <div class="field-pair">
+        <label>Date<input type="date" formControlName="day" [min]="today" required /></label>
+        <label
+          >Time<input
+            type="time"
+            formControlName="time"
+            min="09:00"
+            max="16:45"
+            step="900"
+            required
+        /></label>
+      </div>
+      <label for="channel">Booking type</label
+      ><select id="channel" formControlName="channel">
+        <option>Scheduled</option>
+        <option>Walk-in</option>
+      </select>
+      @if (dialogFailure()) {
+        <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="busy()">Book appointment</button>
+    </form>
+  }
+</dialog>
+
+<dialog #checkInDialog aria-labelledby="check-in-heading">
+  <div class="dialog-head">
+    <h2 id="check-in-heading">Verify arrival</h2>
+    <button class="icon-button" aria-label="Close" type="button" (click)="checkInDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <form class="dialog-body fields" (submit)="$event.preventDefault(); verify(checkInDialog)">
+    <label for="qr-file">Scan a QR pass image</label
+    ><input
+      id="qr-file"
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      (change)="readQr($event)"
+    />
+    <label for="pass-code">Appointment pass code</label
+    ><input id="pass-code" autocomplete="off" [formControl]="checkInCode" required />
+    @if (dialogFailure()) {
+      <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+    }
+    <button class="button primary" type="submit" [disabled]="busy()">Check in patient</button>
+  </form>
+</dialog>
+
+<dialog #consultationDialog aria-labelledby="consultation-heading">
+  <div class="dialog-head">
+    <h2 id="consultation-heading">Consultation</h2>
+    <button
+      class="icon-button"
+      aria-label="Close"
+      type="button"
+      (click)="consultationDialog.close()"
+    >
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (active(); as row) {
+    <div class="dialog-body">
+      <div class="identity">
+        <span class="table-initials">{{ row.patient.initials }}</span>
+        <div>
+          <strong>{{ row.patient.name }}</strong
+          ><small>{{ row.patient.id }} · Age {{ row.patient.age }}</small>
+        </div>
+      </div>
+      @if (row.encounter?.signedAt; as signed) {
+        <p>{{ row.encounter?.observation }}</p>
+        <small>Signed {{ signed | date: 'd MMM y, HH:mm' : '+0530' }} IST</small>
+      } @else {
+        <div class="clinical-orders fields">
+          <label for="laboratory-test">Laboratory order</label>
+          <select id="laboratory-test" [formControl]="selectedTest">
+            <option value="">Select a test</option>
+            @for (test of labCatalogue; track test) {
+              <option>{{ test }}</option>
+            }
+          </select>
+          <button class="button secondary" type="button" [disabled]="busy()" (click)="orderLab()">
+            Order test
+          </button>
+          @if (clinicalFeedback()) {
+            <p class="subtle" role="status">{{ clinicalFeedback() }}</p>
+          }
+        </div>
+        <form class="fields" (submit)="$event.preventDefault(); complete(consultationDialog)">
+          <label for="observation">Consultation observation</label>
+          <select id="observation" [formControl]="observation" required>
+            <option value="">Select an observation</option>
+            @for (note of observations; track note) {
+              <option [value]="note">{{ note }}</option>
+            }
+          </select>
+          @if (dialogFailure()) {
+            <p class="field-error" role="alert">{{ dialogFailure() }}</p>
+          }
+          <button class="button primary" type="submit" [disabled]="busy()">
+            Sign and complete
+          </button>
+        </form>
+      }
+    </div>
+  }
+</dialog>

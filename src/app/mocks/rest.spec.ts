@@ -1,0 +1,259 @@
+import '@angular/compiler';
+import 'fake-indexeddb/auto';
+import { HttpHeaders, HttpRequest } from '@angular/common/http';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { dayInIndia, invoiceTotal, type AppointmentPage, type Session } from '../domain/operations';
+import { db } from './database';
+import { handle } from './rest';
+import { seed } from './seed';
+
+beforeAll(() => vi.stubGlobal('location', { origin: 'http://127.0.0.1:4317' }));
+
+function get(path: string, session?: Session, facility?: string) {
+  return handle(new HttpRequest('GET', '/api/v1/' + path, { headers: headers(session, facility) }));
+}
+
+function post(path: string, body: Record<string, string>, session?: Session, facility?: string) {
+  return handle(
+    new HttpRequest('POST', '/api/v1/' + path, body, { headers: headers(session, facility) }),
+  );
+}
+
+function headers(session?: Session, facility?: string) {
+  let values = new HttpHeaders();
+  if (session) values = values.set('Authorization', 'Bearer ' + session.token);
+  if (facility) values = values.set('X-Facility-Id', facility);
+  return values;
+}
+
+const login = (account: string) =>
+  post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('evaluation REST contract', () => {
+  it('requires a valid unexpired session and rejects disabled entitlements or another tenant', async () => {
+    await expect(get('overview')).rejects.toMatchObject({ status: 401 });
+    await expect(
+      post('session', { account: 'executive', password: 'wrong' }),
+    ).rejects.toMatchObject({ status: 401 });
+    const user = await login('sunrise');
+    await expect(get('beds', user, 'sunrise')).rejects.toMatchObject({ status: 403 });
+    await expect(get('appointments', user, 'mer-central')).rejects.toMatchObject({ status: 403 });
+    await expect(get('clinical', user, 'sunrise')).rejects.toMatchObject({ status: 403 });
+    await db.sessions.update(user.token, { expiresAt: Date.now() - 1 });
+    await expect(get('appointments', user, 'sunrise')).rejects.toMatchObject({ status: 401 });
+  }, 20_000);
+
+  it('serializes conflicts and rejects replay, cross-tenant patient IDs and appointment pass disclosure', async () => {
+    const user = await login('reception');
+    const day = dayInIndia();
+    const detail = {
+      patientId: 'TC-MERIDIAN-01001',
+      practitionerId: 'mer-central-DR-1',
+      time: '15:45',
+      day,
+    };
+    await expect(
+      post('appointments', { ...detail, patientId: 'TC-SUNRISE-01001' }, user, 'mer-central'),
+    ).rejects.toMatchObject({ status: 404 });
+    const bookings = await Promise.allSettled([
+      post('appointments', detail, user, 'mer-central'),
+      post('appointments', detail, user, 'mer-central'),
+    ]);
+    expect(bookings.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const saved = bookings.find(
+      (result) => result.status === 'fulfilled',
+    ) as PromiseFulfilledResult<{ id: string; pass: string }>;
+    const list = (await get(
+      'appointments?q=TC-MERIDIAN-01001',
+      user,
+      'mer-central',
+    )) as AppointmentPage;
+    expect(
+      list.items.find((row) => row.appointment.id === saved.value.id)?.appointment,
+    ).not.toHaveProperty('pass');
+    await post('queue/check-in', { pass: saved.value.pass }, user, 'mer-central');
+    await expect(
+      post('queue/check-in', { pass: saved.value.pass }, user, 'mer-central'),
+    ).rejects.toMatchObject({ status: 409 });
+    const executive = await login('executive');
+    await expect(
+      post('queue/call', { appointmentId: saved.value.id }, executive, 'mer-central'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('records at most one payment on an outstanding invoice under concurrent requests', async () => {
+    const user = await login('cashier');
+    const payments = await db.payments.toArray();
+    const paid = new Set(payments.map((row) => row.invoiceId));
+    const invoice = (await db.invoices.where('facilityId').equals('mer-central').toArray()).find(
+      (row) => !paid.has(row.id),
+    )!;
+    const results = await Promise.allSettled([
+      post('billing/payments', { invoiceId: invoice.id }, user, 'mer-central'),
+      post('billing/payments', { invoiceId: invoice.id }, user, 'mer-central'),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const entries = await db.payments.where('invoiceId').equals(invoice.id).toArray();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].amountMinor).toBe(invoiceTotal(invoice));
+  });
+
+  it('prevents simultaneous bed allocations and preserves the ward status through discharge', async () => {
+    const user = await login('admissions');
+    const facility = 'mer-central';
+    const first = (await post(
+      'admissions',
+      { patientId: 'TC-MERIDIAN-01199' },
+      user,
+      facility,
+    )) as { id: string };
+    const second = (await post(
+      'admissions',
+      { patientId: 'TC-MERIDIAN-01200' },
+      user,
+      facility,
+    )) as { id: string };
+    const bed = (await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .first())!;
+    const results = await Promise.allSettled(
+      [first, second].map(({ id }) =>
+        post(
+          'admissions/allocate',
+          { admissionId: id, version: '1', bedId: bed.id },
+          user,
+          facility,
+        ),
+      ),
+    );
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const allocated = (await db.admissions.where('bedId').equals(bed.id).first())!;
+    await expect(
+      post('admissions/discharge', { admissionId: allocated.id, version: '1' }, user, facility),
+    ).rejects.toMatchObject({ status: 409 });
+    await post('admissions/discharge', { admissionId: allocated.id, version: '2' }, user, facility);
+    expect((await db.beds.get(bed.id))?.status).toBe('Cleaning');
+    await post('beds/release', { bedId: bed.id }, user, facility);
+    expect((await db.beds.get(bed.id))?.status).toBe('Available');
+  });
+
+  it('releases only the patient’s published reports and restricts the laboratory authorisation stage', async () => {
+    const facility = 'mer-central';
+    const technician = await login('lab');
+    const reviewer = await login('labreview');
+    const patient = await login('patient');
+    const order = (await db.labOrders
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Entered')
+      .first())!;
+    const body = { orderId: order.id, version: String(order.version) };
+    await expect(post('laboratory/advance', body, technician, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await post('laboratory/advance', body, reviewer, facility);
+    await expect(post('laboratory/advance', body, reviewer, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+    await post(
+      'laboratory/advance',
+      { ...body, version: String(order.version + 1) },
+      reviewer,
+      facility,
+    );
+    const portal = (await get(
+      'portal',
+      patient,
+      facility,
+    )) as import('../domain/portal').PatientPortal;
+    expect(portal.patient.id).toBe('TC-MERIDIAN-01001');
+    expect(
+      portal.records.every(
+        (row) => row.status === 'Published' && row.patientId === portal.patient.id,
+      ),
+    ).toBe(true);
+    await expect(
+      post('portal/passes', { appointmentId: 'mer-central-A-0-2' }, patient, facility),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('exposes token numbers and clinical departments on approved signage without identity fields', async () => {
+    const feed = (await get(
+      'queue-display?facility=mer-central',
+    )) as import('../domain/operations').QueueDisplayData;
+    expect(feed.calling.length).toBeGreaterThan(0);
+    expect(
+      feed.calling.every((token) => Object.keys(token).sort().join(',') === 'number,specialty'),
+    ).toBe(true);
+    await expect(get('queue-display?facility=sunrise')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('fixture contract', () => {
+  it('generates deterministic tenant identities and linked outpatient records', () => {
+    const date = '2026-11-26';
+    const dataset = seed(date, true);
+    expect(seed(date, true)).toEqual(dataset);
+    const patients = new Map(dataset.patients.map((row) => [row.id, row]));
+    const appointments = new Map(dataset.appointments.map((row) => [row.id, row]));
+    const encounters = new Map(dataset.encounters.map((row) => [row.id, row]));
+    const invoices = new Map(dataset.invoices.map((row) => [row.id, row]));
+    expect(dataset.appointments.every((row) => patients.has(row.patientId))).toBe(true);
+    expect(
+      dataset.encounters.every(
+        (row) => appointments.get(row.appointmentId)?.patientId === row.patientId,
+      ),
+    ).toBe(true);
+    expect(
+      dataset.invoices.every((row) => encounters.get(row.encounterId)?.patientId === row.patientId),
+    ).toBe(true);
+    expect(dataset.payments.every((row) => invoices.has(row.invoiceId))).toBe(true);
+  });
+});
+
+describe('platform authorization and entitlements', () => {
+  it('provisions an organisation and a facility without sharing clinical access', async () => {
+    const admin = await login('platform');
+    const staff = await login('reception');
+    await expect(get('platform', staff)).rejects.toMatchObject({ status: 403 });
+    await expect(get('appointments', admin, 'mer-central')).rejects.toMatchObject({ status: 403 });
+    const organisation = (await post(
+      'platform/organizations',
+      { name: 'Juniper Healthcare', plan: 'Hospital' },
+      admin,
+    )) as { id: string };
+    const facility = (await post(
+      'platform/facilities',
+      { tenantId: organisation.id, name: 'Juniper East Hospital', city: 'Pune' },
+      admin,
+    )) as { id: string };
+    await expect(get('patients', staff, facility.id)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      post('platform/organizations', { name: 'juniper healthcare', plan: 'Hospital' }, admin),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('enforces the live configuration record and rejects stale versions or ineligible plans', async () => {
+    const admin = await login('platform');
+    const staff = await login('executive');
+    const context = 'mer-central';
+    const setup = (id: string, version: string, inpatient: string) =>
+      handle(
+        new HttpRequest(
+          'PATCH',
+          '/api/v1/platform/entitlements',
+          { facilityId: id, version, inpatient },
+          { headers: headers(admin) },
+        ),
+      );
+    await expect(setup('sunrise', '1', 'true')).rejects.toMatchObject({ status: 409 });
+    await expect(get('beds', staff, context)).resolves.toHaveProperty('beds');
+    await setup(context, '1', 'false');
+    await expect(get('beds', staff, context)).rejects.toMatchObject({ status: 403 });
+    await expect(setup(context, '1', 'true')).rejects.toMatchObject({ status: 409 });
+    await setup(context, '2', 'true');
+    await expect(get('beds', staff, context)).resolves.toHaveProperty('beds');
+  });
+});
