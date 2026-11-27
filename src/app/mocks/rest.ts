@@ -21,6 +21,7 @@ import { crmAvailability, crmData, crmPatients } from './crm';
 import { contactPreferences, marketingData } from './marketing';
 import { analyticsReport } from './analytics';
 import { automationData } from './automation';
+import { clinicalDocuments, portalDocument, portalDocuments } from './patient-documents';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -114,6 +115,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'portal/contact-preferences',
     'automation/policy',
     'automation/drafts/status',
+    'portal/documents/withdraw',
+    'clinical/documents/withdraw',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -151,6 +154,21 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return patientSharing(scope(session, facilityRecord, 'D12'), session);
     case 'portal/contact-preferences':
       return contactPreferences(scope(session, facilityRecord, 'D12'), session);
+    case 'portal/documents':
+      return portalDocuments(scope(session, facilityRecord, 'D12'), session);
+    case 'portal/documents/detail':
+      return portalDocument(
+        scope(session, facilityRecord, 'D12'),
+        session,
+        params.get('documentId') ?? '',
+        params.get('version'),
+      );
+    case 'clinical/documents':
+      return clinicalDocuments(
+        scope(session, facilityRecord, 'D13', 'clinical'),
+        session,
+        params.get('encounterId') ?? '',
+      );
     case 'clinical-governance':
       return clinicalGovernance(scope(session, facilityRecord, 'D07'), params);
     case 'quality':

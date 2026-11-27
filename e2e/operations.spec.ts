@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { readFile } from 'node:fs/promises';
 import { dayInIndia, shiftDay } from '../src/app/domain/operations';
 
 async function signIn(page: Page, account: string) {
@@ -24,6 +25,111 @@ async function checkReflow(page: Page) {
     ).toBeLessThanOrEqual(width);
   }
 }
+
+test('uploads a synthetic sample and invalidates a shared document when withdrawn', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(100_000);
+  await signIn(page, 'patient');
+  const documents = page.getByRole('button', { name: 'Documents', exact: true });
+  await documents.click();
+  const upload = page.getByRole('button', { name: 'Upload document' });
+  await upload.focus();
+  await page.keyboard.press('Enter');
+  const editor = page.getByRole('dialog', { name: 'Upload document' });
+  await expect(editor).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(upload).toBeFocused();
+  await upload.click();
+  const input = editor.getByLabel('Sample file');
+  await input.setInputFiles({
+    name: 'other.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('Outside the evaluation catalogue'),
+  });
+  await editor.getByRole('button', { name: 'Upload sample' }).click();
+  await expect(editor.getByRole('alert')).toContainText('Choose one of the TrueCare sample files.');
+  const downloading = page.waitForEvent('download');
+  await editor.getByRole('button', { name: 'Download sample referral (PDF)' }).click();
+  const sample = await downloading;
+  const bytes = await readFile((await sample.path())!);
+  expect(bytes.subarray(0, 8).toString()).toBe('%PDF-1.4');
+  await input.setInputFiles({
+    name: sample.suggestedFilename(),
+    mimeType: 'application/pdf',
+    buffer: bytes,
+  });
+  await editor.getByRole('button', { name: 'Upload sample' }).click();
+  const row = page.getByRole('row', { name: /Sample referral/ });
+  await expect(row).toContainText('Available');
+  await page.reload();
+  await documents.click();
+  await expect(row).toContainText('Patient upload · PDF');
+  await checkReflow(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await row.getByRole('button', { name: 'View document' }).click();
+  const ownerPreview = page.getByRole('dialog', { name: 'Sample referral' });
+  await expect(ownerPreview).toContainText('Synthetic referral for a scheduled specialist visit.');
+  const exportReady = page.waitForEvent('download');
+  await ownerPreview.getByRole('button', { name: 'Download PDF' }).click();
+  const exported = await exportReady;
+  expect(await readFile((await exported.path())!)).toEqual(bytes);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('patient-document-390.png'),
+    animations: 'disabled',
+  });
+  await ownerPreview.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Record sharing' }).click();
+  await page.getByLabel('Recipient', { exact: true }).selectOption('mer-referral-records');
+  await page.getByRole('button', { name: 'Generate matching code' }).click();
+  const code = await page.getByTestId('issued-matching-code').innerText();
+  const recipient = await page.context().newPage();
+  await signIn(recipient, 'partnercare');
+  await recipient.getByRole('button', { name: 'Request record', exact: true }).click();
+  const request = recipient.getByRole('dialog', { name: 'Request record' });
+  await request.getByLabel('Patient-issued matching code').fill(code);
+  await request.getByRole('button', { name: 'Send request' }).click();
+  await expect(recipient.getByRole('button', { name: 'View shared document' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Review request' }).click();
+  const review = page.getByRole('dialog', { name: 'Review record request' });
+  await review.getByLabel('Record type').selectOption('Patient document');
+  await review.getByLabel('Document to share').selectOption({ label: 'Sample referral · PDF' });
+  await review.getByRole('button', { name: 'Grant document access' }).click();
+  await expect(page.getByText('Document access granted.')).toBeVisible();
+  await recipient.getByRole('button', { name: 'View shared document' }).click();
+  const shared = recipient.getByRole('dialog', { name: 'Shared document' });
+  await expect(shared).toContainText('Synthetic referral for a scheduled specialist visit.');
+  await checkReflow(recipient);
+  expect(
+    (
+      await new AxeBuilder({ page: recipient })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await recipient.screenshot({
+    path: testInfo.outputPath('shared-document-1440.png'),
+    animations: 'disabled',
+  });
+  await documents.click();
+  await row.getByRole('button', { name: 'Withdraw upload' }).click();
+  await page.getByRole('button', { name: 'Confirm withdrawal' }).click();
+  await expect(row).toContainText('Withdrawn');
+  await expect(shared).toContainText('This document is no longer available to this recipient.');
+  await expect(
+    shared.getByText('Synthetic referral for a scheduled specialist visit.'),
+  ).toHaveCount(0);
+  await shared.getByRole('button', { name: 'Close' }).click();
+  await expect(recipient.getByRole('row', { name: /Continuation of care/ })).toContainText(
+    'Unavailable',
+  );
+  await recipient.close();
+});
 
 test('filters scoped analytics and downloads an aggregate report', async ({ page }, testInfo) => {
   await signIn(page, 'analyst');
@@ -1180,6 +1286,19 @@ test('uses prior care in booking and hands a signed follow-up to the patient and
     .selectOption('Observation completed. Follow-up discussed.');
   await visit.getByRole('button', { name: 'Sign and complete' }).click();
   await clinicalRow.getByRole('button', { name: 'View note' }).click();
+  await visit.getByRole('button', { name: 'Release attendance note' }).click();
+  const release = clinician.getByRole('dialog', { name: 'Release attendance note' });
+  await release.getByRole('button', { name: 'Confirm release' }).click();
+  await expect(visit.getByText('Attendance note released.')).toBeVisible();
+  await patient.getByRole('button', { name: 'Documents', exact: true }).click();
+  const attendance = patient.getByRole('row', { name: /Visit attendance note/ });
+  await expect(attendance).toContainText('Facility release');
+  await expect(attendance.getByRole('button', { name: 'Withdraw upload' })).toHaveCount(0);
+  await attendance.getByRole('button', { name: 'View document' }).click();
+  const note = patient.getByRole('dialog', { name: 'Visit attendance note' });
+  await expect(note).toContainText('Visit completed on ' + dayInIndia());
+  await note.getByRole('button', { name: 'Close' }).click();
+  await patient.getByRole('button', { name: 'Appointments', exact: true }).click();
   await visit.getByRole('button', { name: 'Request follow-up' }).click();
   await visit.getByLabel('Purpose', { exact: true }).selectOption('Review care plan');
   await visit.getByLabel('Earliest date').fill(startsOn);
@@ -1373,8 +1492,8 @@ test('matches a record request, grants one report, and withdraws access live', a
 
   const recipient = await page.context().newPage();
   await signIn(recipient, 'partnercare');
-  await recipient.getByRole('button', { name: 'Request report', exact: true }).click();
-  const editor = recipient.getByRole('dialog', { name: 'Request report' });
+  await recipient.getByRole('button', { name: 'Request record', exact: true }).click();
+  const editor = recipient.getByRole('dialog', { name: 'Request record' });
   await editor.getByLabel('Patient-issued matching code').fill(code);
   await editor.getByRole('button', { name: 'Send request' }).click();
   await expect(recipient.getByText('Request sent for patient review.')).toBeVisible();

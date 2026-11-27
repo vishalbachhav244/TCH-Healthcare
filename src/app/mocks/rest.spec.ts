@@ -14,6 +14,12 @@ import {
 import type { SchedulingDay } from '../domain/scheduling';
 import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
+import type {
+  DocumentDetail,
+  DocumentSummary,
+  PatientDocuments,
+} from '../domain/patient-documents';
+import { documentFixtures } from './document-fixtures';
 import type { DischargeDocument, InpatientBillingDetail } from '../domain/discharge';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
@@ -3358,5 +3364,182 @@ describe('enterprise intelligence', () => {
       approved: 1,
     });
     expect(await db.encounters.get(first.encounterId)).toEqual(source);
+  }, 90_000);
+});
+
+describe('synthetic patient documents', () => {
+  const facility = 'mer-central';
+  const patientId = 'TC-MERIDIAN-01001';
+
+  it('accepts only the sample bytes, presents provenance and withdraws a recipient’s exact document version', async () => {
+    const [patient, staff, recipient, otherRecipient] = await Promise.all(
+      ['patient', 'clinician', 'partnercare', 'partnerlab'].map(login),
+    );
+    const documents = async () =>
+      (await get('portal/documents', patient, facility)) as PatientDocuments;
+    const { sample } = documentFixtures['synthetic-referral-v1'];
+    const upload = (data = sample.data, format = sample.format, actor = patient) =>
+      post('portal/documents', { data, format }, actor, facility);
+    await expect(get('portal/documents', patient, 'mer-north')).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(get('portal/documents', staff, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(upload(sample.data, 'PDF', staff)).rejects.toMatchObject({ status: 403 });
+    await expect(upload(sample.data + 'A')).rejects.toMatchObject({ status: 422 });
+    await expect(upload(sample.data, 'TXT')).rejects.toMatchObject({ status: 422 });
+    expect((await documents()).samples).toContainEqual(sample);
+    const attempted = await Promise.allSettled([upload(), upload()]);
+    expect(attempted.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const { id } = attempted.find((item) => item.status === 'fulfilled')!.value as { id: string };
+    const record = (await documents()).documents.find((row) => row.id === id)!;
+    expect(record).toMatchObject({
+      title: 'Sample referral',
+      origin: 'Patient upload',
+      format: 'PDF',
+      status: 'Available',
+    });
+    const preview = (version = '1', actor = patient) =>
+      get('portal/documents/detail?documentId=' + id + '&version=' + version, actor, facility);
+    await expect(preview('2')).rejects.toMatchObject({ status: 404 });
+    await expect(preview('1', recipient)).rejects.toMatchObject({ status: 403 });
+    expect(((await preview()) as DocumentDetail).file.data).toBe(sample.data);
+    expect(await db.patientDocuments.get(id)).not.toHaveProperty('data');
+    const textSample = documentFixtures['synthetic-visit-preparation-v1'].sample;
+    const { id: txt } = (await upload(textSample.data, 'TXT')) as { id: string };
+    expect(
+      await get('portal/documents/detail?documentId=' + txt + '&version=1', patient, facility),
+    ).toMatchObject({
+      format: 'TXT',
+      file: { filename: textSample.filename, data: textSample.data },
+    });
+
+    const { code } = (await post(
+      'portal/matching-code',
+      { connectorId: 'mer-referral-records' },
+      patient,
+      facility,
+    )) as { code: string };
+    const { id: requestId } = (await post(
+      'record-requests',
+      { code, purpose: 'Specialist review' },
+      recipient,
+    )) as { id: string };
+    const retrieve = (actor = recipient) => post('record-requests/retrieve', { requestId }, actor);
+    const decide = (recordKind: string) =>
+      patch(
+        'portal/sharing',
+        { requestId, version: '1', action: 'grant', hours: '24', reportId: id, recordKind },
+        patient,
+        facility,
+      );
+    await expect(retrieve()).rejects.toMatchObject({ status: 403 });
+    await expect(decide('Laboratory report')).rejects.toMatchObject({ status: 422 });
+    await decide('Patient document');
+    expect((await db.consentGrants.get(requestId))?.record).toEqual({
+      kind: 'Patient document',
+      id,
+      version: 1,
+    });
+    const result = (await retrieve()) as { report: object };
+    expect(result.report).toMatchObject({
+      kind: 'Patient document',
+      title: 'Sample referral',
+      origin: 'Patient upload',
+      format: 'PDF',
+    });
+    expect(result.report).not.toHaveProperty('file');
+    expect(result.report).not.toHaveProperty('patientId');
+    await expect(retrieve(otherRecipient)).rejects.toMatchObject({ status: 404 });
+    const withdraw = (version: string) =>
+      patch('portal/documents/withdraw', { documentId: id, version }, patient, facility);
+    await expect(withdraw('2')).rejects.toMatchObject({ status: 409 });
+    await withdraw('1');
+    await expect(preview()).rejects.toMatchObject({ status: 404 });
+    await expect(retrieve()).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringContaining('Source mismatch'),
+    });
+    expect(await get('record-requests', recipient)).toContainEqual(
+      expect.objectContaining({
+        id: requestId,
+        status: 'Unavailable',
+        recordKind: 'Patient document',
+      }),
+    );
+    expect(await db.exchangeAudit.where('requestId').equals(requestId).toArray()).toContainEqual(
+      expect.objectContaining({ outcome: 'Source mismatch' }),
+    );
+    expect((await documents()).documents).toContainEqual(
+      expect.objectContaining({ id, status: 'Withdrawn', version: 2 }),
+    );
+    const replacement = (await upload()) as { id: string };
+    expect(replacement.id).not.toBe(id);
+    await expect(retrieve()).rejects.toMatchObject({ status: 403 });
+  }, 90_000);
+
+  it('releases an assigned signed attendance note and restricts withdrawal to its clinical source', async () => {
+    const [patient, clinician, reception] = await Promise.all(
+      ['patient', 'clinician', 'reception'].map(login),
+    );
+    const day = shiftDay(dayInIndia(), -70);
+    const appointmentId = 'document-contract-appointment';
+    const encounterId = 'document-contract-encounter';
+    const practitionerId = 'mer-central-DR-1';
+    await db.appointments.add({
+      id: appointmentId,
+      facilityId: facility,
+      patientId,
+      practitionerId,
+      day,
+      time: '15:00',
+      channel: 'Scheduled',
+      status: 'In consultation',
+    });
+    await db.encounters.add({
+      id: encounterId,
+      facilityId: facility,
+      appointmentId,
+      patientId,
+      practitionerId,
+      startedAt: 1,
+    });
+    const release = (id = encounterId, actor = clinician) =>
+      post('clinical/documents', { encounterId: id }, actor, facility);
+    await expect(release(encounterId, reception)).rejects.toMatchObject({ status: 403 });
+    await expect(release()).rejects.toMatchObject({ status: 409 });
+    const other = (await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.practitionerId !== practitionerId)
+      .first())!;
+    await expect(release(other.id)).rejects.toMatchObject({ status: 403 });
+    await db.appointments.update(appointmentId, { status: 'Completed' });
+    await db.encounters.update(encounterId, { signedAt: 2 });
+    const { id } = (await release()) as { id: string };
+    await expect(release()).rejects.toMatchObject({ status: 409 });
+    const clinical = async () =>
+      (await get(
+        'clinical/documents?encounterId=' + encounterId,
+        clinician,
+        facility,
+      )) as DocumentSummary[];
+    expect(await clinical()).toContainEqual(
+      expect.objectContaining({ id, origin: 'Facility release', status: 'Available' }),
+    );
+    const detail = () =>
+      get(
+        'portal/documents/detail?documentId=' + id + '&version=1',
+        patient,
+        facility,
+      ) as Promise<DocumentDetail>;
+    expect((await detail()).body).toContain('Visit completed on ' + day + ' at 15:00 IST.');
+    const fields = { documentId: id, version: '1' };
+    await expect(
+      patch('portal/documents/withdraw', fields, patient, facility),
+    ).rejects.toMatchObject({ status: 404 });
+    await patch('clinical/documents/withdraw', fields, clinician, facility);
+    await expect(detail()).rejects.toMatchObject({ status: 404 });
+    expect(await clinical()).toContainEqual(expect.objectContaining({ id, status: 'Withdrawn' }));
+    expect(await db.encounters.get(encounterId)).toMatchObject({ signedAt: 2, patientId });
   }, 90_000);
 });

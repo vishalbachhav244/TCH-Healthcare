@@ -2,10 +2,10 @@
   <div>
     <p class="eyebrow"><span></span> RECORD EXCHANGE</p>
     <h1>Record Requests</h1>
-    <p>Request a report using a patient-issued matching code and review consent decisions.</p>
+    <p>Request a record using a patient-issued matching code and review consent decisions.</p>
   </div>
   <button class="button primary" type="button" (click)="open(editor)">
-    <ng-icon name="plus" /> Request report
+    <ng-icon name="plus" /> Request record
   </button>
 </section>
 @if (notice()) {
@@ -78,7 +78,11 @@
                       [disabled]="busy()"
                       (click)="view(row, preview)"
                     >
-                      View shared report
+                      {{
+                        row.recordKind === 'Patient document'
+                          ? 'View shared document'
+                          : 'View shared report'
+                      }}
                     </button>
                   } @else {
                     <span>—</span>
@@ -96,7 +100,7 @@
 }
 <dialog #editor aria-labelledby="new-request-title">
   <div class="dialog-head">
-    <h2 id="new-request-title">Request report</h2>
+    <h2 id="new-request-title">Request record</h2>
     <button type="button" class="icon-button" aria-label="Close" (click)="editor.close()">
       <ng-icon name="close" />
     </button>
@@ -126,26 +130,46 @@
 </dialog>
 <dialog #preview aria-labelledby="shared-report-title" (close)="viewed.set(undefined)">
   <div class="dialog-head">
-    <h2 id="shared-report-title">Shared report</h2>
+    <h2 id="shared-report-title">{{ documentPreview() ? 'Shared document' : 'Shared report' }}</h2>
     <button type="button" class="icon-button" aria-label="Close" (click)="preview.close()">
       <ng-icon name="close" />
     </button>
   </div>
   <div class="dialog-body fields">
     @if (viewed()?.report; as report) {
-      <h3>{{ report.test }}</h3>
-      <p>{{ report.finding }}</p>
-      <p><strong>Source facility</strong><br />{{ report.source }}</p>
-      <p><strong>Accession</strong><br />{{ report.accession }}</p>
-      <p>
-        <strong>Published</strong><br />{{ report.publishedAt | date: 'd MMM y, HH:mm' : '+0530' }}
-        IST
-      </p>
+      @if (isDocument(report)) {
+        <h3>{{ report.title }}</h3>
+        @for (line of report.body; track $index) {
+          <p>{{ line }}</p>
+        }
+        <p>
+          <strong>Provenance</strong><br />{{ report.origin }} · {{ report.format }} ·
+          {{ report.addedAt | date: 'd MMM y' : '+0530' }}
+        </p>
+        <p><strong>Source facility</strong><br />{{ report.source }}</p>
+      } @else {
+        <h3>{{ report.test }}</h3>
+        <p>{{ report.finding }}</p>
+        <p><strong>Source facility</strong><br />{{ report.source }}</p>
+        <p><strong>Accession</strong><br />{{ report.accession }}</p>
+        <p>
+          <strong>Published</strong><br />{{
+            report.publishedAt | date: 'd MMM y, HH:mm' : '+0530'
+          }}
+          IST
+        </p>
+      }
       <p class="subtle">
         Consent expires {{ report.expiresAt | date: 'd MMM y, HH:mm' : '+0530' }} IST.
       </p>
     } @else {
-      <p role="status">This report is no longer available to this recipient.</p>
+      <p role="status">
+        {{
+          documentPreview()
+            ? 'This document is no longer available to this recipient.'
+            : 'This report is no longer available to this recipient.'
+        }}
+      </p>
     }
   </div>
 </dialog>

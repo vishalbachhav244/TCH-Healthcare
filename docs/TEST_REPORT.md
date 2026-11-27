@@ -7,18 +7,20 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test` | 46 contract and domain tests passed across 3 files |
-| `npm run e2e -- --fully-parallel --workers=3` | All 24 Chromium journeys passed, including analytics filters and CSV export, documentation policy, and clinician review. |
-| `npm run build` | Passed. Initial assets approximately 381 kB raw and 98 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 384 kB raw and 99 kB estimated transfer. |
+| `npm test` | 48 contract and domain tests passed across 3 files |
+| `npm run e2e -- --fully-parallel --workers=2` | All 25 Chromium journeys passed, including exact PDF download after reload, signed visit note release and live withdrawal of shared document access. |
+| `npm run build` | Passed. Initial assets approximately 382 kB raw and 98 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 385 kB raw and 99 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 24 to 25 in Chromium. The saved campaign and enquiry survived. Both new roles signed in and the draft policy started paused. |
-| OpenAPI | 169 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 25 to 26 in Chromium. The new document library opened, a saved laboratory grant could still be retrieved and a saved approved draft survived. |
+| Sample PDF | Poppler `pdfinfo` parsed one US Letter page from the generated PDF 1.4 sample. |
+| OpenAPI | 176 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
 
+- Reject a non-catalogue document, upload the downloaded synthetic PDF and verify its exact bytes after portal reload. Grant the document version to a matched recipient, preview it, then withdraw the upload and clear the recipient’s live preview.
 - Switch Analytics from a 7- to 14-day window and download the aggregate CSV. Verify its schema and row count, open the specialty report, check the historical empty state and switch to the authorized North facility.
 - Enable draft generation as supervisor, generate one draft as the assigned clinician and verify the quota. Reload and inspect source context, save an administrative format edit and pause generation. Approve the pending draft and check the supervisor receives its outcome without the source observation.
 - Capture a referral enquiry, assign an agent and keep the work hidden before assignment. Record a missed contact and then a successful one, reload and book a live slot. Verify conversion in Marketing. Draft an Email campaign at zero opt-ins, allow and withdraw permission in the portal, reject the withdrawn audience and run after the patient opts in again. Verify the result after reload and withdraw the facility engagement entitlement.
@@ -28,7 +30,7 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 - Submit a component request from the assigned ward, verify the discharge gate and exclude an expired unit from selection. Require the review confirmation, reserve and issue a unit after reload, then verify ward status and stock.
 - Record an unassessed emergency arrival, assign priority explicitly and request admission. Allocate ICU, record and reload a review, request step-down and transfer to a regular ward. Schedule theatre, reject an overlap and block discharge until the case is complete. Reload the case and a different theatre date, then discharge and verify the emergency disposition closes.
 - Admit a patient and assign a physician and nurse. Record a round and complete a linked nursing task. Reject unsigned discharge, transfer to critical care, draft and sign the summary, and confirm that it is withheld until discharge. Download the released summary and issue a bed ledger invoice. Record settlement and verify the paid balance in the patient portal.
-- Suggest a returning patient’s previous clinician in intake. Check in using the patient’s pass, filter signed visits by specialty, sign a consultation and request follow-up. In the patient portal, book within the requested window. Cancel at reception, verify the request reopens, then rebook and reload to verify persistence.
+- Suggest a returning patient’s previous clinician in intake. Check in using the patient’s pass, filter signed visits by specialty and sign a consultation. Release an attendance note and open it in the patient’s portal. Request follow-up, book within the window, cancel at reception and rebook after the request reopens.
 - Add a patient to a clinician’s waitlist. From an executive tab, block the day and verify both reception and the patient portal lose the available times. Release the block, book an open time from the waitlist, and confirm the appointment persists after reload. Reject an overlapping block and patient access to the staff route.
 - Match a recipient with a patient-issued code, grant one report version, preview it, pause and resume the connector, then revoke access. Check that access disappears on the recipient’s open screen and the patient’s decision survives reload.
 - Refer a flagged laboratory result using the keyboard, claim the redacted case, require a resolution and close it. Verify that status updates in the original worklist, the case history survives reload, and the Medical Director cannot open the quality register. Create and filter a facility case.
@@ -81,3 +83,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [CRM enquiries](screenshots/crm-1440.png) · [Mobile campaign register](screenshots/marketing-390.png)
 
 [Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)
+
+[Mobile patient document](screenshots/patient-document-390.png) · [Desktop shared document](screenshots/shared-document-1440.png)

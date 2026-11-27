@@ -1997,7 +1997,7 @@ paths:
   /portal/sharing:
     get:
       operationId: getPatientSharing
-      summary: Read own report choices, consent decisions and access history.
+      summary: Read own record choices, consent decisions and access history.
       parameters:
         - $ref: '#/components/parameters/Facility'
       responses:
@@ -2021,7 +2021,7 @@ paths:
           $ref: '#/components/responses/Error503'
     patch:
       operationId: decideReportConsent
-      summary: Approve one released report version for a limited duration, decline the
+      summary: Approve one available record version for a limited duration, decline the
         request, or revoke access.
       requestBody:
         required: true
@@ -2034,6 +2034,10 @@ paths:
                   type: string
                 version: *a6
                 reportId: *a6
+                recordKind:
+                  type: string
+                  enum: [Laboratory report, Patient document]
+                  default: Laboratory report
                 hours:
                   type: string
                   enum:
@@ -2174,7 +2178,7 @@ paths:
     post:
       operationId: retrieveSharedReport
       summary: Validate current consent and provenance, then audit and release the
-        selected report or deny access.
+        selected record or deny access.
       requestBody:
         required: true
         content:
@@ -2197,7 +2201,9 @@ paths:
                   id:
                     type: string
                   report:
-                    $ref: '#/components/schemas/SharedReport'
+                    oneOf:
+                      - $ref: '#/components/schemas/SharedReport'
+                      - $ref: '#/components/schemas/SharedPatientDocument'
                 required:
                   - id
                   - report
@@ -6486,6 +6492,256 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /portal/documents:
+    get:
+      operationId: getPatientDocuments
+      summary: List documents and upload samples for the signed-in patient at the selected facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientDocuments"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+    post:
+      operationId: uploadSyntheticDocument
+      summary: Upload the exact bytes of a supplied TrueCare sample.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - format
+                - data
+              properties:
+                format:
+                  type: string
+                  enum:
+                    - PDF
+                    - TXT
+                data:
+                  type: string
+                  contentEncoding: base64
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/documents/detail:
+    get:
+      operationId: getPatientDocumentVersion
+      summary: Read an available document version owned by the signed-in patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: documentId
+          in: query
+          schema:
+            type: string
+          required: true
+        - name: version
+          in: query
+          schema:
+            type: string
+            pattern: ^[1-9][0-9]*$
+          required: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientDocumentDetail"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/documents/withdraw:
+    patch:
+      operationId: withdrawPatientUpload
+      summary: Withdraw a current sample upload owned by the signed-in patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - documentId
+                - version
+              properties:
+                documentId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/documents:
+    get:
+      operationId: getSignedVisitDocuments
+      summary: List released and withdrawn documents for an assigned encounter.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: encounterId
+          in: query
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatientDocumentSummary"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+    post:
+      operationId: releaseVisitAttendanceNote
+      summary: Release a synthetic visit attendance note for an assigned signed and completed visit.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - encounterId
+              properties:
+                encounterId:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /clinical/documents/withdraw:
+    patch:
+      operationId: withdrawVisitAttendanceNote
+      summary: Withdraw a current release linked to an assigned encounter.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - documentId
+                - version
+              properties:
+                documentId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -7495,6 +7751,9 @@ components:
           type: integer
         version: *a7
         expiresAt: *a7
+        recordKind:
+          type: string
+          enum: [Patient document]
       required:
         - id
         - source
@@ -7510,6 +7769,9 @@ components:
           type: string
         source: *a6
         reportId: *a6
+        recordKind:
+          type: string
+          enum: [Patient document]
         connector:
           $ref: '#/components/schemas/ExchangeConnectorSummary'
         purpose:
@@ -7576,11 +7838,16 @@ components:
               - id
               - test
               - publishedAt
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentConsentOption'
       required:
         - connectors
         - requests
         - audit
         - reports
+        - documents
     MatchingCode:
       type: object
       properties:
@@ -10503,6 +10770,203 @@ components:
               changedAt:
                 type: integer
                 minimum: 0
+    DocumentConsentOption:
+      type: object
+      required:
+        - id
+        - title
+        - format
+        - origin
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        format:
+          type: string
+          enum:
+            - PDF
+            - TXT
+        origin:
+          type: string
+          enum:
+            - Patient upload
+            - Facility release
+    PatientDocumentSummary:
+      type: object
+      required:
+        - id
+        - title
+        - format
+        - origin
+        - status
+        - addedAt
+        - version
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        format:
+          type: string
+          enum:
+            - PDF
+            - TXT
+        origin:
+          type: string
+          enum:
+            - Patient upload
+            - Facility release
+        status:
+          type: string
+          enum:
+            - Available
+            - Withdrawn
+        addedAt:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+        clinician:
+          type: string
+    PatientDocumentFile:
+      type: object
+      required:
+        - filename
+        - format
+        - data
+      properties:
+        filename:
+          type: string
+        format:
+          type: string
+          enum:
+            - PDF
+            - TXT
+        data:
+          type: string
+          contentEncoding: base64
+    PatientDocumentDetail:
+      type: object
+      required:
+        - id
+        - title
+        - format
+        - origin
+        - status
+        - addedAt
+        - version
+        - body
+        - file
+        - source
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        format:
+          type: string
+          enum:
+            - PDF
+            - TXT
+        origin:
+          type: string
+          enum:
+            - Patient upload
+            - Facility release
+        status:
+          type: string
+          enum:
+            - Available
+            - Withdrawn
+        addedAt:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+        clinician:
+          type: string
+        body:
+          type: array
+          items:
+            type: string
+        file:
+          $ref: "#/components/schemas/PatientDocumentFile"
+        source:
+          type: string
+    PatientDocuments:
+      type: object
+      required:
+        - documents
+        - samples
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatientDocumentSummary"
+        samples:
+          type: array
+          items:
+            type: object
+            required:
+              - title
+              - filename
+              - format
+              - data
+            properties:
+              title:
+                type: string
+              filename:
+                type: string
+              format:
+                type: string
+                enum:
+                  - PDF
+                  - TXT
+              data:
+                type: string
+                contentEncoding: base64
+    SharedPatientDocument:
+      type: object
+      required:
+        - kind
+        - title
+        - format
+        - origin
+        - body
+        - source
+        - addedAt
+        - expiresAt
+      properties:
+        kind:
+          type: string
+          const: Patient document
+        title:
+          type: string
+        format:
+          type: string
+          enum:
+            - PDF
+            - TXT
+        origin:
+          type: string
+          enum:
+            - Patient upload
+            - Facility release
+        body:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+        addedAt:
+          type: integer
+          minimum: 0
+        expiresAt:
+          type: integer
+          minimum: 0
   responses:
     Error401:
       description: 'Missing or expired session.'

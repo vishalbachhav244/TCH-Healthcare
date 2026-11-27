@@ -16,7 +16,8 @@ import {
   requestPurposes,
   type RecordRequest,
   type RequestSummary,
-  type SharedReport,
+  type SharedRecord,
+  type SharedDocument,
 } from '../domain/interoperability';
 
 @Component({
@@ -32,9 +33,10 @@ export class RecordRequests {
   protected readonly notice = signal('');
   protected readonly error = signal('');
   protected readonly busy = signal(false);
-  protected readonly viewed = signal<{ requestId: string; report: SharedReport } | undefined>(
+  protected readonly viewed = signal<{ requestId: string; report: SharedRecord } | undefined>(
     undefined,
   );
+  protected readonly documentPreview = signal(false);
   private readonly forms = inject(NonNullableFormBuilder);
   protected readonly form = this.forms.group({
     code: ['', Validators.required],
@@ -105,6 +107,7 @@ export class RecordRequests {
     this.viewed.set(undefined);
     try {
       const report = await this.api.sharedReport(this.scope().token, request.id);
+      this.documentPreview.set(this.isDocument(report));
       this.viewed.set({ requestId: request.id, report });
       dialog.showModal();
     } catch (error) {
@@ -112,5 +115,9 @@ export class RecordRequests {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected isDocument(record: SharedRecord): record is SharedDocument {
+    return 'kind' in record;
   }
 }

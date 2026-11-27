@@ -91,6 +91,8 @@ In **Healthcare CRM**, `crm` captures a registered patient’s enquiry and assig
 
 Use `analyst` to choose a facility and a 7-, 14- or 30-day period in **Enterprise Analytics & BI**. The daily CSV contains aggregate appointment activity, queue waits and INR collections. Use `automation` to enable the documentation draft policy. Then use `clinician` to open **AI & Automation**, request a synthetic draft from a signed visit and review it before recording a decision.
 
+In **My care → Documents**, use `patient` to download and upload a TrueCare sample PDF or TXT. The library shows the document’s origin and supports preview and download. In a signed consultation, `clinician` can release a visit attendance note to the library. In **Record sharing**, a patient can approve one available document version for a recipient.
+
 ## Verify
 
 ```powershell

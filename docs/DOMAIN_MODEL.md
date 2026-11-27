@@ -44,4 +44,6 @@ An `Enquiry` links a tenant patient to a facility, capture source, specialty and
 
 An `AnalyticsReport` contains dated totals and specialty aggregates. Wait sample counts and elapsed time support a weighted period mean. A facility `DocumentationPolicy` controls generation and the daily quota. A `DocumentationDraft` references the assigned encounter, author, format, version and review state. Review is separate from the encounter lifecycle. [Intelligence contracts](../src/app/domain/intelligence.ts)
 
+A `PatientDocument` belongs to one patient and facility. Uploads reference an immutable synthetic fixture. Facility releases reference a signed encounter and the recorded visit details. A consent grant identifies the record type, ID and version. [Document contracts](../src/app/domain/patient-documents.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

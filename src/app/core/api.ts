@@ -31,6 +31,12 @@ import type {
 } from '../domain/biomedical';
 import type { ShiftAction, ShiftFields, StaffShift, WorkforceData } from '../domain/workforce';
 import type {
+  DocumentDetail,
+  DocumentFormat,
+  DocumentSummary,
+  PatientDocuments,
+} from '../domain/patient-documents';
+import type {
   AnalyticsReport,
   AnalyticsWindow,
   AutomationData,
@@ -100,6 +106,8 @@ import type {
   RecordRequest,
   RequestSummary,
   SharedReport,
+  SharedDocument,
+  RecordReference,
 } from '../domain/interoperability';
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
 import type { ScheduleException, SchedulingDay, WaitlistEntry } from '../domain/scheduling';
@@ -1418,10 +1426,67 @@ export class Api {
     );
   }
 
+  patientDocuments(token: string, facility: string) {
+    return this.get('portal/documents', token, facility).pipe(
+      map((value) => objectShape<PatientDocuments>(value, ['documents', 'samples'])),
+    );
+  }
+
+  portalDocument(token: string, facility: string, record: DocumentSummary) {
+    return firstValueFrom(
+      this.get('portal/documents/detail', token, facility, {
+        documentId: record.id,
+        version: record.version,
+      }).pipe(
+        map((value) =>
+          objectShape<DocumentDetail>(value, ['id', 'title', 'body', 'file', 'source', 'version']),
+        ),
+      ),
+    );
+  }
+
+  uploadPatientDocument(token: string, facility: string, format: DocumentFormat, data: string) {
+    return this.execute('portal/documents', token, facility, { format, data });
+  }
+
+  clinicalDocuments(token: string, facility: string, encounterId: string) {
+    return this.get('clinical/documents', token, facility, { encounterId }).pipe(
+      map((value) => collection<DocumentSummary>(value, ['id', 'title', 'status', 'version'])),
+    );
+  }
+
+  releaseVisitDocument(token: string, facility: string, encounterId: string) {
+    return this.execute('clinical/documents', token, facility, { encounterId });
+  }
+
+  withdrawDocument(
+    token: string,
+    facility: string,
+    context: 'portal' | 'clinical',
+    record: DocumentSummary,
+  ) {
+    return this.execute(
+      context + '/documents/withdraw',
+      token,
+      facility,
+      {
+        documentId: record.id,
+        version: String(record.version),
+      },
+      'PATCH',
+    );
+  }
+
   patientSharing(token: string, facility: string) {
     return this.get('portal/sharing', token, facility).pipe(
       map((value) =>
-        objectShape<PatientSharing>(value, ['connectors', 'requests', 'audit', 'reports']),
+        objectShape<PatientSharing>(value, [
+          'connectors',
+          'requests',
+          'audit',
+          'reports',
+          'documents',
+        ]),
       ),
     );
   }
@@ -1431,7 +1496,7 @@ export class Api {
     facility: string,
     request: Pick<RequestSummary, 'id' | 'version'>,
     action: ConsentAction,
-    grant?: { reportId: string; hours: string },
+    grant?: { reportId: string; hours: string; recordKind?: RecordReference['kind'] },
   ) {
     return this.execute(
       'portal/sharing',
@@ -1467,7 +1532,25 @@ export class Api {
       'POST',
       ['id', 'report'],
     );
-    return objectShape<SharedReport>(response.report, [
+    const report = response.report;
+    if (
+      typeof report === 'object' &&
+      report &&
+      'kind' in report &&
+      report.kind === 'Patient document'
+    ) {
+      return objectShape<SharedDocument>(report, [
+        'kind',
+        'title',
+        'format',
+        'origin',
+        'body',
+        'source',
+        'addedAt',
+        'expiresAt',
+      ]);
+    }
+    return objectShape<SharedReport>(report, [
       'test',
       'finding',
       'accession',

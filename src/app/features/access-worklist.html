@@ -567,6 +567,9 @@
       @if (row.encounter?.signedAt; as signed) {
         <p>{{ row.encounter?.observation }}</p>
         <small>Signed {{ signed | date: 'd MMM y, HH:mm' : '+0530' }} IST</small>
+        @if (row.encounter; as encounter) {
+          <tc-clinical-visit-documents [encounterId]="encounter.id" />
+        }
       } @else {
         <div class="clinical-orders fields">
           <label for="laboratory-test">Laboratory order</label>

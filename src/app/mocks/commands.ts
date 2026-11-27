@@ -36,6 +36,7 @@ import { transportCommand } from './transport';
 import { crmCommand } from './crm';
 import { campaignCommand, updateContactPreferences } from './marketing';
 import { automationCommand } from './automation';
+import { documentCommand } from './patient-documents';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -116,6 +117,7 @@ export async function command(
       db.engagementPermissions,
       db.automationPolicies,
       db.documentationDrafts,
+      db.patientDocuments,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -630,6 +632,24 @@ export async function command(
             session,
             payload,
             path.endsWith('/status') ? 'review' : 'request',
+          );
+          break;
+        case 'portal/documents':
+        case 'portal/documents/withdraw':
+          changed = await documentCommand(
+            path,
+            scope(session, facilityRecord, 'D12', 'portal'),
+            session,
+            payload,
+          );
+          break;
+        case 'clinical/documents':
+        case 'clinical/documents/withdraw':
+          changed = await documentCommand(
+            path,
+            scope(session, facilityRecord, 'D13', 'clinical'),
+            session,
+            payload,
           );
           break;
         case 'alerts/acknowledge': {

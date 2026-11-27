@@ -10,7 +10,7 @@ import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
-import type { ConsentAction, RequestSummary } from '../domain/interoperability';
+import type { ConsentAction, RecordReference, RequestSummary } from '../domain/interoperability';
 
 @Component({
   selector: 'tc-patient-sharing',
@@ -34,6 +34,9 @@ export class PatientSharing {
     { request: RequestSummary; action: ConsentAction } | undefined
   >(undefined);
   protected readonly grant = inject(NonNullableFormBuilder).group({
+    recordKind: new FormControl<RecordReference['kind']>('Laboratory report', {
+      nonNullable: true,
+    }),
     reportId: ['', Validators.required],
     hours: ['24', Validators.required],
   });
@@ -97,10 +100,14 @@ export class PatientSharing {
       );
       this.notice.set(
         target.action === 'grant'
-          ? 'Report access granted.'
+          ? this.grant.controls.recordKind.value === 'Patient document'
+            ? 'Document access granted.'
+            : 'Report access granted.'
           : target.action === 'decline'
             ? 'Request declined.'
-            : 'Report access revoked.',
+            : target.request.recordKind === 'Patient document'
+              ? 'Document access revoked.'
+              : 'Report access revoked.',
       );
       dialog.close();
     } catch (error) {

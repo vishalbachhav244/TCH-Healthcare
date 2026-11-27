@@ -1,5 +1,9 @@
 export function downloadCsv(filename: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }));
+  downloadBlob(filename, new Blob([content], { type: 'text/csv' }));
+}
+
+export function downloadBlob(filename: string, content: Blob) {
+  const url = URL.createObjectURL(content);
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;

@@ -58,6 +58,7 @@ import type { SupportTask } from '../domain/support';
 import type { TransportRequest, TransportUnit } from '../domain/transport';
 import type { Campaign, EngagementPermission, Enquiry } from '../domain/engagement';
 import type { DocumentationDraft, FacilityDocumentationPolicy } from '../domain/intelligence';
+import type { PatientDocument } from '../domain/patient-documents';
 import { initialBedPreparations, initialTransportUnits } from './support-seed';
 import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
@@ -95,6 +96,7 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   enquiries: EntityTable<Enquiry, 'id'>;
   automationPolicies: EntityTable<FacilityDocumentationPolicy, 'facilityId'>;
   documentationDrafts: EntityTable<DocumentationDraft, 'id'>;
+  patientDocuments: EntityTable<PatientDocument, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -567,6 +569,10 @@ db.version(25)
         await members.add(membership);
     }
   });
+
+db.version(26).stores({
+  patientDocuments: 'id, [facilityId+patientId], [facilityId+encounterId]',
+});
 
 export function initialize() {
   return (initialization ??= db

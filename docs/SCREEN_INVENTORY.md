@@ -22,7 +22,7 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-16 | D05 | `/work/network` | Date-based facility comparison and department drill-down |
 | TC-LOCAL-17 | D22 | `/work/pharmacy` | Signed worklist, stock lot directory and dispense dialog |
 | TC-LOCAL-18 | D04 | `/work/integrations` | Connector configuration, versioned lifecycle and redacted audit |
-| TC-LOCAL-19 | D04 | `/work/record-requests` | Matching-code request, consent status and authorized report preview |
+| TC-LOCAL-19 | D04 | `/work/record-requests` | Matching-code request, consent status and authorized laboratory report or document preview |
 | TC-LOCAL-20 | D12 | `/work/portal` → Record sharing | One-time matching code, consent review, revocation and access history |
 | TC-LOCAL-21 | D07 | `/work/clinical-governance` | Seven-day indicators, flagged report worklist, review and referral |
 | TC-LOCAL-22 | D08 | `/work/quality` | Case intake, status filter, ownership, resolution and case history |
@@ -57,3 +57,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-51 | D12 and D34 | `/work/portal` → Contact preferences | Facility-scoped patient opt-in for Email and SMS |
 | TC-LOCAL-52 | D35 | `/work/analytics` | Daily and specialty reporting windows, appointment chart, queue wait and net collections, aggregate CSV |
 | TC-LOCAL-53 | D36 | `/work/automation` | Facility documentation policy, daily usage, supervisor activity, clinician draft and decision history |
+| TC-LOCAL-54 | D12 | `/work/portal` → Documents | Synthetic PDF and TXT upload, available and withdrawn statuses, provenance, preview and download |
+| TC-LOCAL-55 | D13 | `/work/clinical` → Signed consultation → Visit documents | Attendance note release, withdrawal and patient portal handoff |

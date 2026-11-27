@@ -1,0 +1,186 @@
+@let state = data();
+<section class="panel table-panel" aria-labelledby="patient-documents-heading">
+  <div class="panel-heading">
+    <div>
+      <h2 id="patient-documents-heading">Documents</h2>
+      <p>Your uploads and notes released by this facility.</p>
+    </div>
+    @if (state.state === 'ready') {
+      <button type="button" class="button primary" (click)="open(editorDialog, { kind: 'upload' })">
+        <ng-icon name="plus" /> Upload document
+      </button>
+    }
+  </div>
+  @if (status()) {
+    <p class="inline-notice success" role="status">{{ status() }}</p>
+  }
+  @if (error()) {
+    <p class="inline-notice" role="alert">{{ error() }}</p>
+  }
+  @if (state.state === 'loading') {
+    <p class="state-panel" role="status">Loading documents…</p>
+  } @else if (state.state === 'error') {
+    <div class="state-panel">
+      <p role="alert">{{ state.message }}</p>
+      <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">
+        Retry
+      </button>
+    </div>
+  } @else {
+    <div class="filter-bar">
+      <div class="select-control">
+        <label for="patient-document-status">Status</label>
+        <select
+          #statusFilter
+          id="patient-document-status"
+          [value]="filter()"
+          (change)="filter.set(statusFilter.value); more.set(10)"
+        >
+          <option value="">All statuses</option>
+          <option>Available</option>
+          <option>Withdrawn</option>
+        </select>
+      </div>
+    </div>
+    @if (!records().length) {
+      <p class="state-panel">
+        {{
+          filter() ? 'No documents match this filter.' : 'You have no documents at this facility.'
+        }}
+      </p>
+    } @else {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Patient documents">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Patient documents
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Document</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (record of records().slice(0, more()); track record.id) {
+              <tr>
+                <td>
+                  <strong>{{ record.title }}</strong
+                  ><small>{{ record.origin }} · {{ record.format }}</small>
+                  <small>{{ record.addedAt | date: 'd MMM y' : '+0530' }}</small>
+                </td>
+                <td>
+                  <span [class]="record.status | statusTone">{{ record.status }}</span>
+                </td>
+                <td>
+                  @if (record.status === 'Available') {
+                    <button class="text-button" type="button" (click)="view(preview, record)">
+                      View document
+                    </button>
+                    @if (record.origin === 'Patient upload') {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open(editorDialog, { kind: 'withdraw', record })"
+                      >
+                        Withdraw upload
+                      </button>
+                    }
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (records().length > more()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="more.set(more() + 10)">
+            Show more documents
+          </button>
+        </div>
+      }
+    }
+  }
+</section>
+<dialog #editorDialog aria-labelledby="document-editor-title" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="document-editor-title">
+      {{ editor()?.kind === 'withdraw' ? 'Withdraw upload' : 'Upload document' }}
+    </h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editorDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as edit) {
+    @if (edit.kind === 'upload') {
+      <form
+        class="dialog-body fields"
+        (submit)="$event.preventDefault(); save(editorDialog, upload.files?.[0])"
+      >
+        <p>
+          Download a synthetic sample, then select it below. Use TrueCare samples for this
+          evaluation.
+        </p>
+        @if (state.state === 'ready') {
+          <div class="view-controls" role="group" aria-label="Synthetic samples">
+            @for (sample of state.data.samples; track sample.filename) {
+              <button class="button secondary" type="button" (click)="download(sample)">
+                Download {{ sample.title.toLowerCase() }} ({{ sample.format }})
+              </button>
+            }
+          </div>
+        }
+        <label for="patient-document-upload">Sample file</label>
+        <input #upload id="patient-document-upload" type="file" accept=".pdf,.txt" required />
+        @if (dialogError()) {
+          <p class="field-error" role="alert">{{ dialogError() }}</p>
+        }
+        <button type="submit" class="button primary" [disabled]="busy()">Upload sample</button>
+      </form>
+    } @else {
+      <form class="dialog-body fields" (submit)="$event.preventDefault(); save(editorDialog)">
+        <p>
+          Withdraw <strong>{{ edit.record.title }}</strong> from your available documents? Any
+          recipient access to this version will end.
+        </p>
+        @if (dialogError()) {
+          <p class="field-error" role="alert">{{ dialogError() }}</p>
+        }
+        <button type="submit" class="button primary" [disabled]="busy()">Confirm withdrawal</button>
+      </form>
+    }
+  }
+</dialog>
+<dialog #preview aria-labelledby="patient-document-preview" (close)="viewed.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="patient-document-preview">{{ viewed()?.title ?? 'Document preview' }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="preview.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  <div class="dialog-body fields">
+    @if (viewed(); as item) {
+      @for (line of item.body; track $index) {
+        <p>{{ line }}</p>
+      }
+      <dl class="document-facts">
+        <div>
+          <dt>Source facility</dt>
+          <dd>{{ item.source }}</dd>
+        </div>
+        <div>
+          <dt>Provenance</dt>
+          <dd>{{ item.origin }} · {{ item.addedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST</dd>
+        </div>
+      </dl>
+      <button class="button secondary" type="button" (click)="download(item.file)">
+        <ng-icon name="download" /> Download {{ item.format }}
+      </button>
+    } @else {
+      <p role="status">This document is unavailable.</p>
+    }
+  </div>
+</dialog>

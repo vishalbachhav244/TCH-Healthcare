@@ -30,4 +30,6 @@ CRM and Marketing passed reflow checks at 390, 768, 1024 and 1440 px. The deskto
 
 Enterprise Analytics and the Automation supervisor worklist passed reflow checks at 390, 768, 1024 and 1440 px. The desktop analytics report and mobile supervisor activity view passed the selected axe rules. The analytics plot has an accessible daily table. Enter opens the clinician draft request and Escape restores focus to its trigger. [Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)
 
+The patient document library and recipient preview passed reflow checks at 390, 768, 1024 and 1440 px. Mobile patient and desktop recipient previews passed the selected axe rules. Enter opens the upload form and Escape restores focus to the upload button. [Patient document preview](screenshots/patient-document-390.png) · [Recipient document preview](screenshots/shared-document-1440.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

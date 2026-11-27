@@ -13,7 +13,7 @@
 | 9 Insurance | Eligible invoice → patient coverage → preauthorisation → prepare and submit → record payer settlement or denial → collect patient remainder → reconcile | Payer rules, appeals, attachments, batch remittances and external clearing |
 | 10 Procurement | Request replenishment → approve → choose supplier → issue order → receive all or part into the lot ledger → verify stock and order balance | Supplier onboarding, multiple order lines, non-pharmacy stock and payables matching |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
-| 12 Integration | Configure connector → redeem patient code → request report → grant one published version → verify provenance and consent → audit access | Real external transport, verified partner identities and additional record formats |
+| 12 Integration | Configure connector → redeem patient code → request record → grant one available version → verify provenance and consent → audit access | Real external transport, verified partner identities and wider record coverage |
 | 13 Patient application | Clinician selection → booking → pass → queue status → released reports, discharge summaries and dispensed medication history → consent or patient-owned follow-up booking | Public discovery, family access and reminders |
 | 14 CRM and marketing | Open | Conversion, engagement and campaigns |
 | 15 AI documentation | Open | Draft, review and audit |
@@ -55,3 +55,5 @@ The patient can opt in or out by channel under Contact preferences. A Marketing 
 An analyst selects a facility and an end date for a 7-, 14- or 30-day reporting window. The report groups non-cancelled appointments by day and specialty. It measures queue wait from arrival to the first call, counts cancellations separately and calculates net collections from posted payments less recorded refunds. Export uses the daily aggregate rows.
 
 An automation supervisor enables synthetic documentation drafts and sets a facility limit per IST day. The assigned clinician chooses a signed, completed visit. A local template generates an administrative draft with source context for review. The clinician can save a different format and approve or reject the current version. The decision applies to the draft record. A paused policy stops new requests and leaves pending reviews available.
+
+A patient downloads a supplied sample and uploads it in Documents. The portal shows its origin and lets the patient preview and download it. An assigned clinician can release an attendance note from a signed visit. The note enters the patient’s Documents list with facility provenance. Withdrawal keeps the history row and ends access to that version for both the patient and any recipient.

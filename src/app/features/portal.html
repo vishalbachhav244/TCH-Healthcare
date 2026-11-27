@@ -77,6 +77,14 @@
     <button
       class="button secondary"
       type="button"
+      [attr.aria-pressed]="active() === 'documents'"
+      (click)="active.set('documents')"
+    >
+      Documents
+    </button>
+    <button
+      class="button secondary"
+      type="button"
       [attr.aria-pressed]="active() === 'sharing'"
       (click)="active.set('sharing')"
     >
@@ -279,6 +287,9 @@
 }
 @if (active() === 'sharing') {
   <tc-patient-sharing />
+}
+@if (active() === 'documents') {
+  <tc-patient-documents />
 }
 @if (active() === 'preferences') {
   <tc-contact-preferences />

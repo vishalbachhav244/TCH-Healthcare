@@ -1,4 +1,5 @@
 import type { LabFinding, LabTest } from './diagnostics';
+import type { DocumentFormat, DocumentSummary } from './patient-documents';
 
 export const connectorStandards = ['HL7 FHIR', 'Document exchange'] as const;
 export const requestPurposes = ['Continuation of care', 'Specialist review'] as const;
@@ -46,7 +47,7 @@ export interface RecordRequest {
 }
 
 export interface RecordReference {
-  kind: 'Laboratory report';
+  kind: 'Laboratory report' | 'Patient document';
   id: string;
   version: number;
 }
@@ -83,6 +84,7 @@ export interface RequestSummary {
   version: number;
   expiresAt?: number;
   reportId?: string;
+  recordKind?: RecordReference['kind'];
   decision?: RequestStatus;
 }
 
@@ -94,6 +96,19 @@ export interface SharedReport {
   publishedAt: number;
   expiresAt: number;
 }
+
+export interface SharedDocument {
+  kind: 'Patient document';
+  title: string;
+  format: DocumentFormat;
+  origin: DocumentSummary['origin'];
+  body: string[];
+  source: string;
+  addedAt: number;
+  expiresAt: number;
+}
+
+export type SharedRecord = SharedReport | SharedDocument;
 
 export interface AuditSummary {
   id: string;
@@ -115,4 +130,5 @@ export interface PatientSharing {
   requests: RequestSummary[];
   audit: AuditSummary[];
   reports: { id: string; test: LabTest; accession?: string; publishedAt: number }[];
+  documents: Pick<DocumentSummary, 'id' | 'title' | 'format' | 'origin'>[];
 }

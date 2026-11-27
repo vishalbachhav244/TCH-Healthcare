@@ -8,14 +8,14 @@
 | Customer success | Reviews subscriptions and changes compatible plans. |
 | Platform operations | Tracks incidents and views activity metadata and counts. |
 | Integration administrator | Manages connector configuration and masked audit metadata. Cannot open report content or impersonate recipients. |
-| Record recipient | Can redeem its own matching codes and view only the exact report version covered by active consent to its connector. |
+| Record recipient | Can redeem its own matching codes and view the exact laboratory report or document version covered by current consent to its connector. |
 | Network executive | Compares active, assigned facilities within the selected tenant and drills into their overviews. |
 | Medical director | Reviews eligible published reports at assigned facilities and sees linked case status. |
 | Quality coordinator | Creates and claims quality cases within assigned facilities. Resolution requires ownership. Clinical referrals expose a process description and status. |
 | Pharmacist | Views signed facility prescriptions and the stock ledger. Receives stock, dispenses, returns on-hand stock to a supplier and quarantines returned patient units. A patient return credits the unpaid charge up to the recorded return value. |
 | Executive | Meridian facilities. Overview, alert acknowledgement and clinician schedule blocks. Read-only appointments, waitlist, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointment and waitlist commands, and queue operations. Follow-up booking exposes the clinician, date window and booking state. Appointment, queue and dashboard worklists omit encounter records. |
-| Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, manages follow-up, orders laboratory and imaging studies and reads released imaging reports for the assigned encounter. Requests and reviews their own synthetic drafts from signed assigned visits. |
+| Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, manages follow-up, orders laboratory and imaging studies and reads released imaging reports for the assigned encounter. Requests and reviews their own synthetic drafts and releases or withdraws attendance notes for assigned signed visits. |
 | Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, manages orders and component requests and drafts or signs the discharge summary. Reads related nursing tasks and observations. |
 | Ward nurse | Active assigned admissions at inpatient-enabled facilities. Starts and completes linked tasks and records observations. Reads rounds and orders for the assigned admission. |
 | Emergency clinician | Emergency arrivals, clinician-entered priority and disposition for registered patients within the selected facility tenant. May request admission. |
@@ -41,5 +41,5 @@
 | Engagement coordinator | Engagement-enabled facilities. Sees aggregate conversion and current channel opt-in counts. Manages local campaign drafts. |
 | Enterprise analyst | Reads and exports daily and specialty aggregates for assigned facilities. |
 | Automation supervisor | Configures facility draft policy and reads aggregate usage and redacted activity. |
-| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications, bill balances and facility contact preferences. |
+| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released records, synthetic sample uploads, dispensed medications, bill balances and facility contact preferences. Can withdraw their uploads and grant or revoke sharing for an available record version. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

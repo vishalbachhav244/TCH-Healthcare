@@ -11,13 +11,15 @@ import {
   type IntegrationDashboard,
   type PatientSharing,
   type RecordRequest,
+  type RecordReference,
   type RequestSummary,
-  type SharedReport,
+  type SharedRecord,
 } from '../domain/interoperability';
 import type { DomainEvent, Facility, Session } from '../domain/operations';
 import { ApiError, patientSubject, requireSession, scope } from './access';
 import { integrationAccount, recordRecipients } from './accounts';
 import { db } from './database';
+import { describeDocument, documentDetail, findAvailableDocument } from './patient-documents';
 
 function requireIntegration(session: Session) {
   if (session.account !== integrationAccount)
@@ -59,23 +61,29 @@ function requestStatus(
   return request.status;
 }
 
-function summarize(
+async function summarize(
   request: RecordRequest,
   connector: Connector,
   facility: Facility,
   grant: ConsentGrant | undefined,
   now: number,
   includeSelection = false,
-): RequestSummary {
+): Promise<RequestSummary> {
+  let status = requestStatus(request, connector, facility, grant, now);
+  if (status === 'Granted' && grant?.record.kind === 'Patient document') {
+    const record = await findAvailableDocument(facility, request.patientId, grant.record.id);
+    if (!record || record.version !== grant.record.version) status = 'Unavailable';
+  }
   return {
     id: request.id,
     connector: connectorSummary(connector),
     source: facility.name,
     purpose: request.purpose,
-    status: requestStatus(request, connector, facility, grant, now),
+    status,
     createdAt: request.createdAt,
     version: request.version,
     expiresAt: grant?.expiresAt,
+    ...(grant?.record.kind === 'Patient document' ? { recordKind: grant.record.kind } : {}),
     ...(includeSelection ? { reportId: grant?.record.id, decision: request.status } : {}),
   };
 }
@@ -132,7 +140,9 @@ export async function patientSharing(
   session: Session,
 ): Promise<PatientSharing> {
   const patientId = patientSubject(session);
-  const [connectors, requests, reports] = await Promise.all([
+  if ((await db.patients.get(patientId))?.tenantId !== facility.tenantId)
+    throw new ApiError(404, 'Patient profile unavailable.');
+  const [connectors, requests, reports, documentRows] = await Promise.all([
     db.connectors.where('facilityId').equals(facility.id).toArray(),
     db.recordRequests
       .where('patientId')
@@ -150,20 +160,27 @@ export async function patientSharing(
           !!row.authorisedBy,
       )
       .toArray(),
+    db.patientDocuments
+      .where('[facilityId+patientId]')
+      .equals([facility.id, patientId])
+      .filter((row) => row.status === 'Available')
+      .toArray(),
   ]);
   const grants = await grantsByRequest(requests);
   const now = Date.now();
   const map = new Map(connectors.map((connector) => [connector.id, connector]));
   return {
     connectors: connectors.filter((row) => row.status === 'Enabled').map(connectorSummary),
-    requests: requests
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .flatMap((request) => {
-        const connector = map.get(request.connectorId);
-        return connector
-          ? [summarize(request, connector, facility, grants.get(request.id), now, true)]
-          : [];
-      }),
+    requests: await Promise.all(
+      requests
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .flatMap((request) => {
+          const connector = map.get(request.connectorId);
+          return connector
+            ? [summarize(request, connector, facility, grants.get(request.id), now, true)]
+            : [];
+        }),
+    ),
     audit: await exchangeHistory(
       connectors,
       [facility],
@@ -177,6 +194,12 @@ export async function patientSharing(
         accession,
         publishedAt: changedAt,
       })),
+    documents: documentRows
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .map((row) => {
+        const { id, title, format, origin } = describeDocument(row);
+        return { id, title, format, origin };
+      }),
   };
 }
 
@@ -198,14 +221,16 @@ export async function recipientRequests(session: Session): Promise<RequestSummar
   );
   const grants = await grantsByRequest(requests);
   const now = Date.now();
-  return requests
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .flatMap((request) => {
-      const pair = pairs.get(request.connectorId);
-      return pair?.facility && pair.facility.id === request.facilityId
-        ? [summarize(request, pair.connector, pair.facility, grants.get(request.id), now)]
-        : [];
-    });
+  return Promise.all(
+    requests
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .flatMap((request) => {
+        const pair = pairs.get(request.connectorId);
+        return pair?.facility && pair.facility.id === request.facilityId
+          ? [summarize(request, pair.connector, pair.facility, grants.get(request.id), now)]
+          : [];
+      }),
+  );
 }
 
 function fields(body: unknown) {
@@ -396,13 +421,25 @@ async function decide(
     const connector = await db.connectors.get(request.connectorId);
     if (connector?.status !== 'Enabled' || connector.facilityId !== facility.id)
       throw new ApiError(409, 'This connector is unavailable.');
-    const source = await provenance(request, facility, key(input['reportId']));
+    const kind = input['recordKind'] ?? 'Laboratory report';
     const duration = consentHours.find((value) => String(value) === input['hours']);
-    if (!source || !duration)
-      throw new ApiError(422, 'Choose one of your published reports and a consent duration.');
+    let record: RecordReference | undefined;
+    if (kind === 'Laboratory report') {
+      const source = await provenance(request, facility, key(input['reportId']));
+      if (source) record = { kind, id: source.report.id, version: source.report.version };
+    } else if (kind === 'Patient document') {
+      const document = await findAvailableDocument(
+        facility,
+        request.patientId,
+        key(input['reportId']),
+      );
+      if (document) record = { kind, id: document.id, version: document.version };
+    }
+    if (!record || !duration)
+      throw new ApiError(422, 'Choose an available record and a consent duration.');
     await db.consentGrants.add({
       requestId: request.id,
-      record: { kind: 'Laboratory report', id: source.report.id, version: source.report.version },
+      record,
       expiresAt: now + duration * 3_600_000,
       revoked: false,
     });
@@ -433,13 +470,29 @@ async function retrieve(session: Session, input: Record<string, unknown>, now: n
     db.consentGrants.get(request.id),
   ]);
   let outcome: ExchangeOutcome;
-  let report: SharedReport | undefined;
+  let report: SharedRecord | undefined;
   if (request.status === 'Revoked' || grant?.revoked) outcome = 'Revoked';
   else if (request.status !== 'Granted' || !grant) outcome = 'Consent required';
   else if (grant.expiresAt <= now) outcome = 'Expired';
   else if (!facility || facility.active === false || connector.status !== 'Enabled')
     outcome = 'Connector unavailable';
-  else {
+  else if (grant.record.kind === 'Patient document') {
+    const document = await findAvailableDocument(facility, request.patientId, grant.record.id);
+    if (document && document.version === grant.record.version) {
+      const { title, format, origin, body, source, addedAt } = documentDetail(document, facility);
+      outcome = 'Released';
+      report = {
+        kind: 'Patient document',
+        title,
+        format,
+        origin,
+        body,
+        source,
+        addedAt,
+        expiresAt: grant.expiresAt,
+      };
+    } else outcome = 'Source mismatch';
+  } else {
     const source = await provenance(request, facility, grant.record.id);
     if (source && source.report.version === grant.record.version) {
       outcome = 'Released';
@@ -487,6 +540,8 @@ export async function exchangeCommand(
       db.exchangeAudit,
       db.labOrders,
       db.encounters,
+      db.patientDocuments,
+      db.patients,
       db.events,
     ],
     async () => {

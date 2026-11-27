@@ -1,5 +1,14 @@
 # Progress ledger
 
+## Patient documents and exchange, 27 November 2026
+
+- Added the patient document library and sample-file picker. A patient can load a supplied PDF or TXT, preview provenance, download the file or withdraw their upload. The adapter validates exact sample bytes and keeps one immutable catalogue reference. [Patient library](../src/app/features/patient-documents.ts) · [Document adapter](../src/app/mocks/patient-documents.ts)
+- Added release and withdrawal of attendance notes from assigned signed visits. The released note appears in the patient’s library. [Signed visit documents](../src/app/features/clinical-visit-documents.ts)
+- Extended the exchange to exact document versions. Recipient previews clear live on source withdrawal, and a subsequent denied request is audited. [Exchange adapter](../src/app/mocks/interoperability.ts) · [OpenAPI](openapi.yaml)
+- Verified schema version 26 in Chromium with a saved laboratory grant and approved draft. The new document library opened, and the existing grant still opened its laboratory report. Poppler opened the supplied one-page PDF. [Migration](../src/app/mocks/database.ts) · [Test evidence](TEST_REPORT.md)
+- Passed 48 domain and contract tests, 25 Chromium journeys, both builds and release verification. [Mobile patient document](screenshots/patient-document-390.png) · [Desktop shared document](screenshots/shared-document-1440.png)
+- Family access, general file intake, public discovery, kiosk check-in and additional exchange formats remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md)
+
 ## Enterprise Analytics and Automation, 27 November 2026
 
 - Added D35 `/work/analytics` for facility date windows, specialty breakdowns, appointment volume, queue wait, net collections and aggregate CSV. Report queries validate facility and tenant relationships. [Analytics workspace](../src/app/features/analytics.ts) · [Report adapter](../src/app/mocks/analytics.ts)

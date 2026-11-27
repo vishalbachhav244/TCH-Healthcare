@@ -7,7 +7,7 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D01 | SaaS Super Admin | `/work/platform` | Partial | Department setup, account creation, and additional entitlement policies |
 | D02 | Customer Success & Subscriptions | `/work/subscriptions` | Partial | Renewals, plan authoring and billing integration |
 | D03 | Platform Operations | `/work/platform-operations` | Partial | Service health probes, alert ownership, escalation and audit exports |
-| D04 | Interoperability & Integration | `/work/integrations`, `/work/record-requests` | Partial | Endpoint validation, real transport adapters and additional record types |
+| D04 | Interoperability & Integration | `/work/integrations`, `/work/record-requests` | Partial | Endpoint validation, real transport adapters and sharing of additional records such as imaging and discharge summaries |
 | D05 | Healthcare Network Executive | `/work/network` | Partial | Trend comparisons, longer reporting periods and network exports |
 | D06 | Hospital Executive | `/work/overview` | Partial | Staff capacity, approvals and deeper analytics |
 | D07 | Medical Director | `/work/clinical-governance` | Partial | Peer review, additional clinical indicators and approvals |
@@ -15,7 +15,7 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D09 | Front Desk & Reception | `/work/patients` | Partial | Duplicate adjudication, contact data boundary and appointment history |
 | D10 | Appointments & Scheduling | `/work/appointments`, `/work/scheduling` | Partial | Recurring schedules, calendar views and resource availability |
 | D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility` | Partial | Recall, skip, transfer, delays and performance reports |
-| D12 | Patient & Family | `/work/portal` | Partial | Family access, consent, secure uploads, notifications and discovery |
+| D12 | Patient & Family | `/work/portal` | Partial | Family access, general file intake, notifications and discovery |
 | D13 | Doctor / OPD Workspace | `/work/clinical` | Partial | Clinical history and vitals, prescriptions, referrals and follow-up |
 | D14 | IPD Physician Workspace | `/work/inpatient-physician` | Partial | Inpatient prescribing, expanded charting and post-signature amendments |
 | D15 | Nursing Station | `/work/nursing-station` | Partial | Medication administration, detailed vitals and shift roster |
