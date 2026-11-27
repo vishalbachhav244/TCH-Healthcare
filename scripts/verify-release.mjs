@@ -50,7 +50,14 @@ let browser;
 try {
   browser = await chromium.launch();
   const page = await browser.newPage();
-  for (const route of ['/', '/sign-in', '/work/overview', '/display/mer-central']) {
+  for (const route of [
+    '/',
+    '/sign-in',
+    '/work/overview',
+    '/display/mer-central',
+    '/find-care',
+    '/kiosk/mer-central',
+  ]) {
     await page.goto('http://127.0.0.1:' + server.address().port + route);
     await page.getByRole('heading', { name: /(?:Workspace|Queue display) unavailable/ }).waitFor();
   }
@@ -65,6 +72,10 @@ try {
   });
   await page.goto('http://truecare.invalid/');
   await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
+  for (const route of ['/find-care', '/kiosk/mer-central']) {
+    await page.goto('http://truecare.invalid' + route);
+    await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
+  }
   console.log('Verified inactive release routes and evaluation host restrictions.');
 } finally {
   await browser?.close();

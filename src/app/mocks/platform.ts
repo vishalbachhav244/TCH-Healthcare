@@ -11,6 +11,7 @@ const administrativeEvents = [
   'FacilityCreated',
   'ModuleConfigurationChanged',
   'EngagementConfigurationChanged',
+  'PublicAccessChanged',
   'FacilityActivationChanged',
   'StaffAccessChanged',
   'SubscriptionPlanChanged',
@@ -125,6 +126,7 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
           'platform/activation',
           'platform/membership',
           'platform/engagement',
+          'platform/public-access',
         ].includes(path)
       )
         throw new ApiError(404, 'Platform operation not found.');
@@ -190,6 +192,20 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
       }
       if (value['version'] !== String(facility.configurationVersion))
         throw new ApiError(409, 'Facility settings have changed. Refresh and try again.');
+      if (path === 'platform/public-access') {
+        const { discovery, kiosk } = value;
+        if (
+          (discovery !== 'true' && discovery !== 'false') ||
+          (kiosk !== 'true' && kiosk !== 'false')
+        )
+          throw new ApiError(422, 'Choose a setting for discovery and self-service check-in.');
+        await db.facilities.update(facility.id, {
+          publicDiscovery: discovery === 'true',
+          publicKiosk: kiosk === 'true',
+          configurationVersion: (facility.configurationVersion ?? 0) + 1,
+        });
+        return emit('PublicAccessChanged', facility.id, facility.id);
+      }
       if (path === 'platform/engagement') {
         if (value['engagement'] !== 'true' && value['engagement'] !== 'false')
           throw new ApiError(422, 'Choose an engagement entitlement state.');

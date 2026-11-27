@@ -1,0 +1,60 @@
+.kiosk-content {
+  max-width: 650px;
+}
+
+.kiosk-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-weight: 650;
+}
+
+.kiosk-location small {
+  display: block;
+  font-weight: 500;
+}
+
+.kiosk-panel {
+  padding: clamp(18px, 5vw, 34px);
+}
+
+.kiosk-panel > p,
+.kiosk-panel > button {
+  margin-top: 14px;
+}
+
+.kiosk-panel form {
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.kiosk-panel input::file-selector-button {
+  font: inherit;
+  color: var(--ink);
+  background: #edf5f1;
+  border: 0;
+  padding: 6px 10px;
+  margin-right: 8px;
+  border-radius: 5px;
+}
+
+.kiosk-receipt {
+  text-align: center;
+}
+
+.kiosk-number {
+  margin-inline: auto;
+  max-width: 15rem;
+  padding: 10px;
+  color: var(--teal-hover);
+  background: #e7f1ed;
+  border-radius: var(--radius);
+  font-weight: 650;
+}
+
+.kiosk-number strong {
+  display: block;
+  font-size: clamp(42px, 12vw, 72px);
+  line-height: 1.1;
+}

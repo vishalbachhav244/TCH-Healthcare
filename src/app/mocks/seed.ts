@@ -22,6 +22,8 @@ export const facilities: Facility[] = [
     city: 'Bengaluru',
     inpatient: true,
     publicQueue: true,
+    publicDiscovery: true,
+    publicKiosk: true,
   },
   {
     id: 'mer-north',
@@ -30,6 +32,7 @@ export const facilities: Facility[] = [
     city: 'Bengaluru',
     inpatient: true,
     publicQueue: true,
+    publicDiscovery: true,
   },
   {
     id: 'city-main',
@@ -45,7 +48,14 @@ export const facilities: Facility[] = [
     city: 'Hyderabad',
     inpatient: false,
   },
-  { id: 'sunrise', tenantId: 'sunrise', name: 'Sunrise Clinic', city: 'Chennai', inpatient: false },
+  {
+    id: 'sunrise',
+    tenantId: 'sunrise',
+    name: 'Sunrise Clinic',
+    city: 'Chennai',
+    inpatient: false,
+    publicDiscovery: true,
+  },
   {
     id: 'lakeside',
     tenantId: 'lakeside',

@@ -14,14 +14,25 @@ export function facilityQuery<T, P extends { facility: string; token: string }>(
   request: (params: P) => Observable<T>,
   affected: (id: string, params: P) => boolean = (id, params) => id === params.facility,
 ) {
+  return refreshingQuery(
+    params,
+    (value) => !!value.facility && !!value.token,
+    (value) => facilityChanges.pipe(filter((id) => affected(id, value))),
+    request,
+  );
+}
+
+export function refreshingQuery<T, P>(
+  params: Signal<P>,
+  enabled: (params: P) => boolean,
+  changes: (params: P) => Observable<unknown>,
+  request: (params: P) => Observable<T>,
+) {
   return toSignal(
     toObservable(params).pipe(
       switchMap((value) => {
-        if (!value.facility || !value.token) return of<QueryState<T>>({ state: 'loading' });
-        return merge(
-          of(value.facility),
-          facilityChanges.pipe(filter((id) => affected(id, value))),
-        ).pipe(
+        if (!enabled(value)) return of<QueryState<T>>({ state: 'loading' });
+        return merge(of(null), changes(value)).pipe(
           switchMap(() =>
             request(value).pipe(
               map((data): QueryState<T> => ({ state: 'ready', data })),

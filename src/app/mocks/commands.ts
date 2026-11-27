@@ -37,12 +37,9 @@ import { crmCommand } from './crm';
 import { campaignCommand, updateContactPreferences } from './marketing';
 import { automationCommand } from './automation';
 import { documentCommand } from './patient-documents';
-import {
-  appointmentByFamilyPass,
-  bookFamilyVisit,
-  changeFamilyAccess,
-  issueFamilyPass,
-} from './family-access';
+import { bookFamilyVisit, changeFamilyAccess, issueFamilyPass } from './family-access';
+import { checkInAppointment } from './arrival';
+import { requireDiscovery } from './public-care';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -167,11 +164,13 @@ export async function command(
           break;
         }
         case 'appointments':
+        case 'public/appointments':
         case 'portal/appointments': {
-          const selfService = path === 'portal/appointments';
+          const selfService = path !== 'appointments';
           const facility = selfService
             ? scope(session, facilityRecord, 'D12', 'portal')
             : scope(session, facilityRecord, 'D10', 'appointments');
+          if (path === 'public/appointments') requireDiscovery(facility);
           const patientId = selfService ? patientSubject(session) : field(payload, 'patientId');
           const practitionerId = field(payload, 'practitionerId');
           const day = bookingDay(field(payload, 'day'));
@@ -184,7 +183,10 @@ export async function command(
             channel: !selfService && payload['channel'] === 'Walk-in' ? 'Walk-in' : 'Scheduled',
           });
           pass = appointment.pass;
-          changed = event(facility, 'AppointmentBooked', appointment.id);
+          changed = {
+            ...event(facility, 'AppointmentBooked', appointment.id),
+            actor: session.account,
+          };
           break;
         }
         case 'scheduling/waitlist':
@@ -281,36 +283,8 @@ export async function command(
         }
         case 'queue/check-in': {
           const facility = scope(session, facilityRecord, 'D11', 'queue');
-          const code = field(payload, 'pass').toLowerCase();
-          if (!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/.test(code))
-            throw new ApiError(422, 'Enter a valid appointment pass.');
-          const appointment =
-            (await db.appointments.where('pass').equals(code).first()) ??
-            (await appointmentByFamilyPass(facility, code));
-          if (appointment?.facilityId !== facility.id)
-            throw new ApiError(404, 'Appointment pass not found for this facility.');
-          if (appointment.day !== dayInIndia())
-            throw new ApiError(422, 'This pass is valid only on the appointment date.');
-          if (appointment.status !== 'Booked')
-            throw new ApiError(409, 'The appointment has already been checked in or closed.');
-          const sameDay = await db.appointments
-            .where('[facilityId+day]')
-            .equals([facility.id, appointment.day])
-            .primaryKeys();
-          const tickets = await db.tickets.where('appointmentId').anyOf(sameDay).toArray();
-          const number =
-            tickets.reduce((largest, ticket) => Math.max(largest, ticket.number), 0) + 1;
-          const id = crypto.randomUUID();
-          await db.tickets.add({
-            id,
-            appointmentId: appointment.id,
-            facilityId: facility.id,
-            number,
-            arrivedAt: Date.now(),
-            status: 'Waiting',
-          });
-          await db.appointments.update(appointment.id, { status: 'Checked in' });
-          changed = event(facility, 'PatientCheckedIn', appointment.id);
+          const { appointmentId } = await checkInAppointment(facility, payload['pass']);
+          changed = event(facility, 'PatientCheckedIn', appointmentId);
           break;
         }
         case 'portal/passes': {

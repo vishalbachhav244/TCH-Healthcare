@@ -24,7 +24,13 @@
     <div class="sign-in-inner">
       <span class="square-icon teal login-icon"><ng-icon name="door" /></span>
       <h1>Welcome to TrueCare</h1>
-      <p>Sign in with your organization account.</p>
+      <p>
+        {{
+          selectedVisit
+            ? 'Sign in with your patient account to continue booking.'
+            : 'Sign in with your organization or patient account.'
+        }}
+      </p>
       <form [formGroup]="form" (ngSubmit)="submit()">
         <label for="account">Account ID</label>
         <input
@@ -76,6 +82,9 @@
           Contact your organization administrator for account access or a password reset.
         </p>
       }
+      <a class="text-button" routerLink="/find-care" [queryParams]="selectedVisit">
+        <ng-icon name="search" /> Find care
+      </a>
     </div>
   </section>
 </main>

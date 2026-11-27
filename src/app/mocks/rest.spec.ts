@@ -14,6 +14,7 @@ import {
 import type { SchedulingDay } from '../domain/scheduling';
 import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
+import type { CareDirectory } from '../domain/public-care';
 import type { FamilyAccessEntry, FamilyCare } from '../domain/family-access';
 import type {
   DocumentDetail,
@@ -82,6 +83,153 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('public access and arrival', () => {
+  const facility = 'mer-central';
+  const branch = 'mer-north';
+  const day = dayInIndia();
+  const practitionerId = 'mer-central-DR-6';
+  const directory = () => get('public/directory') as Promise<CareDirectory>;
+  const slots = (at = facility, practitioner = practitionerId) =>
+    get(
+      'public/availability?' +
+        new URLSearchParams({ facility: at, practitionerId: practitioner, day }),
+    ) as Promise<string[]>;
+  const checkIn = (pass: string, at = facility) =>
+    post('public/kiosk/check-in', { pass }, undefined, at);
+
+  it('lists only published fields, then requires a scoped patient session and a current free slot to book', async () => {
+    const [patient, staff, admin] = await Promise.all(
+      ['patient', 'reception', 'platform'].map(login),
+    );
+    const data = await directory();
+    expect(data.facilities.map(({ id }) => id).sort()).toEqual([facility, branch, 'sunrise']);
+    expect(Object.keys(data.facilities[0]).sort()).toEqual(['city', 'id', 'kiosk', 'name']);
+    expect(Object.keys(data.clinicians[0]).sort()).toEqual([
+      'facilityId',
+      'id',
+      'name',
+      'specialty',
+    ]);
+    expect(
+      data.clinicians.every((row) => data.facilities.some((site) => site.id === row.facilityId)),
+    ).toBe(true);
+    await expect(slots('horizon', 'horizon-DR-1')).rejects.toMatchObject({ status: 404 });
+    await expect(slots(branch)).rejects.toMatchObject({ status: 404 });
+    const [time, later] = await slots();
+    const booking = { practitionerId, day, time };
+    await expect(post('public/appointments', booking, undefined, facility)).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(post('public/appointments', booking, staff, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(
+      post(
+        'public/appointments',
+        { ...booking, practitionerId: 'mer-north-DR-1' },
+        patient,
+        branch,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+    const { id, pass } = (await post(
+      'public/appointments',
+      { ...booking, patientId: 'TC-MERIDIAN-01002' },
+      patient,
+      facility,
+    )) as { id: string; pass: string };
+    const original = (await db.facilities.get(facility))!;
+    const access = {
+      facilityId: facility,
+      version: String(original.configurationVersion),
+      discovery: 'false',
+      kiosk: 'true',
+    };
+    try {
+      expect(await db.appointments.get(id)).toMatchObject({
+        patientId: 'TC-MERIDIAN-01001',
+        time,
+        pass,
+        facilityId: facility,
+      });
+      expect(await slots()).not.toContain(time);
+      await expect(post('public/appointments', booking, patient, facility)).rejects.toMatchObject({
+        status: 409,
+      });
+      await expect(patch('platform/public-access', access, staff)).rejects.toMatchObject({
+        status: 403,
+      });
+      await patch('platform/public-access', access, admin);
+      await expect(patch('platform/public-access', access, admin)).rejects.toMatchObject({
+        status: 409,
+      });
+      expect((await directory()).facilities.map(({ id }) => id)).not.toContain(facility);
+      await expect(slots()).rejects.toMatchObject({ status: 404 });
+      await expect(
+        post('public/appointments', { ...booking, time: later }, patient, facility),
+      ).rejects.toMatchObject({ status: 404 });
+      await expect(get('public/kiosk?facility=' + facility)).resolves.toMatchObject({
+        id: facility,
+      });
+    } finally {
+      await db.appointments.delete(id);
+      await db.facilities.put(original);
+    }
+  });
+
+  it('checks pass date, facility and entitlement, then allocates a single token across kiosk and reception', async () => {
+    const [patient, staff] = await Promise.all(['patient', 'reception'].map(login));
+    const [time] = await slots();
+    const book = (when: string, bookedTime: string) =>
+      post(
+        'portal/appointments',
+        { day: when, time: bookedTime, practitionerId },
+        patient,
+        facility,
+      ) as Promise<{ id: string; pass: string }>;
+    const tomorrow = shiftDay(day, 1);
+    const [nextTime] = (await get(
+      'public/availability?' + new URLSearchParams({ facility, practitionerId, day: tomorrow }),
+    )) as string[];
+    const today = await book(day, time);
+    const future = await book(tomorrow, nextTime);
+    const north = {
+      ...(await db.appointments.get(today.id))!,
+      id: crypto.randomUUID(),
+      facilityId: branch,
+      practitionerId: 'mer-north-DR-1',
+      pass: crypto.randomUUID(),
+    };
+    await db.appointments.add(north);
+    const original = (await db.facilities.get(facility))!;
+    try {
+      await expect(get('public/kiosk?facility=' + branch)).rejects.toMatchObject({ status: 404 });
+      await expect(checkIn(today.pass, branch)).rejects.toMatchObject({ status: 404 });
+      await expect(checkIn(north.pass)).rejects.toMatchObject({ status: 404 });
+      await expect(checkIn(future.pass)).rejects.toMatchObject({ status: 422 });
+      await expect(checkIn('invalid')).rejects.toMatchObject({ status: 422 });
+      await db.facilities.update(facility, { active: false });
+      await expect(checkIn(today.pass)).rejects.toMatchObject({ status: 404 });
+      await db.facilities.put(original);
+      const race = await Promise.allSettled([checkIn(today.pass), checkIn(today.pass)]);
+      const issued = race.find((result) => result.status === 'fulfilled');
+      const rejected = race.find((result) => result.status === 'rejected');
+      expect(issued?.value).toEqual({ number: expect.any(Number) });
+      expect(rejected?.reason).toMatchObject({ status: 409 });
+      await expect(
+        post('queue/check-in', { pass: today.pass }, staff, facility),
+      ).rejects.toMatchObject({ status: 409 });
+      const tickets = await db.tickets.where('appointmentId').equals(today.id).toArray();
+      expect(tickets).toHaveLength(1);
+      expect(issued?.value).toEqual({ number: tickets[0].number });
+      expect((await db.appointments.get(today.id))?.status).toBe('Checked in');
+    } finally {
+      await db.facilities.put(original);
+      await db.tickets.where('appointmentId').equals(today.id).delete();
+      await db.appointments.bulkDelete([today.id, future.id, north.id]);
+    }
+  });
+});
 
 describe('patient family profiles', () => {
   const facility = 'mer-central';

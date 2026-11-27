@@ -114,6 +114,25 @@ ng-icon {
   background: var(--teal);
   font-size: 21px;
 }
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px max(16px, calc((100% - 1120px) / 2));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.public-content {
+  max-width: 1152px;
+  padding: clamp(18px, 4vw, 38px) 16px;
+  margin: 0 auto;
+}
+.public-field {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
 .button,
 .icon-button,
 .text-button {

@@ -15,6 +15,7 @@ const actions = {
   facilities: 'Add facility',
   entitlements: 'Edit inpatient entitlement',
   engagement: 'Edit engagement entitlement',
+  'public-access': 'Edit public access',
   activation: 'Edit facility status',
   membership: 'Manage staff access',
 } as const;
@@ -24,6 +25,7 @@ const eventLabels: Partial<Record<DomainEvent['type'], string>> = {
   FacilityCreated: 'Facility added',
   ModuleConfigurationChanged: 'Inpatient entitlement updated',
   EngagementConfigurationChanged: 'Engagement entitlement updated',
+  PublicAccessChanged: 'Public access updated',
   FacilityActivationChanged: 'Facility status updated',
   StaffAccessChanged: 'Staff access updated',
   SubscriptionReviewed: 'Subscription reviewed',
@@ -58,6 +60,8 @@ export class Platform {
   });
   protected readonly inpatient = this.fb.control('false');
   protected readonly engagement = this.fb.control('true');
+  protected readonly publicDiscovery = this.fb.control('false');
+  protected readonly publicKiosk = this.fb.control('false');
   protected readonly facilityActive = this.fb.control('true');
   protected readonly staffRoleOptions = Object.entries(staffRoles);
   protected readonly staffForm = this.fb.group({
@@ -120,6 +124,8 @@ export class Platform {
     this.activeFacility.set(facility);
     this.inpatient.setValue(String(!!facility?.inpatient));
     this.engagement.setValue(String(facility?.engagement !== false));
+    this.publicDiscovery.setValue(String(facility?.publicDiscovery === true));
+    this.publicKiosk.setValue(String(facility?.publicKiosk === true));
     this.facilityActive.setValue(String(facility?.active !== false));
     this.staffForm.reset({ role: 'reception' });
     this.selectedRole.set('reception');
@@ -172,7 +178,9 @@ export class Platform {
           ? { active: this.facilityActive.value }
           : task === 'engagement'
             ? { engagement: this.engagement.value }
-            : { inpatient: this.inpatient.value }),
+            : task === 'public-access'
+              ? { discovery: this.publicDiscovery.value, kiosk: this.publicKiosk.value }
+              : { inpatient: this.inpatient.value }),
       };
     }
     this.busy.set(true);
@@ -200,7 +208,9 @@ export class Platform {
                   : 'Staff access saved.'
                 : task === 'engagement'
                   ? 'Engagement entitlement updated.'
-                  : 'Inpatient entitlement updated.',
+                  : task === 'public-access'
+                    ? 'Public access updated.'
+                    : 'Inpatient entitlement updated.',
       );
       this.reload.update((number) => number + 1);
       dialog.close();

@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | 1 New patient consultation | Registration code → slot → pass → check-in → call → assigned consultation → documentation, orders and invoice → local settlement → follow-up request → linked booking | Specialist referrals and broader clinic record |
 | 2 Returning patient | Search patient → suggest the most recent completed clinician at the facility → check slots → book, or add a waitlist request | Recurring schedules and authorized cross-facility continuity |
-| 3 QR check-in | Issue opaque QR → decode an image or enter code → verify facility and date → issue one ticket → update token-only display | Camera, kiosk, patient notifications and enhanced identity checks |
+| 3 QR check-in | Issue opaque QR → scan an image or enter a code at reception or the enabled kiosk → verify facility and date → issue one ticket → update queue and token display | Live camera scanning, notifications and enhanced identity checks |
 | 4 Connected records | View published laboratory results → choose a report for a recipient → grant or revoke access → review access history | Uploads, document classification, and expanded report types |
 | 5 Inpatient | Request → allocate bed → assign physician and nurse → record care → resolve open tasks, theatre cases and component requests → sign summary → discharge and release the summary → clean and release the bed | Medication administration, advance discharge coordination and summary amendments |
 | 6 Laboratory | Clinician order → collect → process → enter result → separate reviewer authorises and publishes → patient-scoped view | Numeric panels, corrections, report files and richer audit |
@@ -14,7 +14,7 @@
 | 10 Procurement | Request replenishment → approve → choose supplier → issue order → receive all or part into the lot ledger → verify stock and order balance | Supplier onboarding, multiple order lines, non-pharmacy stock and payables matching |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
 | 12 Integration | Configure connector → redeem patient code → request record → grant one available version → verify provenance and consent → audit access | Real external transport, verified partner identities and wider record coverage |
-| 13 Patient application | Book → use pass → follow queue → review released records. Grant family appointment or document access → caregiver opens the profile → revoke access or let it expire | Public discovery, family relationship onboarding and reminders |
+| 13 Patient application | Find a facility and clinician → choose an available time → sign in → confirm the booking → open the pass in My care. Grant family access → caregiver opens the profile → revoke access or let it expire | Patient and family relationship onboarding, reminders and additional formats |
 | 14 CRM and marketing | Open | Conversion, engagement and campaigns |
 | 15 AI documentation | Open | Draft, review and audit |
 

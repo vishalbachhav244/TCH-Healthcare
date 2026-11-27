@@ -27,6 +27,7 @@ import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
 import { portal } from './portal';
+import { directory, kioskCheckIn, kioskLocation, publicAvailability } from './public-care';
 import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
 import { schedulingDay } from './scheduling-workspace';
@@ -51,6 +52,23 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   if (path === 'session' && request.method === 'POST') return startSession(request.body);
   if (path === 'queue-display' && request.method === 'GET')
     return queueDisplay(url.searchParams.get('facility'));
+  if (request.method === 'GET' && path === 'public/directory') return directory();
+  if (request.method === 'GET' && path === 'public/availability')
+    return publicAvailability(
+      url.searchParams.get('facility') ?? '',
+      url.searchParams.get('practitionerId') ?? '',
+      url.searchParams.get('day') ?? '',
+    );
+  if (request.method === 'GET' && path === 'public/kiosk')
+    return kioskLocation(url.searchParams.get('facility') ?? '');
+  if (request.method === 'POST' && path === 'public/kiosk/check-in') {
+    const { event, number } = await kioskCheckIn(
+      request.headers.get('X-Facility-Id') ?? '',
+      request.body,
+    );
+    notifyFacility(event);
+    return { number };
+  }
   const session = await requireSession(token);
   if (path === 'session' && request.method === 'DELETE') {
     await db.sessions.delete(session.token);
@@ -85,6 +103,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'platform/entitlements',
     'platform/engagement',
     'platform/activation',
+    'platform/public-access',
     'platform/membership',
     'subscriptions',
     'appointments/reschedule',

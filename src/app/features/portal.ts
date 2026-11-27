@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
@@ -29,6 +30,7 @@ import type { ReleasedImagingReport } from '../domain/radiology';
     FamilyAccess,
     ReactiveFormsModule,
     Rupees,
+    RouterLink,
     StatusTone,
   ],
   templateUrl: './portal.html',

@@ -32,6 +32,7 @@ export function notifyFacility(event: DomainEvent) {
   const configuration = [
     'ModuleConfigurationChanged',
     'EngagementConfigurationChanged',
+    'PublicAccessChanged',
     'FacilityActivationChanged',
     'StaffAccessChanged',
     'FacilityCreated',

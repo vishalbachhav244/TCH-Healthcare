@@ -7,6 +7,7 @@ import { debounceTime } from 'rxjs';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
+import { readAppointmentPass } from '../core/qr-pass';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
 import { dayInIndia, observations, shiftDay, type AppointmentRow } from '../domain/operations';
@@ -344,21 +345,7 @@ export class AccessWorklist {
     if (!file) return;
     field.value = '';
     try {
-      if (file.size > 2_000_000 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
-        throw new Error();
-      const image = await createImageBitmap(file, { resizeWidth: 600 });
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext('2d');
-      context?.drawImage(image, 0, 0);
-      image.close();
-      const pixels = context?.getImageData(0, 0, canvas.width, canvas.height);
-      if (!pixels) throw new Error();
-      const { default: decode } = await import('jsqr');
-      const value = decode(pixels.data, pixels.width, pixels.height)?.data;
-      if (!value || !/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(value)) throw new Error();
-      this.checkInCode.setValue(value);
+      this.checkInCode.setValue(await readAppointmentPass(file));
     } catch {
       this.dialogFailure.set('The image did not contain a readable TrueCare appointment code.');
     }

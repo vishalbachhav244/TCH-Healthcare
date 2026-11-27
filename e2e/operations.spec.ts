@@ -26,6 +26,149 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('finds published care and preserves the selected visit through patient sign-in', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Find care' }).click();
+  await expect(page).toHaveURL('/find-care');
+  const facilities = page.getByRole('region', { name: 'Facilities', exact: true });
+  await expect(facilities).toContainText('Sunrise Clinic', { timeout: 20_000 });
+  await expect(facilities).not.toContainText('Horizon Polyclinic');
+  const search = page.getByRole('searchbox', { name: 'Search name, specialty or city' });
+  await search.fill('unpublished');
+  await expect(page.getByText('No clinicians match these filters.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await search.fill('Bengaluru');
+  const results = page.getByRole('region', { name: 'Clinicians', exact: true });
+  await expect(results).not.toContainText('Sunrise Clinic');
+  await facilities.getByRole('button', { name: /Meridian Medical Centre/ }).click();
+  await page.getByLabel('Specialty', { exact: true }).selectOption('General Medicine');
+  const viewTimes = results.getByRole('button', { name: 'View times for Dr. Nandita Rao' });
+  await expect(viewTimes).toBeVisible();
+  await checkReflow(page);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await viewTimes.blur();
+  await page.screenshot({
+    path: testInfo.outputPath('find-care-1440.png'),
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await viewTimes.focus();
+  await page.keyboard.press('Enter');
+  const appointment = page.getByRole('dialog', { name: 'Choose an appointment' });
+  await expect(appointment.getByRole('button', { name: 'Close' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(viewTimes).toBeFocused();
+  await viewTimes.click();
+  const time = appointment.getByLabel('Time (IST)', { exact: true });
+  await time.selectOption({ index: 1 });
+  const chosenTime = await time.inputValue();
+  await appointment.getByRole('link', { name: 'Sign in to book' }).click();
+  await expect(page).toHaveURL(/\/sign-in\?/);
+  await page.getByLabel('Account ID').fill('patient');
+  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/find-care\?/);
+  await expect(time).toHaveValue(chosenTime);
+  await appointment.getByRole('button', { name: 'Confirm appointment' }).click();
+  const booked = page.getByRole('dialog', { name: 'Appointment booked' });
+  await expect(booked).toContainText(chosenTime + ' IST');
+  await booked.getByRole('link', { name: 'Open My care' }).click();
+  await expect(page).toHaveURL('/work/portal');
+  await page.reload();
+  const visit = page
+    .getByRole('article')
+    .filter({ hasText: 'Dr. Nandita Rao' })
+    .filter({ hasText: chosenTime + ' IST' });
+  await expect(visit).toContainText('Booked');
+});
+
+test('issues one queue token at the kiosk and withdraws kiosk access live', async ({
+  page: patient,
+}, testInfo) => {
+  test.setTimeout(95_000);
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Book a visit' }).click();
+  const booking = patient.getByRole('dialog', { name: 'Book a visit' });
+  await booking.getByLabel('Find a clinician').selectOption('mer-central-DR-6');
+  await booking.getByLabel('Time', { exact: true }).selectOption({ index: 1 });
+  await booking.getByRole('button', { name: 'Book appointment' }).click();
+  const pass = patient.getByRole('dialog', { name: 'Appointment pass' });
+  const code = await pass.locator('code').innerText();
+  const image = await pass.getByRole('img', { name: /QR appointment pass/ }).getAttribute('src');
+  const qr = Buffer.from(image!.split(',')[1], 'base64');
+  await pass.getByRole('button', { name: 'Close', exact: true }).click();
+
+  const kiosk = await patient.context().newPage();
+  await kiosk.clock.install();
+  await kiosk.goto('/kiosk/mer-north');
+  await expect(kiosk.getByRole('heading', { name: 'Check-in unavailable' })).toBeVisible();
+  await kiosk.goto('/find-care');
+  await kiosk.getByRole('link', { name: 'Self-service check-in' }).click();
+  await expect(kiosk).toHaveURL('/kiosk/mer-central');
+  await expect(kiosk.getByRole('heading', { name: 'Self-service check-in' })).toBeVisible();
+  await checkReflow(kiosk);
+  await kiosk.setViewportSize({ width: 390, height: 844 });
+  const passInput = kiosk.getByLabel('Appointment pass code');
+  await kiosk
+    .getByLabel('Scan a QR pass image')
+    .setInputFiles({ name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from('not an image') });
+  await expect(kiosk.getByRole('alert')).toContainText(
+    'did not contain a readable TrueCare appointment code',
+  );
+  await kiosk
+    .getByLabel('Scan a QR pass image')
+    .setInputFiles({ name: 'visit.png', mimeType: 'image/png', buffer: qr });
+  await expect(passInput).toHaveValue(code);
+  await expect(passInput).toBeFocused();
+  await kiosk.keyboard.press('Enter');
+  await expect(kiosk.getByRole('heading', { name: "You're checked in" })).toBeFocused();
+  const receipt = kiosk.getByRole('region', { name: "You're checked in" });
+  await expect(receipt.getByRole('status')).toHaveText(/Token\s*\d+/);
+  const token = (await receipt.getByRole('status').textContent())!.match(/\d+/)![0];
+  await expect(kiosk.locator('main')).not.toContainText('Ananya Sharma');
+  await expect(kiosk.locator('main')).not.toContainText(code);
+  expect(
+    (await new AxeBuilder({ page: kiosk }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await kiosk.screenshot({
+    path: testInfo.outputPath('kiosk-token-390.png'),
+    animations: 'disabled',
+  });
+  await kiosk.clock.fastForward(45_001);
+  await expect(passInput).toHaveValue('');
+  await expect(passInput).toBeFocused();
+  await passInput.fill(code);
+  await kiosk.getByRole('button', { name: 'Check in', exact: true }).click();
+  await expect(kiosk.getByRole('alert')).toContainText('already been checked in or closed');
+
+  const reception = await patient.context().newPage();
+  await signIn(reception, 'reception');
+  await reception
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  const row = reception.getByRole('row', { name: /Ananya Sharma.*Waiting/ });
+  await expect(row).toContainText(token);
+  const admin = await patient.context().newPage();
+  await signIn(admin, 'platform');
+  await admin.getByRole('button', { name: /Meridian Healthcare Network/ }).click();
+  await admin
+    .getByRole('row', { name: /Meridian Medical Centre/ })
+    .getByRole('button', { name: 'Edit public access' })
+    .click();
+  const edit = admin.getByRole('dialog', { name: 'Edit public access' });
+  await edit.getByLabel('Self-service check-in', { exact: true }).selectOption('false');
+  await edit.getByRole('button', { name: 'Save public access' }).click();
+  await expect(kiosk.getByRole('heading', { name: 'Check-in unavailable' })).toBeVisible();
+  await expect(passInput).toHaveCount(0);
+});
+
 test('shares selected family permissions, books a visit and revokes a previously issued pass', async ({
   page: owner,
 }, testInfo) => {

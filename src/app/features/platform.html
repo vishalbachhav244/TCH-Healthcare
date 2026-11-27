@@ -108,6 +108,13 @@
                       <button
                         class="text-button"
                         type="button"
+                        (click)="open('public-access', editor, facility)"
+                      >
+                        Edit public access
+                      </button>
+                      <button
+                        class="text-button"
+                        type="button"
                         (click)="open('activation', editor, facility)"
                       >
                         Edit status
@@ -230,6 +237,25 @@
           <p class="field-error" role="alert">{{ error() }}</p>
         }
         <button class="button primary" type="submit" [disabled]="busy()">Save engagement</button>
+      </form>
+    }
+    @case ('public-access') {
+      <form class="dialog-body fields" (submit)="$event.preventDefault(); save(editor)">
+        <p>{{ activeFacility()?.name }}</p>
+        <label for="platform-public-discovery">Public directory and booking</label>
+        <select id="platform-public-discovery" [formControl]="publicDiscovery">
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+        <label for="platform-public-kiosk">Self-service check-in</label>
+        <select id="platform-public-kiosk" [formControl]="publicKiosk">
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">Save public access</button>
       </form>
     }
     @case ('activation') {

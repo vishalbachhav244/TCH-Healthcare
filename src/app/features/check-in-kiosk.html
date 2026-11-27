@@ -1,0 +1,78 @@
+<header class="public-header">
+  <a routerLink="/find-care" aria-label="TrueCare home"><tc-brand /></a>
+  <a class="button secondary" routerLink="/find-care">Find care</a>
+</header>
+<main class="public-content kiosk-content">
+  @let location = site();
+  @switch (location.state) {
+    @case ('loading') {
+      <h1>Self-service check-in</h1>
+      <p class="state-panel" role="status">Loading check-in…</p>
+    }
+    @case ('error') {
+      <h1>Check-in unavailable</h1>
+      <p class="state-panel" role="alert">{{ location.message }}</p>
+      <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">
+        Retry
+      </button>
+    }
+    @case ('ready') {
+      <div class="kiosk-location">
+        <span class="square-icon teal"><ng-icon name="hospital" /></span>
+        <span
+          >{{ location.data.name }}<small>{{ location.data.city }}</small></span
+        >
+      </div>
+      @if (receipt(); as ticket) {
+        <section class="panel kiosk-panel kiosk-receipt" aria-labelledby="kiosk-token">
+          <h1 id="kiosk-token" #tokenHeading tabindex="-1">You're checked in</h1>
+          <p class="kiosk-number" role="status">
+            Token <strong>{{ ticket.number }}</strong>
+          </p>
+          <p>Watch the queue display for your token.</p>
+          <button class="button primary" type="button" (click)="finish()">Done</button>
+        </section>
+      } @else {
+        <section class="panel kiosk-panel" aria-labelledby="kiosk-title">
+          <h1 id="kiosk-title">Self-service check-in</h1>
+          <p>Use your appointment pass for today's visit at this facility.</p>
+          <form class="fields" (submit)="$event.preventDefault(); checkIn()">
+            <div class="public-field">
+              <label for="kiosk-code">Appointment pass code</label>
+              <input
+                id="kiosk-code"
+                #passField
+                type="text"
+                [formControl]="code"
+                maxlength="36"
+                autocomplete="off"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </div>
+            <div class="public-field">
+              <label for="kiosk-scan">Scan a QR pass image</label>
+              <input
+                id="kiosk-scan"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                [disabled]="scanning() || busy()"
+                (change)="scan($event)"
+              />
+            </div>
+            @if (scanning()) {
+              <p role="status">Reading your QR image…</p>
+            }
+            @if (error()) {
+              <p role="alert" class="field-error">{{ error() }}</p>
+            }
+            <button class="button primary" type="submit" [disabled]="busy() || scanning()">
+              <ng-icon name="scan" /> {{ busy() ? 'Checking in…' : 'Check in' }}
+            </button>
+          </form>
+          <p class="subtle">Visit reception if you need help with your pass.</p>
+        </section>
+      }
+    }
+  }
+</main>

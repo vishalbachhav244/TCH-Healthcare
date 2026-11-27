@@ -4,7 +4,7 @@
 
 | Responsibility | Scope |
 | --- | --- |
-| SaaS platform administrator | Creates organizations, activates facilities, configures inpatient entitlements and grants or revokes named facility roles. |
+| SaaS platform administrator | Creates organizations, activates facilities, configures inpatient entitlements and public access, and grants or revokes named facility roles. |
 | Customer success | Reviews subscriptions and changes compatible plans. |
 | Platform operations | Tracks incidents and views activity metadata and counts. |
 | Integration administrator | Manages connector configuration and masked audit metadata. Cannot open report content or impersonate recipients. |
@@ -43,4 +43,6 @@
 | Automation supervisor | Configures facility draft policy and reads aggregate usage and redacted activity. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released records, synthetic sample uploads, dispensed medications, bill balances and facility contact preferences. Can withdraw their uploads and grant or revoke sharing for an available record version. |
 | Family caregiver | An independent patient account with a verified facility relationship. A current patient-issued grant can authorize appointment listing, booking and passes, document reading and download, or both. Each request checks the relationship, both patient identities, facility, tenant, expiry and applicable permission. Only the patient who owns the profile can change the grant. |
+| Public directory visitor | Can search published active facilities and their clinicians and view free times. Creating an appointment requires the signed-in patient and matching facility access. |
+| Kiosk visitor | Can check in with a valid same-day appointment pass for the enabled facility. Receives the token number. Queue staff retain the assigned facility worklist. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

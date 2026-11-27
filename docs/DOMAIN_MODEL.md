@@ -48,4 +48,6 @@ A `PatientDocument` belongs to one patient and facility. Uploads reference an im
 
 A `FamilyRelationship` links two verified synthetic patients at one facility with independently selectable appointment and document permissions. The owner’s grant has an expiration time and a version. A `FamilyPass` binds its own opaque code to the grant and appointment versions. Reception verifies both before creating a ticket for the appointment patient. [Family portal contracts](../src/app/domain/family-access.ts)
 
+Facilities carry independent directory, kiosk and public queue display settings. `PublicAppointment` contains a selected facility, clinician, day and time. Confirming the selection uses the same persisted `Appointment` as the patient portal. Kiosk arrivals create the shared `Ticket` and return a receipt with only its queue number. [Public care contracts](../src/app/domain/public-care.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

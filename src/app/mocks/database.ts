@@ -597,6 +597,17 @@ db.version(27)
       await transaction.table<FamilyRelationship, string>('familyRelationships').add(relationship);
   });
 
+db.version(28)
+  .stores({})
+  .upgrade(async (transaction) => {
+    const sites = transaction.table<Facility, string>('facilities');
+    for (const { id, tenantId, publicDiscovery, publicKiosk } of initialFacilities) {
+      if (!publicDiscovery && !publicKiosk) continue;
+      const existing = await sites.get(id);
+      if (existing?.tenantId === tenantId) await sites.update(id, { publicDiscovery, publicKiosk });
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(

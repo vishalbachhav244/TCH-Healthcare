@@ -1,20 +1,24 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { SessionStore } from '../core/session';
 import { evaluationAvailable } from '../core/evaluation';
 import { errorMessage } from '../core/api';
 import { Brand } from '../design-system/brand';
+import { readPublicAppointment } from '../domain/public-care';
 
 @Component({
-  imports: [Brand, NgIcon, ReactiveFormsModule],
+  imports: [Brand, NgIcon, ReactiveFormsModule, RouterLink],
   templateUrl: './sign-in.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SignIn {
   private readonly router = inject(Router);
   private readonly session = inject(SessionStore);
+  protected readonly selectedVisit = readPublicAppointment(
+    inject(ActivatedRoute).snapshot.queryParamMap,
+  );
   protected readonly form = inject(NonNullableFormBuilder).group({
     account: ['', [Validators.required, Validators.pattern(/^[a-z]+$/)]],
     password: ['', Validators.required],
@@ -38,7 +42,14 @@ export class SignIn {
     const { account, password } = this.form.getRawValue();
     try {
       await this.session.signIn(account, password);
-      await this.router.navigateByUrl(this.session.home(), { replaceUrl: true });
+      if (this.selectedVisit) {
+        await this.router.navigate(['/find-care'], {
+          queryParams: this.selectedVisit,
+          replaceUrl: true,
+        });
+      } else {
+        await this.router.navigateByUrl(this.session.home(), { replaceUrl: true });
+      }
     } catch (error) {
       this.error.set(errorMessage(error));
     } finally {

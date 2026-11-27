@@ -7,18 +7,21 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test` | 50 contract and domain tests passed across 3 files |
-| `npm run e2e -- --fully-parallel --workers=2` | All 26 Chromium journeys passed, including family grant and revocation, delegated booking and rejection of a revoked family pass. |
-| `npm run build` | Passed. Initial assets approximately 383 kB raw and 99 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 386 kB raw and 99 kB estimated transfer. |
-| `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
+| `npm test -- --testTimeout 45000` | All 52 contract and domain tests passed across 3 files. The retry used a longer per-test timeout while the browser suite was running. |
+| `npm run e2e -- --fully-parallel --workers=2` | All 28 Chromium journeys passed, including booking through sign-in, QR image check-in, pass replay rejection and live kiosk withdrawal. |
+| `npm run build` | Passed. Initial assets approximately 385 kB raw and 99 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 388 kB raw and 100 kB estimated transfer. |
+| `npm run verify:release` | Passed. The default build blocks evaluation routes and excludes local authentication and persistence. The evaluation build rejects non-loopback access, including the directory and kiosk. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 26 to 27 in Chromium. A saved document and patient pass survived, and the family relationship began inactive. Earlier checks verified 25 to 26 with a saved laboratory grant and approved draft. |
+| Browser-local migration | Verified 27 to 28 in Chromium. The upgrade preserved a saved patient pass, active family grant and facility versions. An inactive facility stayed hidden. Earlier checks covered the document and family schema upgrades. |
 | Sample PDF | Poppler `pdfinfo` parsed one US Letter page from the generated PDF 1.4 sample. |
-| OpenAPI | 183 operations, unique IDs and checked internal references. |
+| OpenAPI | 189 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
+
+- Find a published clinician by city, facility and specialty. Open appointment selection with Enter and verify focus restoration with Escape. Choose an available time, carry it through patient sign-in and confirm it. Reload My care and verify the visit persists.
+- Open a kiosk at an enabled facility, reject an invalid image, decode a QR pass and issue one token. Verify reception sees the arrival and a duplicate submission is rejected. Advance the kiosk clock to clear the receipt and revoke kiosk access in an open tab.
 
 - Use Enter to open a family grant and Escape to restore focus. Share documents first and verify the caregiver cannot book. Reload, download the exact PDF, enable appointments, book a visit and issue a family pass. Revoke while the document preview is open, verify it closes and restores focus to the heading, and verify reception rejects the pass.
 
@@ -89,3 +92,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Mobile patient document](screenshots/patient-document-390.png) · [Desktop shared document](screenshots/shared-document-1440.png)
 
 [Desktop family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)
+
+[Find care](screenshots/find-care-1440.png) · [Mobile kiosk receipt](screenshots/kiosk-token-390.png)

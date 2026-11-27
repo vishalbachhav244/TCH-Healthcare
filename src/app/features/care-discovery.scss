@@ -1,0 +1,133 @@
+.directory-intro {
+  background: #e7f1ed;
+  border: 1px solid #d4e7de;
+  border-radius: var(--radius);
+  padding: clamp(20px, 4vw, 42px);
+  margin-bottom: 24px;
+}
+
+.directory-intro p {
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.directory-filters {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.directory-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.65fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.directory-facilities {
+  padding: 16px;
+}
+
+.directory-facilities h2 {
+  margin-bottom: 10px;
+}
+
+.facility-card {
+  border-top: 1px solid var(--line);
+}
+
+.facility-card button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  padding: 11px 8px;
+  text-align: start;
+}
+
+.facility-card button:hover,
+.facility-card button[aria-pressed='true'] {
+  background: #edf5f1;
+  border-color: #d0e5db;
+}
+
+.facility-card small {
+  display: block;
+}
+
+.facility-card a {
+  margin: 0 0 4px 24px;
+}
+
+.directory-results-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.directory-results-heading p,
+.clinician-card p {
+  color: var(--muted);
+}
+
+.directory-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.clinician-card,
+.clinician-details {
+  display: grid;
+  gap: 12px;
+}
+
+.clinician-card {
+  padding: 16px;
+}
+
+.clinician-details {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.clinician-details h3 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+
+.clinician-card .button {
+  justify-content: space-between;
+  align-self: end;
+}
+
+.directory-results > .state-panel {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 820px) {
+  .directory-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .directory-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .directory-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .directory-filters,
+  .directory-results {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -18,6 +18,8 @@ export interface Facility {
   city: string;
   inpatient: boolean;
   publicQueue?: boolean;
+  publicDiscovery?: boolean;
+  publicKiosk?: boolean;
   engagement?: boolean;
   configurationVersion?: number;
   active?: boolean;
@@ -273,6 +275,7 @@ export type EventType =
   | 'AppointmentPassIssued'
   | 'OrganisationCreated'
   | 'FacilityCreated'
+  | 'PublicAccessChanged'
   | 'ModuleConfigurationChanged'
   | 'FacilityActivationChanged'
   | 'StaffAccessChanged'

@@ -4,6 +4,7 @@
     <p class="eyebrow"><span></span> PATIENT PORTAL</p>
     <h1>My care</h1>
     <p>{{ store.facility()?.name }}</p>
+    <a class="text-button" routerLink="/find-care"><ng-icon name="search" /> Find care</a>
   </div>
   @if (active() !== 'family') {
     <button

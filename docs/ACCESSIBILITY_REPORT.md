@@ -34,4 +34,6 @@ The patient document library and recipient preview passed reflow checks at 390, 
 
 Family profiles passed reflow checks at 390, 768, 1024 and 1440 px. The mobile family pass passed the selected axe rules. Enter opens the grant dialog and Escape returns focus to its trigger. Revocation moves focus from the closed document preview to the Family profiles heading. [Family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)
 
+Find care and the kiosk passed reflow checks at 390, 768, 1024 and 1440 px. The desktop directory and mobile kiosk receipt passed the selected axe rules. Enter opens appointment selection and Escape returns focus to the clinician’s button. Scanning a QR image moves focus to the pass field. The receipt receives focus after check-in and its timed reset returns focus to the pass field. [Find care](screenshots/find-care-1440.png) · [Kiosk receipt](screenshots/kiosk-token-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

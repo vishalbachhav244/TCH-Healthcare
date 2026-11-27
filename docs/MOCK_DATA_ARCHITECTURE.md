@@ -27,3 +27,5 @@ Schema version 25 adds facility documentation policies and synthetic drafts. It 
 Schema version 26 adds patient documents. A record points to a catalogue sample or a signed encounter. Withdrawal advances the version and retains provenance. Previously issued laboratory consent grants keep their existing references.
 
 Schema version 27 adds family relationships and family appointment passes. The pre-verified Meridian Central relationship begins inactive. An upgrade adds it when both patients and the facility match the expected tenant. Patient documents and existing appointment passes retain their stored values.
+
+Schema version 28 adds directory and kiosk flags to existing facility records. The directory initially lists Meridian Medical Centre, Meridian North Hospital and Sunrise Clinic. The kiosk starts enabled at Meridian Medical Centre. The migration checks the expected facility and tenant and preserves activation, configuration versions and all booking records. Newly provisioned facilities begin with public access disabled.

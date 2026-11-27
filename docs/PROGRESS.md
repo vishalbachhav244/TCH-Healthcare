@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Public discovery, booking and kiosk check-in, 27 November 2026
+
+- Added Find care with published facility and clinician search, specialty filters, available dates and times, and a booking selection that survives patient sign-in. Confirmation rechecks the patient facility scope and current slot and writes the shared appointment. [Discovery workspace](../src/app/features/care-discovery.ts) · [Public adapter](../src/app/mocks/public-care.ts)
+- Added self-service check-in with pass code or QR image entry. The kiosk and reception share arrival validation and token allocation. The kiosk shows only the assigned token and clears the receipt after 45 seconds. [Kiosk workspace](../src/app/features/check-in-kiosk.ts) · [Arrival transaction](../src/app/mocks/arrival.ts)
+- Added versioned platform controls for directory publication and kiosk access. Schema version 28 preserved a saved appointment pass, family grant and facility configuration versions during a Chromium upgrade. Inactive facilities stayed hidden. [Migration](../src/app/mocks/database.ts) · [OpenAPI](openapi.yaml)
+- Passed 52 contract and domain tests, 28 Chromium journeys, responsive and keyboard checks, both builds and release verification. [Test report](TEST_REPORT.md) · [Accessibility report](ACCESSIBILITY_REPORT.md)
+- Live camera scanning and patient self-registration remain open. The two patient demo accounts can book at Meridian Medical Centre. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Find care](screenshots/find-care-1440.png) · [Kiosk receipt](screenshots/kiosk-token-390.png)
+
 ## Patient family profiles, 27 November 2026
 
 - Added Family profiles to My care. Rajesh can give Ananya 24 hours or 7 days of access to appointments, documents or both. Ananya can book within the facility schedule, issue a separate family pass and preview or download available document versions. [Family workspace](../src/app/features/family-access.ts) · [Adapter](../src/app/mocks/family-access.ts)

@@ -1,5 +1,7 @@
 import type { Appointment, Practitioner } from './operations';
 
+export const appointmentPassPattern = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i;
+
 export const appointmentSlots = Array.from({ length: 32 }, (_, slot) => {
   const hour = String(9 + Math.floor(slot / 4)).padStart(2, '0');
   const minute = String((slot % 4) * 15).padStart(2, '0');

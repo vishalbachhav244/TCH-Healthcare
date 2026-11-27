@@ -23,6 +23,17 @@ const entry: CanActivateFn = async () => {
   return router.parseUrl(store.session() ? store.home() : '/sign-in');
 };
 
+const evaluationAccess: CanActivateFn = () =>
+  evaluationAvailable || inject(Router).parseUrl('/unavailable');
+
+const publicDiscovery: CanActivateFn = async () => {
+  const router = inject(Router);
+  const session = inject(SessionStore);
+  if (!evaluationAvailable) return router.parseUrl('/unavailable');
+  await session.restore();
+  return true;
+};
+
 export const routes: Routes = [
   {
     path: '',
@@ -41,6 +52,18 @@ export const routes: Routes = [
     loadComponent: () => import('./layouts/boundary').then((m) => m.Boundary),
   },
   { path: 'denied', loadComponent: () => import('./layouts/boundary').then((m) => m.Boundary) },
+  {
+    path: 'find-care',
+    canActivate: [publicDiscovery],
+    loadComponent: () => import('./features/care-discovery').then((m) => m.CareDiscovery),
+    title: 'Find care · TrueCare',
+  },
+  {
+    path: 'kiosk/:facility',
+    canActivate: [evaluationAccess],
+    loadComponent: () => import('./features/check-in-kiosk').then((m) => m.CheckInKiosk),
+    title: 'Self-service check-in · TrueCare',
+  },
   {
     path: 'display/:facility',
     loadComponent: () => import('./features/queue-display').then((m) => m.QueueDisplay),

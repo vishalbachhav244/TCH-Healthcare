@@ -1,0 +1,218 @@
+<header class="public-header">
+  <a routerLink="/" aria-label="TrueCare home"><tc-brand /></a>
+  @if (store.session()) {
+    <a class="button secondary" [routerLink]="store.home()">{{
+      store.allowed('portal') ? 'My care' : 'Workspace'
+    }}</a>
+  } @else {
+    <a class="button secondary" routerLink="/sign-in">Sign in</a>
+  }
+</header>
+<main class="public-content">
+  <section class="directory-intro" aria-labelledby="find-care-title">
+    <h1 id="find-care-title" #heading tabindex="-1">Find care</h1>
+    <p>Browse sample hospitals and clinics, find a clinician and choose an appointment time.</p>
+    <div class="directory-filters fields" role="group" aria-label="Find care filters">
+      <div class="public-field">
+        <label for="care-search">Search name, specialty or city</label>
+        <input
+          id="care-search"
+          #searchBox
+          type="search"
+          maxlength="100"
+          [value]="search()"
+          (input)="search.set(searchBox.value)"
+        />
+      </div>
+      <div class="public-field">
+        <label for="care-facility">Facility</label>
+        <select
+          id="care-facility"
+          #siteFilter
+          [value]="facility()"
+          (change)="facility.set(siteFilter.value)"
+        >
+          <option value="">All facilities</option>
+          @for (site of facilities(); track site.id) {
+            <option [value]="site.id">{{ site.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="public-field">
+        <label for="care-specialty">Specialty</label>
+        <select
+          id="care-specialty"
+          #specialtyFilter
+          [value]="specialty()"
+          (change)="specialty.set(specialtyFilter.value)"
+        >
+          <option value="">All specialties</option>
+          @for (name of specialties(); track name) {
+            <option [value]="name">{{ name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </section>
+  @if (message()) {
+    <p class="inline-notice" role="status">{{ message() }}</p>
+  }
+  @let state = directory();
+  @if (state.state === 'loading') {
+    <p class="panel state-panel" role="status">Loading the care directory…</p>
+  } @else if (state.state === 'error') {
+    <section class="panel state-panel">
+      <p role="alert">{{ state.message }}</p>
+      <button class="button secondary" type="button" (click)="refresh()">Retry</button>
+    </section>
+  } @else if (!state.data.facilities.length) {
+    <p class="panel state-panel">No facilities are accepting appointments through the directory.</p>
+  } @else {
+    <div class="directory-layout">
+      <section class="panel directory-facilities" aria-labelledby="directory-facilities-title">
+        <h2 id="directory-facilities-title">Facilities</h2>
+        @for (site of facilities(); track site.id) {
+          <article class="facility-card">
+            <button
+              type="button"
+              [attr.aria-pressed]="facility() === site.id"
+              (click)="facility.set(facility() === site.id ? '' : site.id)"
+            >
+              <ng-icon name="hospital" />
+              <span
+                ><strong>{{ site.name }}</strong
+                ><small>{{ site.city }}</small></span
+              >
+            </button>
+            @if (site.kiosk) {
+              <a class="text-button" [routerLink]="['/kiosk', site.id]">Self-service check-in</a>
+            }
+          </article>
+        }
+      </section>
+      <section aria-labelledby="directory-results-title">
+        <div class="directory-results-heading">
+          <h2 id="directory-results-title">Clinicians</h2>
+          <p role="status">{{ results().length }} found</p>
+        </div>
+        <div class="directory-results">
+          @for (clinician of results(); track clinician.id) {
+            <article class="panel clinician-card">
+              @let site = byId().get(clinician.facilityId);
+              <div class="clinician-details">
+                <span class="square-icon teal"><ng-icon name="stethoscope" /></span>
+                <div>
+                  <h3>{{ clinician.name }}</h3>
+                  <p>{{ clinician.specialty }}</p>
+                </div>
+              </div>
+              @if (site) {
+                <p>{{ site.name }} · {{ site.city }}</p>
+              }
+              <button
+                class="button secondary"
+                type="button"
+                [attr.aria-label]="
+                  'View times for ' + clinician.name + (site ? ' at ' + site.name : '')
+                "
+                (click)="open(clinician)"
+              >
+                View times <ng-icon name="arrow" />
+              </button>
+            </article>
+          } @empty {
+            <div class="panel state-panel">
+              <p>No clinicians match these filters.</p>
+              <button class="button secondary" type="button" (click)="resetFilters()">
+                Clear filters
+              </button>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  }
+</main>
+<dialog #booking aria-labelledby="public-booking-title" (close)="closeBooking()">
+  <div class="dialog-head">
+    <h2 id="public-booking-title">
+      {{ confirmed() ? 'Appointment booked' : 'Choose an appointment' }}
+    </h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="booking.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (selected(); as clinician) {
+    <div class="dialog-body fields">
+      <div>
+        <strong>{{ clinician.name }}</strong>
+        <p>{{ clinician.specialty }} · {{ byId().get(clinician.facilityId)?.name }}</p>
+      </div>
+      @if (confirmed(); as visit) {
+        <div class="inline-notice success" role="status">
+          <p>
+            {{ visit.day + 'T12:00:00Z' | date: 'EEE, d MMM y' : 'UTC' }} · {{ visit.time }} IST
+          </p>
+          <p>Your appointment and pass are available in My care.</p>
+        </div>
+        <a class="button primary" routerLink="/work/portal">Open My care</a>
+      } @else {
+        <form class="fields" [formGroup]="bookingForm" (ngSubmit)="book()">
+          <div class="public-field">
+            <label for="public-appointment-day">Date</label>
+            <input
+              id="public-appointment-day"
+              type="date"
+              formControlName="day"
+              [min]="today"
+              [max]="lastDay"
+              (change)="bookingForm.controls.time.reset()"
+            />
+          </div>
+          @let available = slots();
+          @if (day() < today || day() > lastDay) {
+            <p>Choose a date within the next 90 days.</p>
+          } @else if (available.state === 'loading') {
+            <p role="status">Checking available times…</p>
+          } @else if (available.state === 'error') {
+            <p role="alert">{{ available.message }}</p>
+            <button class="button secondary" type="button" (click)="refresh()">Retry</button>
+          } @else if (!available.data.length) {
+            <p role="status">No times are available on this date. Choose another date.</p>
+          } @else {
+            <div class="public-field">
+              <label for="public-appointment-time">Time (IST)</label>
+              <select id="public-appointment-time" formControlName="time">
+                <option value="">Choose a time</option>
+                @for (time of available.data; track time) {
+                  <option [value]="time">{{ time }}</option>
+                }
+              </select>
+            </div>
+            @if (selection()?.time && !readyToBook()) {
+              <p role="status">That time is no longer available. Choose another time.</p>
+            }
+          }
+          @if (error()) {
+            <p class="field-error" role="alert">{{ error() }}</p>
+          }
+          @if (store.session()) {
+            @if (canBook()) {
+              <button class="button primary" type="submit" [disabled]="busy() || !readyToBook()">
+                Confirm appointment
+              </button>
+            } @else {
+              <p role="status">This account cannot book appointments at this facility.</p>
+            }
+          } @else if (readyToBook()) {
+            <a class="button primary" routerLink="/sign-in" [queryParams]="selection()"
+              >Sign in to book</a
+            >
+          } @else {
+            <p>Choose a time to continue to patient sign-in.</p>
+          }
+        </form>
+      }
+    </div>
+  }
+</dialog>

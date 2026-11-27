@@ -21,6 +21,12 @@ import type {
 } from '../domain/blood-bank';
 import type { PatientPortal } from '../domain/portal';
 import type {
+  CareDirectory,
+  KioskReceipt,
+  PublicAppointment,
+  PublicFacility,
+} from '../domain/public-care';
+import type {
   FamilyAccessEntry,
   FamilyAccessUpdate,
   FamilyBooking,
@@ -850,6 +856,44 @@ export class Api {
       .pipe(
         map((value) => objectShape<QueueDisplayData>(value, ['facility', 'calling', 'waiting'])),
       );
+  }
+
+  careDirectory() {
+    return this.http
+      .get<unknown>(this.base + 'public/directory')
+      .pipe(map((value) => objectShape<CareDirectory>(value, ['facilities', 'clinicians'])));
+  }
+
+  publicTimes(facility: string, practitionerId: string, day: string) {
+    return this.http
+      .get<unknown>(this.base + 'public/availability', {
+        params: { facility, practitionerId, day },
+      })
+      .pipe(map(timeSlots));
+  }
+
+  bookPublicVisit(token: string, { facilityId, ...booking }: PublicAppointment) {
+    return this.execute('public/appointments', token, facilityId, booking);
+  }
+
+  kioskLocation(facility: string) {
+    return this.http
+      .get<unknown>(this.base + 'public/kiosk', { params: { facility } })
+      .pipe(map((value) => objectShape<PublicFacility>(value, ['id', 'name', 'city'])));
+  }
+
+  checkInAtKiosk(facility: string, pass: string) {
+    return firstValueFrom(
+      this.http
+        .post<unknown>(
+          this.base + 'public/kiosk/check-in',
+          { pass },
+          {
+            headers: new HttpHeaders({ 'X-Facility-Id': facility }),
+          },
+        )
+        .pipe(map((value) => objectShape<KioskReceipt>(value, ['number']))),
+    );
   }
 
   invoices(token: string, facility: string, day: string) {
