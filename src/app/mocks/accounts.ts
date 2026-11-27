@@ -66,6 +66,12 @@ export const staff = {
   crm: { name: 'Sara Thomas', role: 'crmCoordinator', facilities: ['mer-central', 'mer-north'] },
   crmagent: { name: 'Karan Verma', role: 'crmAgent', facilities: ['mer-central', 'mer-north'] },
   marketing: { name: 'Pooja Nair', role: 'marketing', facilities: ['mer-central', 'mer-north'] },
+  analyst: { name: 'Maya Kulkarni', role: 'analyst', facilities: ['mer-central', 'mer-north'] },
+  automation: {
+    name: 'Sanjay Varma',
+    role: 'automationSupervisor',
+    facilities: ['mer-central', 'mer-north'],
+  },
   admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
   lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },
   labreview: { name: 'Dr. Ajay Iyer', role: 'labReviewer', facilities: ['mer-central'] },

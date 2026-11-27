@@ -1,0 +1,179 @@
+@let state = data();
+<section class="page-intro">
+  <div>
+    <h1>Enterprise Analytics &amp; BI</h1>
+    <p>Compare patient activity, queue waits and collections over time.</p>
+  </div>
+  @if (state.state === 'ready' && hasActivity()) {
+    <button class="button primary" type="button" (click)="exportReport(state.data)">
+      <ng-icon name="download" /> Export daily CSV
+    </button>
+  }
+</section>
+<div class="view-controls">
+  <label class="date-filter">
+    <ng-icon name="calendar" /><span>Report end date</span>
+    <input
+      #reportEnd
+      type="date"
+      [value]="end()"
+      min="1900-01-01"
+      [max]="today"
+      (change)="end.set(reportEnd.value || today)"
+    />
+  </label>
+  <div class="select-control">
+    <label for="analytics-range">Period</label>
+    <select #period id="analytics-range" [value]="range()" (change)="setRange(period.value)">
+      @for (window of windows; track window) {
+        <option [value]="window">Last {{ window }} days</option>
+      }
+    </select>
+  </div>
+</div>
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Calculating report…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else if (!hasActivity()) {
+  <p class="panel state-panel">No appointment or collection activity in this period.</p>
+} @else {
+  <div class="metric-grid">
+    <article class="panel metric">
+      <p>Appointments</p>
+      <strong>{{ totals().appointments | number }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Completed visits</p>
+      <strong>{{ totals().completed | number }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Mean queue wait</p>
+      <strong>{{
+        wait(totals()) === null ? '—' : (wait(totals()) | number: '1.0-1') + ' min'
+      }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Net collections</p>
+      <strong>{{ totals().netMinor | rupees }}</strong>
+    </article>
+  </div>
+  <div class="view-controls" role="group" aria-label="Analytics views">
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="view() === 'daily'"
+      (click)="view.set('daily')"
+    >
+      Daily activity
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="view() === 'specialties'"
+      (click)="view.set('specialties')"
+    >
+      Specialties
+    </button>
+  </div>
+  @if (view() === 'daily') {
+    @if (totals().appointments) {
+      <section class="panel flow-panel" aria-labelledby="analytics-chart">
+        <div class="panel-heading">
+          <div>
+            <h2 id="analytics-chart">Appointment volume</h2>
+            <p>{{ store.facility()?.name }}</p>
+          </div>
+        </div>
+        <div class="chart-legend">
+          <span><i></i>Scheduled</span><span><i></i>Walk-ins</span>
+        </div>
+        <tc-trend [days]="state.data.days" />
+      </section>
+    }
+    <section class="panel table-panel analytics-table" aria-labelledby="daily-analytics-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="daily-analytics-heading">Daily report</h2>
+          <p>
+            Queue wait is measured from arrival to the first call. Collections are net of refunds.
+          </p>
+        </div>
+      </div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Daily report table">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Daily report
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Scheduled</th>
+              <th scope="col">Walk-ins</th>
+              <th scope="col">Completed</th>
+              <th scope="col">Cancelled</th>
+              <th scope="col">Mean wait</th>
+              <th scope="col">Net collections</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (day of state.data.days; track day.day) {
+              <tr>
+                <th scope="row">{{ day.day + 'T12:00:00Z' | date: 'd MMM' : 'UTC' }}</th>
+                <td>{{ day.scheduled }}</td>
+                <td>{{ day.walkIn }}</td>
+                <td>{{ day.completed }}</td>
+                <td>{{ day.cancelled }}</td>
+                <td>{{ wait(day) === null ? '—' : (wait(day) | number: '1.0-1') + ' min' }}</td>
+                <td>{{ day.netMinor | rupees }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  } @else {
+    <section class="panel table-panel" aria-labelledby="specialty-analytics-heading">
+      <div class="panel-heading">
+        <div>
+          <h2 id="specialty-analytics-heading">Appointment activity by specialty</h2>
+          <p>{{ store.facility()?.name }}</p>
+        </div>
+      </div>
+      @if (!specialties().length) {
+        <p class="state-panel">No specialty appointment activity in this period.</p>
+      } @else {
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Specialty activity table">
+          <table class="ward-record-list">
+            <caption class="sr-only">
+              Appointment activity by specialty
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Specialty</th>
+                <th scope="col">Scheduled</th>
+                <th scope="col">Walk-ins</th>
+                <th scope="col">Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of specialties(); track row.specialty) {
+                <tr>
+                  <td>
+                    <strong>{{ row.specialty }}</strong>
+                  </td>
+                  <td>{{ row.scheduled }}</td>
+                  <td>{{ row.walkIn }}</td>
+                  <td>{{ row.completed }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+}

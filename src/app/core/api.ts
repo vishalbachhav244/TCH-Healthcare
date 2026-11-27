@@ -31,6 +31,15 @@ import type {
 } from '../domain/biomedical';
 import type { ShiftAction, ShiftFields, StaffShift, WorkforceData } from '../domain/workforce';
 import type {
+  AnalyticsReport,
+  AnalyticsWindow,
+  AutomationData,
+  DocumentationDraft,
+  DocumentationFormat,
+  DocumentationPolicy,
+  DraftAction,
+} from '../domain/intelligence';
+import type {
   Campaign,
   CampaignAction,
   CampaignTemplate,
@@ -1204,6 +1213,54 @@ export class Api {
       token,
       facility,
       { email: String(prefs.email), sms: String(prefs.sms), version: String(prefs.version) },
+      'PATCH',
+    );
+  }
+
+  analytics(token: string, facility: string, end: string, window: AnalyticsWindow) {
+    return this.get('analytics', token, facility, { end, window }).pipe(
+      map((value) => objectShape<AnalyticsReport>(value, ['days', 'specialties'])),
+    );
+  }
+
+  automation(token: string, facility: string) {
+    return this.get('automation', token, facility).pipe(
+      map((value) =>
+        objectShape<AutomationData>(value, ['policy', 'usage', 'sources', 'drafts', 'activity']),
+      ),
+    );
+  }
+
+  configureAutomation(token: string, facility: string, policy: DocumentationPolicy) {
+    return this.execute(
+      'automation/policy',
+      token,
+      facility,
+      {
+        version: String(policy.version),
+        enabled: String(policy.enabled),
+        dailyLimit: String(policy.dailyLimit),
+      },
+      'PATCH',
+    );
+  }
+
+  requestDocumentationDraft(token: string, facility: string, encounterId: string) {
+    return this.execute('automation/drafts', token, facility, { encounterId });
+  }
+
+  reviewDocumentationDraft(
+    token: string,
+    facility: string,
+    draft: DocumentationDraft,
+    action: DraftAction,
+    format?: DocumentationFormat,
+  ) {
+    return this.execute(
+      'automation/drafts/status',
+      token,
+      facility,
+      { draftId: draft.id, version: String(draft.version), action, ...(format ? { format } : {}) },
       'PATCH',
     );
   }

@@ -55,3 +55,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-49 | D33 | `/work/crm` | Enquiry capture, assignment, contact history and appointment booking |
 | TC-LOCAL-50 | D34 | `/work/marketing` | Conversion by source and permission-based campaign simulation |
 | TC-LOCAL-51 | D12 and D34 | `/work/portal` → Contact preferences | Facility-scoped patient opt-in for Email and SMS |
+| TC-LOCAL-52 | D35 | `/work/analytics` | Daily and specialty reporting windows, appointment chart, queue wait and net collections, aggregate CSV |
+| TC-LOCAL-53 | D36 | `/work/automation` | Facility documentation policy, daily usage, supervisor activity, clinician draft and decision history |

@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Enterprise Analytics and Automation, 27 November 2026
+
+- Added D35 `/work/analytics` for facility date windows, specialty breakdowns, appointment volume, queue wait, net collections and aggregate CSV. Report queries validate facility and tenant relationships. [Analytics workspace](../src/app/features/analytics.ts) · [Report adapter](../src/app/mocks/analytics.ts)
+- Added D36 `/work/automation` for a default-paused facility policy, daily quota and redacted usage. Clinicians generate, edit the format and decide on synthetic administrative drafts from their own signed visits. [Automation workspace](../src/app/features/automation.ts) · [Policy and draft adapter](../src/app/mocks/automation.ts)
+- Added schema version 25 and 5 OpenAPI operations. A Chromium migration preserved a saved campaign and enquiry, opened both new roles and showed the initial paused policy. [Migration](../src/app/mocks/database.ts) · [OpenAPI](openapi.yaml)
+- Verified 36 workspace mappings to registered Angular routes. Passed 46 domain and contract tests, 24 Chromium journeys, both builds and release verification. [Test evidence](TEST_REPORT.md) · [Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)
+- All 36 dashboard IDs now have working routes with partial workflow coverage. Saved reports, additional automation policies, richer draft authoring and full feature acceptance remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md)
+
 ## CRM and Marketing & Engagement, 27 November 2026
 
 - Added D33 `/work/crm` for registered-patient enquiries, agent assignment, contact history and slot-checked booking. Cancelling a linked appointment returns the enquiry to the worklist and updates conversion. [CRM workspace](../src/app/features/crm.ts) · [CRM adapter](../src/app/mocks/crm.ts)

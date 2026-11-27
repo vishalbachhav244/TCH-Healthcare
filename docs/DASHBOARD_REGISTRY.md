@@ -38,5 +38,5 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D32 | Ambulance & Patient Transport | `/work/patient-transport` | Partial | Emergency pickups, scheduling, fleet and crew administration, and receiving-facility records |
 | D33 | Healthcare CRM & Contact Center | `/work/crm` | Partial | Unregistered leads, inbound referrals, contact scheduling and contact channels |
 | D34 | Marketing & Engagement | `/work/marketing` | Partial | Feedback, scheduling, advanced segmentation and multi-touch attribution |
-| D35 | Enterprise Analytics & BI | — | Open | Configurable reporting, lineage and exports |
-| D36 | AI & Automation Control Center | — | Open | Controlled synthetic drafts, approval, usage and policy |
+| D35 | Enterprise Analytics & BI | `/work/analytics` | Partial | Saved report configurations, multi-facility comparison, custom measures and scheduled exports |
+| D36 | AI & Automation Control Center | `/work/automation` | Partial | Additional automation policies, reviewer delegation, richer draft authoring and audit exports |

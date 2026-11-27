@@ -50,6 +50,8 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `crm` | Facility enquiry capture and follow-up assignment |
 | `crmagent` | Assigned contact work, contact outcomes and linked appointment booking |
 | `marketing` | Enquiry conversion, current opt-in counts and local campaign simulations |
+| `analyst` | Facility reporting, specialty activity and aggregate CSV exports |
+| `automation` | Documentation simulation policy, daily limits and redacted activity |
 | `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
@@ -86,6 +88,8 @@ In **HR & Workforce**, `workforce` can open the staff directory, schedule a shif
 Discharge or transfer an admitted patient to send the vacated bed to **Hospital Support Services**. Use `support` to start housekeeping and mark the bed ready, or to manage ward requests for sterile supplies and meal trolleys. Use `transport` in **Ambulance & Patient Transport** to request a trip from an admitted patient’s current bed, dispatch a synthetic unit, record pickup and confirm handoff.
 
 In **Healthcare CRM**, `crm` captures a registered patient’s enquiry and assigns it to `crmagent`. The agent records the contact outcome and books from an available appointment time. **Marketing & Engagement** shows conversion by source. In **My care**, `patient` can opt in to Email or SMS under **Contact preferences**. Use `marketing` to run a local campaign simulation against the current opt-in count.
+
+Use `analyst` to choose a facility and a 7-, 14- or 30-day period in **Enterprise Analytics & BI**. The daily CSV contains aggregate appointment activity, queue waits and INR collections. Use `automation` to enable the documentation draft policy. Then use `clinician` to open **AI & Automation**, request a synthetic draft from a signed visit and review it before recording a decision.
 
 ## Verify
 

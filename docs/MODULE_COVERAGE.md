@@ -20,5 +20,6 @@ The supplied brief provides the 28-module baseline count, the 36-dashboard list 
 | Workforce and biomedical engineering | D29–D30 | Staff roster and attendance, equipment register and work orders, and linked imaging room availability |
 | Hospital support and patient transport | D31–D32 | Housekeeping handoff and bed release, sterile supply and dietary work queues, and admission-linked transport dispatch and handoff |
 | CRM and engagement | D33–D34, D12 | Enquiry capture, assigned contact tasks, linked booking, conversion by source, patient opt-in and local campaign simulation |
+| Enterprise intelligence | D35–D36 | Facility date-window reporting and aggregate CSV, synthetic documentation drafts, clinician review and supervisor policy |
 
 See [dashboard registry](DASHBOARD_REGISTRY.md) for open responsibilities and [workflow specifications](WORKFLOW_SPECIFICATIONS.md) for connected workflow coverage.

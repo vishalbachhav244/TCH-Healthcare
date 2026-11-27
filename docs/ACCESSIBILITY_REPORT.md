@@ -28,4 +28,6 @@ Hospital Support and Patient Transport passed reflow checks at 390, 768, 1024 an
 
 CRM and Marketing passed reflow checks at 390, 768, 1024 and 1440 px. The desktop enquiry list and mobile campaign register passed the selected axe rules. Enter opens the enquiry and campaign forms and Escape restores focus to each trigger. [CRM enquiries](screenshots/crm-1440.png) · [Mobile campaign register](screenshots/marketing-390.png)
 
+Enterprise Analytics and the Automation supervisor worklist passed reflow checks at 390, 768, 1024 and 1440 px. The desktop analytics report and mobile supervisor activity view passed the selected axe rules. The analytics plot has an accessible daily table. Enter opens the clinician draft request and Escape restores focus to its trigger. [Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

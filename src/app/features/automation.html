@@ -1,0 +1,283 @@
+@let state = data();
+<section class="page-intro">
+  <div>
+    <h1>AI &amp; Automation Control Center</h1>
+    <p>
+      {{
+        managesPolicy()
+          ? 'Set the facility’s draft policy and review simulation activity.'
+          : 'Prepare and review a synthetic draft from your signed visit records.'
+      }}
+    </p>
+  </div>
+  @if (state.state === 'ready') {
+    @if (managesPolicy()) {
+      <button
+        class="button primary"
+        type="button"
+        (click)="open(editorDialog, { kind: 'policy', policy: state.data.policy })"
+      >
+        <ng-icon name="settings" /> Edit draft policy
+      </button>
+    } @else if (
+      store.writeAllowed('automation') &&
+      state.data.policy.enabled &&
+      state.data.usage.today < state.data.policy.dailyLimit &&
+      state.data.sources.length
+    ) {
+      <button
+        class="button primary"
+        type="button"
+        (click)="open(editorDialog, { kind: 'request' })"
+      >
+        <ng-icon name="plus" /> Request synthetic draft
+      </button>
+    }
+  }
+</section>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading automation records…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else {
+  @let enabled = state.data.policy.enabled ? 'Enabled' : 'Disabled';
+  <section class="panel portal-next" aria-labelledby="automation-policy-title">
+    <span class="square-icon teal"><ng-icon name="settings" /></span>
+    <div>
+      <h2 id="automation-policy-title">Documentation draft policy</h2>
+      @let dailyLimit = state.data.policy.dailyLimit;
+      <p>
+        {{ store.facility()?.name }} · {{ dailyLimit }}
+        {{ dailyLimit === 1 ? 'request' : 'requests' }} per day
+      </p>
+      @if (!state.data.policy.enabled) {
+        <p>New draft requests are paused.</p>
+      } @else if (state.data.usage.today >= state.data.policy.dailyLimit) {
+        <p>The daily draft limit has been reached.</p>
+      } @else if (!managesPolicy() && !state.data.sources.length) {
+        <p>No signed visits are available for a new draft.</p>
+      }
+    </div>
+    <span [class]="enabled | statusTone">{{ enabled }}</span>
+  </section>
+  <div class="metric-grid">
+    <article class="panel metric">
+      <p>Facility requests today</p>
+      <strong>{{ state.data.usage.today }} / {{ state.data.policy.dailyLimit }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Pending review</p>
+      <strong>{{ state.data.usage.pending }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Approved</p>
+      <strong>{{ state.data.usage.approved }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Rejected</p>
+      <strong>{{ state.data.usage.rejected }}</strong>
+    </article>
+  </div>
+  @let title = managesPolicy() ? 'Facility simulation activity' : 'My documentation drafts';
+  @let count = managesPolicy() ? activity().length : drafts().length;
+  <section class="panel table-panel" aria-labelledby="automation-activity-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="automation-activity-title">{{ title }}</h2>
+        <p>Local documentation simulation</p>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <div class="select-control">
+        <label for="automation-status">Status</label>
+        <select
+          #filter
+          id="automation-status"
+          [value]="status()"
+          (change)="status.set(filter.value); limit.set(12)"
+        >
+          <option value="">All statuses</option>
+          @for (item of statuses; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (!count) {
+      <p class="state-panel">
+        {{
+          managesPolicy()
+            ? 'No simulation activity matches this filter.'
+            : 'No drafts match this filter.'
+        }}
+      </p>
+    } @else {
+      <div class="table-scroll" tabindex="0" role="region" [attr.aria-label]="title">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            {{
+              title
+            }}
+          </caption>
+          @if (managesPolicy()) {
+            <thead>
+              <tr>
+                <th scope="col">Requested (IST)</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last updated (IST)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of activity().slice(0, limit()); track row.id) {
+                <tr>
+                  <td>{{ row.createdAt | date: 'd MMM y, HH:mm' : '+0530' }}</td>
+                  <td>
+                    <span [class]="row.status | statusTone">{{ row.status }}</span>
+                  </td>
+                  <td>{{ row.changedAt | date: 'd MMM y, HH:mm' : '+0530' }}</td>
+                </tr>
+              }
+            </tbody>
+          } @else {
+            <thead>
+              <tr>
+                <th scope="col">Source visit</th>
+                <th scope="col">Format</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (draft of drafts().slice(0, limit()); track draft.id) {
+                <tr>
+                  <td>
+                    <strong>{{ draft.source.specialty }}</strong
+                    ><small
+                      >{{ draft.source.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} ·
+                      {{ draft.source.time }} IST</small
+                    >
+                  </td>
+                  <td>{{ draft.format }}</td>
+                  <td>
+                    <span [class]="draft.status | statusTone">{{ draft.status }}</span>
+                  </td>
+                  <td>
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="open(editorDialog, { kind: 'review', draft })"
+                    >
+                      {{ draft.status === 'Pending review' ? 'Review draft' : 'View draft' }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      </div>
+      @if (count > limit()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="limit.set(limit() + 12)">
+            Show more records
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+<dialog #editorDialog aria-labelledby="automation-editor-title" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="automation-editor-title">{{ titles[editor()?.kind ?? 'review'] }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editorDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as edit) {
+    <form
+      class="dialog-body fields"
+      [formGroup]="form"
+      (ngSubmit)="save(editorDialog, edit.kind === 'review' ? 'edit' : undefined)"
+    >
+      @switch (edit.kind) {
+        @case ('policy') {
+          <label class="checkbox"
+            ><input type="checkbox" formControlName="enabled" /> Allow synthetic documentation
+            drafts</label
+          >
+          <label for="automation-limit">Daily draft limit</label>
+          <select id="automation-limit" formControlName="dailyLimit">
+            @for (item of limits; track item) {
+              <option [ngValue]="item">{{ item }}</option>
+            }
+          </select>
+        }
+        @case ('request') {
+          <label for="automation-source">Signed visit</label>
+          <select id="automation-source" formControlName="encounterId" required>
+            <option value="">Choose a signed visit</option>
+            @for (source of sourceData()?.sources; track source.encounterId) {
+              <option [value]="source.encounterId">
+                {{ source.specialty }} · {{ source.day + 'T12:00:00Z' | date: 'd MMM y' : 'UTC' }} ·
+                {{ source.time }} IST
+              </option>
+            }
+          </select>
+          <p class="subtle">The draft uses a fixed local template for administrative review.</p>
+        }
+        @case ('review') {
+          <p><strong>Signed source observation</strong><br />{{ edit.draft.source.observation }}</p>
+          <p><strong>Synthetic draft</strong><br />{{ edit.draft.text }}</p>
+          @if (edit.draft.status === 'Pending review' && store.writeAllowed('automation')) {
+            <label for="automation-format">Draft format</label>
+            <select id="automation-format" formControlName="format">
+              @for (format of formats; track format) {
+                <option>{{ format }}</option>
+              }
+            </select>
+            <p class="subtle">Approval records your decision in this simulation.</p>
+          } @else {
+            <p [class]="edit.draft.status | statusTone">{{ edit.draft.status }}</p>
+          }
+        }
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      @if (edit.kind === 'policy') {
+        <button class="button primary" type="submit" [disabled]="busy()">Save draft policy</button>
+      } @else if (edit.kind === 'request') {
+        <button class="button primary" type="submit" [disabled]="busy()">Generate draft</button>
+      } @else if (edit.draft.status === 'Pending review' && store.writeAllowed('automation')) {
+        @let changed = form.controls.format.value !== edit.draft.format;
+        <div class="view-controls" role="group" aria-label="Draft review decisions">
+          <button class="button secondary" type="submit" [disabled]="busy() || !changed">
+            Save draft edits
+          </button>
+          <button
+            class="button primary"
+            type="button"
+            [disabled]="busy() || changed"
+            (click)="save(editorDialog, 'approve')"
+          >
+            Approve draft
+          </button>
+          <button
+            class="button secondary"
+            type="button"
+            [disabled]="busy()"
+            (click)="save(editorDialog, 'reject')"
+          >
+            Reject draft
+          </button>
+        </div>
+      }
+    </form>
+  }
+</dialog>

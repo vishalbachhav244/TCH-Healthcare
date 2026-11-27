@@ -7,18 +7,20 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test` | 44 contract and domain tests passed across 3 files |
-| `npm run e2e -- --fully-parallel --workers=2` | All 22 Chromium journeys passed, including assigned enquiry booking, patient opt-in withdrawal and the facility engagement entitlement. |
-| `npm run build` | Passed. Initial assets approximately 380 kB raw and 98 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 383 kB raw and 99 kB estimated transfer. |
+| `npm test` | 46 contract and domain tests passed across 3 files |
+| `npm run e2e -- --fully-parallel --workers=3` | All 24 Chromium journeys passed, including analytics filters and CSV export, documentation policy, and clinician review. |
+| `npm run build` | Passed. Initial assets approximately 381 kB raw and 98 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 384 kB raw and 99 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 23 to 24 in Chromium. Saved support and transport records survived and the new role memberships opened CRM and Marketing. |
-| OpenAPI | 164 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 24 to 25 in Chromium. The saved campaign and enquiry survived. Both new roles signed in and the draft policy started paused. |
+| OpenAPI | 169 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
 
+- Switch Analytics from a 7- to 14-day window and download the aggregate CSV. Verify its schema and row count, open the specialty report, check the historical empty state and switch to the authorized North facility.
+- Enable draft generation as supervisor, generate one draft as the assigned clinician and verify the quota. Reload and inspect source context, save an administrative format edit and pause generation. Approve the pending draft and check the supervisor receives its outcome without the source observation.
 - Capture a referral enquiry, assign an agent and keep the work hidden before assignment. Record a missed contact and then a successful one, reload and book a live slot. Verify conversion in Marketing. Draft an Email campaign at zero opt-ins, allow and withdraw permission in the portal, reject the withdrawn audience and run after the patient opts in again. Verify the result after reload and withdraw the facility engagement entitlement.
 - Find an active staff member, schedule a shift and reject an overlap. Record check-in, reload, check out and verify the shift is scoped to its facility. Deny this account’s direct navigation to Biomedical Engineering.
 - Request stock as Stores. Approve it as Procurement and issue a purchase order to an eligible supplier. Reject over-receiving, then record two partial receipts, reload receipt history and post a physical stock count. Verify the purchase order status and Pharmacy ledger after each handoff.
@@ -77,3 +79,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Mobile hospital support](screenshots/hospital-support-390.png) · [Transport dispatch](screenshots/transport-1440.png)
 
 [CRM enquiries](screenshots/crm-1440.png) · [Mobile campaign register](screenshots/marketing-390.png)
+
+[Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)

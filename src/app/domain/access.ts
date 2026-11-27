@@ -17,7 +17,7 @@ export const staffRoles = {
     workspaces: ['D09', 'D10', 'D11'],
     writes: ['patients', 'appointments', 'queue'],
   },
-  clinician: { label: 'Clinician', workspaces: ['D13'], writes: ['clinical'] },
+  clinician: { label: 'Clinician', workspaces: ['D13', 'D36'], writes: ['clinical', 'automation'] },
   wardPhysician: {
     label: 'Inpatient physician',
     workspaces: ['D14'],
@@ -55,6 +55,12 @@ export const staffRoles = {
   crmCoordinator: { label: 'CRM coordinator', workspaces: ['D33'], writes: ['crm', 'crm/assign'] },
   crmAgent: { label: 'Contact agent', workspaces: ['D33'], writes: ['crm'] },
   marketing: { label: 'Engagement coordinator', workspaces: ['D34'], writes: ['marketing'] },
+  analyst: { label: 'Enterprise analyst', workspaces: ['D35'], writes: [] },
+  automationSupervisor: {
+    label: 'Automation supervisor',
+    workspaces: ['D36'],
+    writes: ['automation/policy'],
+  },
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },
   labReviewer: { label: 'Laboratory reviewer', workspaces: ['D20'], writes: ['laboratory/review'] },

@@ -79,6 +79,7 @@ export class StatusTone implements PipeTransform {
         'Requested',
         'Acquired',
         'Report ready',
+        'Pending review',
         'Review needed',
         'Out of stock',
         'Unavailable',

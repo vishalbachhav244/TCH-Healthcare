@@ -23,6 +23,7 @@ import type { WorkforceData } from '../domain/workforce';
 import type { SupportData } from '../domain/support';
 import type { TransportData } from '../domain/transport';
 import type { ContactPreferences, CrmData, MarketingData } from '../domain/engagement';
+import type { AnalyticsReport, AutomationData } from '../domain/intelligence';
 import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
 import type { FinanceData } from '../domain/finance';
@@ -3138,5 +3139,224 @@ describe('CRM and engagement', () => {
     }
     expect((await read()).campaigns[0].simulatedCount).toBe(1);
     expect((await read()).audience.Email).toBe(0);
+  }, 90_000);
+});
+
+describe('enterprise intelligence', () => {
+  const facility = 'mer-central';
+  const branch = 'mer-north';
+
+  it('aggregates a bounded report window with verified facility and tenant relationships', async () => {
+    const [analyst, receptionist] = await Promise.all(['analyst', 'reception'].map(login));
+    const day = shiftDay(dayInIndia(), -70);
+    const previous = shiftDay(day, -1);
+    const original = {
+      facilityId: facility,
+      patientId: 'TC-MERIDIAN-01001',
+      practitionerId: 'mer-central-DR-1',
+      time: '09:00',
+      channel: 'Scheduled' as const,
+    };
+    await db.appointments.bulkAdd([
+      { ...original, id: 'analytics-completed', day, status: 'Completed' },
+      { ...original, id: 'analytics-cancelled', day, status: 'Cancelled' },
+      { ...original, id: 'analytics-walkin', day: previous, channel: 'Walk-in', status: 'Booked' },
+      {
+        ...original,
+        id: 'analytics-foreign-patient',
+        day,
+        patientId: 'TC-CITYCARE-01001',
+        status: 'Booked',
+      },
+      {
+        ...original,
+        id: 'analytics-branch',
+        day,
+        facilityId: branch,
+        practitionerId: 'mer-north-DR-1',
+        status: 'Booked',
+      },
+    ]);
+    await db.tickets.add({
+      id: 'analytics-queue',
+      facilityId: facility,
+      appointmentId: 'analytics-completed',
+      number: 1,
+      arrivedAt: 120000,
+      calledAt: 420000,
+      lastCalledAt: 540000,
+      status: 'Completed',
+    });
+    const line = { description: 'Synthetic consultation', unitMinor: 12000, quantity: 1 };
+    await db.invoices.bulkAdd([
+      {
+        id: 'analytics-invoice',
+        facilityId: facility,
+        encounterId: 'analytics-encounter',
+        patientId: original.patientId,
+        day,
+        lines: [line],
+      },
+      {
+        id: 'analytics-foreign-invoice',
+        facilityId: branch,
+        encounterId: 'analytics-branch-encounter',
+        patientId: original.patientId,
+        day,
+        lines: [line],
+      },
+    ]);
+    await db.payments.bulkAdd([
+      { id: 'analytics-payment', invoiceId: 'analytics-invoice', day, amountMinor: 12000 },
+      {
+        id: 'analytics-other-payment',
+        invoiceId: 'analytics-foreign-invoice',
+        day,
+        amountMinor: 12000,
+      },
+    ]);
+    await db.refundDecisions.add({
+      movementId: 'analytics-refund',
+      invoiceId: 'analytics-invoice',
+      facilityId: facility,
+      outcome: 'Record local refund',
+      amountMinor: 1500,
+      day,
+      decidedAt: 1,
+      actor: 'finance',
+    });
+    const query = 'analytics?window=7&end=' + day;
+    await expect(get(query, receptionist, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(query, analyst, 'city-main')).rejects.toMatchObject({ status: 403 });
+    await expect(get('analytics?window=8', analyst, facility)).rejects.toMatchObject({
+      status: 422,
+    });
+    await expect(
+      get('analytics?end=' + shiftDay(dayInIndia(), 1), analyst, facility),
+    ).rejects.toMatchObject({ status: 422 });
+    const report = (await get(query, analyst, facility)) as AnalyticsReport;
+    expect(report.days).toHaveLength(7);
+    expect(report.days.at(-1)).toEqual({
+      day,
+      scheduled: 1,
+      walkIn: 0,
+      completed: 1,
+      cancelled: 1,
+      waitSamples: 1,
+      waitMilliseconds: 300000,
+      netMinor: 10500,
+      postingCount: 2,
+    });
+    expect(report.days.at(-2)).toMatchObject({ day: previous, scheduled: 0, walkIn: 1 });
+    expect(report.specialties).toContainEqual({
+      specialty: 'General Medicine',
+      scheduled: 1,
+      walkIn: 1,
+      completed: 1,
+    });
+    expect(JSON.stringify(report)).not.toContain(original.patientId);
+    expect(((await get(query, analyst, branch)) as AnalyticsReport).days.at(-1)).toMatchObject({
+      scheduled: 1,
+      completed: 0,
+      cancelled: 0,
+      netMinor: 12000,
+      waitSamples: 0,
+    });
+    expect(
+      (
+        (await get(
+          'analytics?window=30&end=' + shiftDay(day, -2),
+          analyst,
+          facility,
+        )) as AnalyticsReport
+      ).days,
+    ).toHaveLength(30);
+  }, 90_000);
+
+  it('requires a facility policy, limits generation and gives review to the assigned clinician', async () => {
+    const [supervisor, clinician, analyst] = await Promise.all(
+      ['automation', 'clinician', 'analyst'].map(login),
+    );
+    const view = async (actor = clinician, at = facility) =>
+      (await get('automation', actor, at)) as AutomationData;
+    const set = (version: string, enabled: string, dailyLimit = '1', actor = supervisor) =>
+      patch('automation/policy', { version, enabled, dailyLimit }, actor, facility);
+    const request = (encounterId: string, actor = clinician) =>
+      post('automation/drafts', { encounterId }, actor, facility);
+    const state = await view();
+    const [first, another] = state.sources;
+    expect(state.policy).toEqual({ enabled: false, version: 0, dailyLimit: 5 });
+    expect(first).toBeDefined();
+    expect(another).toBeDefined();
+    await expect(view(analyst)).rejects.toMatchObject({ status: 403 });
+    await expect(request(first.encounterId)).rejects.toMatchObject({ status: 403 });
+    await expect(set('0', 'true', '1', clinician)).rejects.toMatchObject({ status: 403 });
+    await expect(set('0', 'true', '2')).rejects.toMatchObject({ status: 422 });
+    await set('0', 'true');
+    await expect(set('0', 'false')).rejects.toMatchObject({ status: 409 });
+    const source = await db.encounters.get(first.encounterId);
+    const foreign = (await db.encounters
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.signedAt !== undefined && row.practitionerId !== 'mer-central-DR-1')
+      .first())!;
+    await expect(request(foreign.id)).rejects.toMatchObject({ status: 403 });
+    await expect(request(first.encounterId, supervisor)).rejects.toMatchObject({ status: 403 });
+    const duplicate = await Promise.allSettled([
+      request(first.encounterId),
+      request(first.encounterId),
+    ]);
+    expect(duplicate.map((item) => item.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const { id: draftId } = duplicate.find((item) => item.status === 'fulfilled')!.value as {
+      id: string;
+    };
+    await expect(request(another.encounterId)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('daily draft limit'),
+    });
+    const review = (id: string, version: string, action: string, extra = {}, actor = clinician) =>
+      patch(
+        'automation/drafts/status',
+        { draftId: id, version, action, ...extra },
+        actor,
+        facility,
+      );
+    const redacted = await view(supervisor);
+    expect(redacted.drafts).toEqual([]);
+    expect(redacted.sources).toEqual([]);
+    expect(redacted.activity).toContainEqual(
+      expect.objectContaining({ id: draftId, status: 'Pending review' }),
+    );
+    expect(JSON.stringify(redacted)).not.toContain(first.encounterId);
+    expect((await view(supervisor, branch)).activity).toEqual([]);
+    await expect(review(draftId, '1', 'approve', {}, supervisor)).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(review(draftId, '1', 'edit', { format: 'Foreign format' })).rejects.toMatchObject({
+      status: 422,
+    });
+    await review(draftId, '1', 'reject');
+    expect((await view()).drafts[0].status).toBe('Rejected');
+    await set('1', 'true', '3');
+    const { id: next } = (await request(first.encounterId)) as { id: string };
+    await review(next, '1', 'edit', { format: 'Administrative handoff' });
+    await expect(review(next, '1', 'approve')).rejects.toMatchObject({ status: 409 });
+    await set('2', 'false', '3');
+    await review(next, '2', 'approve');
+    await expect(review(next, '3', 'reject')).rejects.toMatchObject({ status: 409 });
+    expect((await view()).drafts).toContainEqual(
+      expect.objectContaining({
+        id: next,
+        status: 'Approved',
+        text: expect.stringContaining('Refer to the signed encounter'),
+      }),
+    );
+    expect((await view(supervisor)).usage).toEqual({
+      today: 2,
+      pending: 0,
+      rejected: 1,
+      approved: 1,
+    });
+    expect(await db.encounters.get(first.encounterId)).toEqual(source);
   }, 90_000);
 });

@@ -57,6 +57,7 @@ import type { BiomedicalAsset, MaintenanceOrder } from '../domain/biomedical';
 import type { SupportTask } from '../domain/support';
 import type { TransportRequest, TransportUnit } from '../domain/transport';
 import type { Campaign, EngagementPermission, Enquiry } from '../domain/engagement';
+import type { DocumentationDraft, FacilityDocumentationPolicy } from '../domain/intelligence';
 import { initialBedPreparations, initialTransportUnits } from './support-seed';
 import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
@@ -92,6 +93,8 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   campaigns: EntityTable<Campaign, 'id'>;
   engagementPermissions: EntityTable<EngagementPermission, 'id'>;
   enquiries: EntityTable<Enquiry, 'id'>;
+  automationPolicies: EntityTable<FacilityDocumentationPolicy, 'facilityId'>;
+  documentationDrafts: EntityTable<DocumentationDraft, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -541,6 +544,24 @@ db.version(24)
     const members = transaction.table<StaffMembership, string>('memberships');
     for (const membership of initialStaff.filter(
       (row) => row.role === 'crmCoordinator' || row.role === 'crmAgent' || row.role === 'marketing',
+    )) {
+      if (existing.has(membership.facilityId) && !(await members.get(membership.id)))
+        await members.add(membership);
+    }
+  });
+
+db.version(25)
+  .stores({
+    automationPolicies: 'facilityId',
+    documentationDrafts: 'id, facilityId, [facilityId+day], [facilityId+encounterId]',
+  })
+  .upgrade(async (transaction) => {
+    const existing = new Set(
+      await transaction.table<Facility, string>('facilities').toCollection().primaryKeys(),
+    );
+    const members = transaction.table<StaffMembership, string>('memberships');
+    for (const membership of initialStaff.filter(
+      (row) => row.role === 'analyst' || row.role === 'automationSupervisor',
     )) {
       if (existing.has(membership.facilityId) && !(await members.get(membership.id)))
         await members.add(membership);

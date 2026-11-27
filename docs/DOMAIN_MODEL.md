@@ -42,4 +42,6 @@ A `TransportRequest` links an admission, patient, pickup bed and, after dispatch
 
 An `Enquiry` links a tenant patient to a facility, capture source, specialty and optional agent. Contact attempts form a dated history. The current appointment relationship drives the booked state and source conversion. An `EngagementPermission` stores patient opt-in per facility and channel. A `Campaign` stores a template, lifecycle version and aggregate simulation result. [Engagement contracts](../src/app/domain/engagement.ts)
 
+An `AnalyticsReport` contains dated totals and specialty aggregates. Wait sample counts and elapsed time support a weighted period mean. A facility `DocumentationPolicy` controls generation and the daily quota. A `DocumentationDraft` references the assigned encounter, author, format, version and review state. Review is separate from the encounter lifecycle. [Intelligence contracts](../src/app/domain/intelligence.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

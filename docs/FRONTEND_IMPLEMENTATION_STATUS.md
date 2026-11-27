@@ -1,6 +1,6 @@
 # Frontend implementation status
 
-The frontend is an independent project built from the supplied brief. 34 of 36 dashboard IDs have working routes with partial workflow coverage. The other 2 remain open. No dashboard has passed every acceptance criterion in the brief.
+The frontend is an independent project built from the supplied brief. All 36 dashboard IDs have working routes with partial workflow coverage. Full feature acceptance remains open across the dashboard register.
 
 The 137 canonical screen rows and 171 canonical requirement rows are referenced by count in the attachment. Their IDs and individual definitions were not supplied. The register uses local screen IDs and the brief's section numbers while they are unavailable. [Screen inventory](SCREEN_INVENTORY.md)
 
@@ -39,11 +39,13 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §9 Ambulance & Patient Transport | D32 | TC-LOCAL-48 `/work/patient-transport` | Partial | Internal and ambulance trips from active admissions, dispatch, pickup and handoff | Live availability, assignment conflict, pickup change, in-transit guard and inpatient entitlement | Scheduled trips, emergency pickups, fleet configuration and destination records |
 | §§9,16.14 Healthcare CRM | D33 | TC-LOCAL-49 `/work/crm` | Partial | Registered-patient enquiries, assignment, contact history and linked appointment booking | Assigned-agent scope, shared scheduling rules, cancellation recovery and facility entitlement | Unregistered leads, inbound referrals and contact scheduling |
 | §§9,16.14 Marketing & Engagement | D34 | TC-LOCAL-50 and 51 `/work/marketing` and portal Contact preferences | Partial | Conversion by source, campaign drafts, Email and SMS permissions and local simulations | Current opt-in check, scoped aggregates, versioned updates and live revocation | Feedback, advanced segmentation, delivery scheduling and multi-touch attribution |
+| §§9,15 Enterprise Analytics & BI | D35 | TC-LOCAL-52 `/work/analytics` | Partial | Facility-scoped 7-, 14- and 30-day reports, appointment volume, queue wait, net collections, specialty breakdown and aggregate CSV | Facility and tenant joins, scope denial, bounded date filters, valid zero-data state and downloaded CSV | Saved reports, network comparisons and configurable measures |
+| §§9,16.15 AI & Automation Control Center | D36 | TC-LOCAL-53 `/work/automation` | Partial | Facility draft policy, daily usage, redacted supervisor activity and clinician review of synthetic drafts from signed visits | Role and assignment guards, versioned format edits and decisions, duplicate and quota rejection, pending review while paused | Additional policies, reviewer delegation, richer draft editing and audit exports |
 
 Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBILITY_REPORT.md) for exact run evidence.
 
 ## Continuation checkpoint
 
-1. Continue M8 with Enterprise Analytics & BI and AI & Automation Control Center, D35–D36. Extend payments, insurance, diagnostic records and inventory beyond pharmacy.
-2. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
+1. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
+2. Expand the partial workflows in the dashboard registry, including payments, insurance, diagnostic records and inventory beyond pharmacy.
 3. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.

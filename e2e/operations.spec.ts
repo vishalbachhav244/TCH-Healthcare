@@ -25,6 +25,122 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('filters scoped analytics and downloads an aggregate report', async ({ page }, testInfo) => {
+  await signIn(page, 'analyst');
+  await expect(page.getByRole('heading', { name: 'Enterprise Analytics & BI' })).toBeVisible();
+  const daily = page.getByRole('table', { name: 'Daily report', exact: true });
+  await expect(daily.getByRole('row')).toHaveCount(8);
+  await page.getByLabel('Period', { exact: true }).selectOption('14');
+  await expect(daily.getByRole('row')).toHaveCount(15);
+  const pendingDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export daily CSV' }).click();
+  const download = await pendingDownload;
+  expect(download.suggestedFilename()).toBe(
+    'truecare-analytics-mer-central-' + dayInIndia() + '.csv',
+  );
+  const stream = await download.createReadStream();
+  let csv = '';
+  for await (const chunk of stream!) csv += chunk;
+  expect(csv.trimEnd().split('\r\n')).toHaveLength(15);
+  expect(csv).toContain('Wait samples,Mean wait minutes,Net collections (INR)');
+  expect(csv).not.toContain('TC-MERIDIAN');
+  await page.getByRole('button', { name: 'Specialties', exact: true }).click();
+  await expect(page.getByRole('row', { name: /General Medicine/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Daily activity' }).click();
+  const reportEnd = page.getByLabel('Report end date');
+  await reportEnd.fill(shiftDay(dayInIndia(), -90));
+  await expect(
+    page.getByText('No appointment or collection activity in this period.'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export daily CSV' })).toHaveCount(0);
+  await reportEnd.fill(dayInIndia());
+  await page.getByLabel('Period', { exact: true }).selectOption('7');
+  await expect(daily.getByRole('row')).toHaveCount(8);
+  const central = await daily.getByRole('row').last().innerText();
+  await page.getByLabel('Facility', { exact: true }).selectOption('mer-north');
+  await expect(page.getByRole('region', { name: 'Appointment volume' })).toContainText(
+    'Meridian North Hospital',
+  );
+  await expect(daily.getByRole('row')).toHaveCount(8);
+  expect(await daily.getByRole('row').last().innerText()).not.toBe(central);
+  await checkReflow(page);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await reportEnd.blur();
+  await page.screenshot({
+    path: testInfo.outputPath('analytics-1440.png'),
+    animations: 'disabled',
+  });
+  await page.goto('/work/automation');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+});
+
+test('governs and reviews a synthetic documentation draft', async ({ page }, testInfo) => {
+  test.setTimeout(110_000);
+  await signIn(page, 'automation');
+  const clinician = await page.context().newPage();
+  await signIn(clinician, 'clinician');
+  await clinician.getByRole('link', { name: 'AI & automation', exact: true }).click();
+  await expect(clinician.getByText('New draft requests are paused.')).toBeVisible();
+  const request = clinician.getByRole('button', { name: 'Request synthetic draft' });
+  await expect(request).toHaveCount(0);
+  const policy = page.getByRole('dialog', { name: 'Edit draft policy' });
+  const enabled = policy.getByRole('checkbox', { name: 'Allow synthetic documentation drafts' });
+  await page.getByRole('button', { name: 'Edit draft policy' }).click();
+  await enabled.check();
+  await policy.getByLabel('Daily draft limit').selectOption({ label: '1' });
+  await policy.getByRole('button', { name: 'Save draft policy' }).click();
+  await expect(request).toBeVisible();
+  await expect(page.getByText(/1 request per day/)).toBeVisible();
+
+  const create = clinician.getByRole('dialog', { name: 'Request synthetic draft' });
+  await request.focus();
+  await clinician.keyboard.press('Enter');
+  await expect(create).toBeVisible();
+  await clinician.keyboard.press('Escape');
+  await expect(request).toBeFocused();
+  await request.click();
+  await create.getByLabel('Signed visit', { exact: true }).selectOption({ index: 1 });
+  await create.getByRole('button', { name: 'Generate draft' }).click();
+  const pending = clinician.getByRole('row', { name: /Pending review/ });
+  await expect(pending).toBeVisible();
+  await expect(clinician.getByText('The daily draft limit has been reached.')).toBeVisible();
+  await expect(page.getByRole('row', { name: /Pending review/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review draft' })).toHaveCount(0);
+  await expect(page.getByText('History reviewed and findings documented.')).toHaveCount(0);
+  await clinician.reload();
+  await pending.getByRole('button', { name: 'Review draft' }).click();
+  const review = clinician.getByRole('dialog', { name: 'Review documentation draft' });
+  await expect(review.getByText('Signed source observation')).toBeVisible();
+  await review.getByLabel('Draft format').selectOption('Administrative handoff');
+  await expect(review.getByRole('button', { name: 'Approve draft' })).toBeDisabled();
+  await review.getByRole('button', { name: 'Save draft edits' }).click();
+  await expect(pending).toContainText('Administrative handoff');
+
+  await page.getByRole('button', { name: 'Edit draft policy' }).click();
+  await enabled.uncheck();
+  await policy.getByRole('button', { name: 'Save draft policy' }).click();
+  await expect(clinician.getByText('New draft requests are paused.')).toBeVisible();
+  await pending.getByRole('button', { name: 'Review draft' }).click();
+  await expect(review).toContainText('Refer to the signed encounter');
+  await review.getByRole('button', { name: 'Approve draft' }).click();
+  await expect(page.getByRole('row', { name: /Approved/ })).toBeVisible();
+  await expect(clinician.getByRole('row', { name: /Approved/ })).toBeVisible();
+  await checkReflow(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('automation-390.png'),
+    animations: 'disabled',
+  });
+  await clinician.close();
+});
+
 test('converts an assigned enquiry and simulates outreach with current permission', async ({
   page,
 }, testInfo) => {
@@ -2220,6 +2336,7 @@ test('queues CSSD and dietary requests and persists the work states', async ({
   await expect(dietary).toHaveCount(0);
   await sterile.getByRole('button', { name: 'Start task' }).click();
   await page.getByRole('button', { name: 'Confirm start' }).click();
+  await expect(sterile).toContainText('In progress');
   await page.reload();
   await page.getByRole('combobox', { name: 'Service', exact: true }).selectOption('CSSD');
   await expect(sterile).toContainText('In progress');

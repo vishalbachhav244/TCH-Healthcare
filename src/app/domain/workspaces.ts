@@ -30,6 +30,8 @@ export type Resource =
   | 'patient-transport'
   | 'crm'
   | 'marketing'
+  | 'analytics'
+  | 'automation'
   | 'laboratory'
   | 'radiology'
   | 'blood-bank'
@@ -269,8 +271,20 @@ export const workspaces: readonly Workspace[] = [
     icon: 'heart',
     resource: 'marketing',
   },
-  { id: 'D35', title: 'Enterprise Analytics & BI', group: 'Intelligence', icon: 'chart' },
-  { id: 'D36', title: 'AI & Automation Control Center', group: 'Intelligence', icon: 'settings' },
+  {
+    id: 'D35',
+    title: 'Enterprise Analytics & BI',
+    group: 'Intelligence',
+    icon: 'chart',
+    resource: 'analytics',
+  },
+  {
+    id: 'D36',
+    title: 'AI & Automation Control Center',
+    group: 'Intelligence',
+    icon: 'settings',
+    resource: 'automation',
+  },
 ];
 
 export const inpatientWorkspaces = new Set(
@@ -348,6 +362,8 @@ export const navigation = [
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
   { title: 'CRM & contact center', resource: 'crm', icon: 'users', workspace: 'D33' },
   { title: 'Marketing & engagement', resource: 'marketing', icon: 'heart', workspace: 'D34' },
+  { title: 'Enterprise analytics', resource: 'analytics', icon: 'chart', workspace: 'D35' },
+  { title: 'AI & automation', resource: 'automation', icon: 'settings', workspace: 'D36' },
 ] as const;
 
 export const platformResources: readonly string[] = [

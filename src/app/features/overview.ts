@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
+import { downloadCsv } from '../core/download';
 import { SessionStore } from '../core/session';
 import { facilityQuery } from '../core/query';
 import { Rupees, StatusTone } from '../design-system/format';
@@ -71,11 +72,6 @@ export class Overview {
       'Date,Scheduled,Walk-ins',
       ...data.days.map((item) => `${item.day},${item.scheduled},${item.walkIn}`),
     ].join('\r\n');
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'truecare-patient-flow-' + this.day() + '.csv';
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    downloadCsv('truecare-patient-flow-' + this.day() + '.csv', content);
   }
 }

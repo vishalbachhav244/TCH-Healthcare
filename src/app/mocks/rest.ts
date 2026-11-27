@@ -19,6 +19,8 @@ import { supportData } from './support';
 import { transportData } from './transport';
 import { crmAvailability, crmData, crmPatients } from './crm';
 import { contactPreferences, marketingData } from './marketing';
+import { analyticsReport } from './analytics';
+import { automationData } from './automation';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -110,6 +112,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'crm/enquiries/status',
     'marketing/campaigns/status',
     'portal/contact-preferences',
+    'automation/policy',
+    'automation/drafts/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -497,6 +501,37 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         'r',
         [db.campaigns, db.enquiries, db.appointments, db.patients, db.engagementPermissions],
         () => marketingData(facility),
+      );
+    }
+    case 'analytics': {
+      const facility = scope(session, facilityRecord, 'D35');
+      return db.transaction(
+        'r',
+        [
+          db.appointments,
+          db.practitioners,
+          db.tickets,
+          db.invoices,
+          db.payments,
+          db.refundDecisions,
+          db.patients,
+        ],
+        () => analyticsReport(facility, params),
+      );
+    }
+    case 'automation': {
+      const facility = scope(session, facilityRecord, 'D36');
+      return db.transaction(
+        'r',
+        [
+          db.automationPolicies,
+          db.documentationDrafts,
+          db.encounters,
+          db.appointments,
+          db.practitioners,
+          db.patients,
+        ],
+        () => automationData(facility, session),
       );
     }
     case 'billing/inpatient':

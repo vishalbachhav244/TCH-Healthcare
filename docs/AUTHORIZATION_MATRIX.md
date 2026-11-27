@@ -15,7 +15,7 @@
 | Pharmacist | Views signed facility prescriptions and the stock ledger. Receives stock, dispenses, returns on-hand stock to a supplier and quarantines returned patient units. A patient return credits the unpaid charge up to the recorded return value. |
 | Executive | Meridian facilities. Overview, alert acknowledgement and clinician schedule blocks. Read-only appointments, waitlist, queue and bed views. Bed responses omit admissions. |
 | Reception | Default Meridian facility. Patient search and registration, appointment and waitlist commands, and queue operations. Follow-up booking exposes the clinician, date window and booking state. Appointment, queue and dashboard worklists omit encounter records. |
-| Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, manages follow-up, orders laboratory and imaging studies and reads released imaging reports for the assigned encounter. |
+| Clinician | Assigned encounter access with prior signed history for that patient at the same facility. Starts or signs consultations, manages follow-up, orders laboratory and imaging studies and reads released imaging reports for the assigned encounter. Requests and reviews their own synthetic drafts from signed assigned visits. |
 | Inpatient physician | Active assigned admissions at inpatient-enabled facilities. Records rounds, manages orders and component requests and drafts or signs the discharge summary. Reads related nursing tasks and observations. |
 | Ward nurse | Active assigned admissions at inpatient-enabled facilities. Starts and completes linked tasks and records observations. Reads rounds and orders for the assigned admission. |
 | Emergency clinician | Emergency arrivals, clinician-entered priority and disposition for registered patients within the selected facility tenant. May request admission. |
@@ -39,5 +39,7 @@
 | CRM coordinator | Engagement-enabled facilities. Searches registered tenant patients, creates enquiries, assigns contact work to active facility agents and views the facility worklist. Records contact and bookings for enquiries assigned to their account. |
 | Contact agent | Engagement-enabled facilities. Sees assigned enquiries, records contact and books eligible appointments for those enquiries. |
 | Engagement coordinator | Engagement-enabled facilities. Sees aggregate conversion and current channel opt-in counts. Manages local campaign drafts. |
+| Enterprise analyst | Reads and exports daily and specialty aggregates for assigned facilities. |
+| Automation supervisor | Configures facility draft policy and reads aggregate usage and redacted activity. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications, bill balances and facility contact preferences. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |
