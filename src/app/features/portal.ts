@@ -11,6 +11,7 @@ import { dayInIndia, invoiceStatus, shiftDay } from '../domain/operations';
 import type { LabOrder } from '../domain/diagnostics';
 import type { FollowUpDetails } from '../domain/continuity';
 import { PatientSharing } from './patient-sharing';
+import { ContactPreferences } from './contact-preferences';
 import { DischargeDocument } from './discharge-document';
 import type { DischargeDocument as ReleasedSummary } from '../domain/discharge';
 import type { ReleasedImagingReport } from '../domain/radiology';
@@ -21,6 +22,7 @@ import type { ReleasedImagingReport } from '../domain/radiology';
     DischargeDocument,
     NgIcon,
     PatientSharing,
+    ContactPreferences,
     ReactiveFormsModule,
     Rupees,
     StatusTone,
@@ -33,9 +35,9 @@ export class Portal {
   protected readonly store = inject(SessionStore);
   protected readonly today = dayInIndia();
   protected readonly latest = shiftDay(this.today, 90);
-  protected readonly active = signal<'visits' | 'records' | 'billing' | 'sharing' | 'medications'>(
-    'visits',
-  );
+  protected readonly active = signal<
+    'visits' | 'records' | 'billing' | 'sharing' | 'medications' | 'preferences'
+  >('visits');
   protected readonly invoiceStatus = invoiceStatus;
   protected readonly report = signal<LabOrder | undefined>(undefined);
   protected readonly imagingReport = signal<ReleasedImagingReport | undefined>(undefined);

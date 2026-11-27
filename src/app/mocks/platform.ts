@@ -10,6 +10,7 @@ const administrativeEvents = [
   'OrganisationCreated',
   'FacilityCreated',
   'ModuleConfigurationChanged',
+  'EngagementConfigurationChanged',
   'FacilityActivationChanged',
   'StaffAccessChanged',
   'SubscriptionPlanChanged',
@@ -118,7 +119,14 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
         });
         return emit('FacilityCreated', id, id);
       }
-      if (!['platform/entitlements', 'platform/activation', 'platform/membership'].includes(path))
+      if (
+        ![
+          'platform/entitlements',
+          'platform/activation',
+          'platform/membership',
+          'platform/engagement',
+        ].includes(path)
+      )
         throw new ApiError(404, 'Platform operation not found.');
       const facility =
         typeof value['facilityId'] === 'string'
@@ -182,6 +190,15 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
       }
       if (value['version'] !== String(facility.configurationVersion))
         throw new ApiError(409, 'Facility settings have changed. Refresh and try again.');
+      if (path === 'platform/engagement') {
+        if (value['engagement'] !== 'true' && value['engagement'] !== 'false')
+          throw new ApiError(422, 'Choose an engagement entitlement state.');
+        await db.facilities.update(facility.id, {
+          engagement: value['engagement'] === 'true',
+          configurationVersion: (facility.configurationVersion ?? 0) + 1,
+        });
+        return emit('EngagementConfigurationChanged', facility.id, facility.id);
+      }
       if (path === 'platform/activation') {
         if (value['active'] !== 'true' && value['active'] !== 'false')
           throw new ApiError(422, 'Choose a facility status.');

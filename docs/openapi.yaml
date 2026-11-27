@@ -5760,6 +5760,513 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /crm:
+    get:
+      operationId: getCrmWorkspace
+      summary: Read the facility enquiry worklist as the coordinator or assigned agent.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrmWorkspace"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /crm/patients:
+    get:
+      operationId: searchCrmPatients
+      summary: Search registered synthetic patients within the facility tenant as a coordinator.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          required: false
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiagnosticsPatient"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /crm/availability:
+    get:
+      operationId: getCrmBookingTimes
+      summary: Read available appointment times for an assigned enquiry after recording contact.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - name: enquiryId
+          in: query
+          schema:
+            type: string
+          required: true
+        - name: practitionerId
+          in: query
+          schema:
+            type: string
+          required: true
+        - name: day
+          in: query
+          schema:
+            type: string
+            format: date
+          required: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  pattern: ^(?:[01][0-9]|2[0-3]):(?:00|15|30|45)$
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /crm/enquiries:
+    post:
+      operationId: captureCrmEnquiry
+      summary: Open a facility enquiry for an existing tenant patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - patientId
+                - specialty
+                - source
+              properties:
+                patientId:
+                  type: string
+                specialty:
+                  type: string
+                  enum:
+                    - General Medicine
+                    - Cardiology
+                    - Orthopaedics
+                    - Paediatrics
+                    - Dermatology
+                    - ENT
+                source:
+                  type: string
+                  enum:
+                    - Phone
+                    - Reception
+                    - Referral
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /crm/enquiries/status:
+    patch:
+      operationId: updateCrmEnquiry
+      summary: Assign follow-up, log contact, book an appointment or close a current enquiry.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required:
+                    - enquiryId
+                    - version
+                    - action
+                    - assignee
+                    - followUpOn
+                  properties:
+                    enquiryId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                    action:
+                      type: string
+                      const: assign
+                    assignee:
+                      type: string
+                    followUpOn:
+                      type: string
+                      format: date
+                - type: object
+                  required:
+                    - enquiryId
+                    - version
+                    - action
+                    - outcome
+                  properties:
+                    enquiryId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                    action:
+                      type: string
+                      const: contact
+                    outcome:
+                      type: string
+                      enum:
+                        - Reached
+                        - No answer
+                        - Callback requested
+                - type: object
+                  required:
+                    - enquiryId
+                    - version
+                    - action
+                    - practitionerId
+                    - day
+                    - time
+                  properties:
+                    enquiryId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                    action:
+                      type: string
+                      const: book
+                    practitionerId:
+                      type: string
+                    day:
+                      type: string
+                      format: date
+                    time:
+                      type: string
+                      pattern: ^(?:[01][0-9]|2[0-3]):(?:00|15|30|45)$
+                - type: object
+                  required:
+                    - enquiryId
+                    - version
+                    - action
+                    - reason
+                  properties:
+                    enquiryId:
+                      type: string
+                    version:
+                      type: string
+                      pattern: ^[0-9]+$
+                    action:
+                      type: string
+                      const: close
+                    reason:
+                      type: string
+                      enum:
+                        - Resolved without booking
+                        - Patient declined
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /marketing:
+    get:
+      operationId: getMarketingWorkspace
+      summary: Read facility conversion counts, permitted audience sizes and campaign records.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketingWorkspace"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /marketing/campaigns:
+    post:
+      operationId: draftEngagementCampaign
+      summary: Create a local simulation draft for an allowed topic and channel.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - channel
+                - template
+              properties:
+                channel:
+                  type: string
+                  enum:
+                    - Email
+                    - SMS
+                template:
+                  type: string
+                  enum:
+                    - Facility updates
+                    - Health education
+                    - Community events
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /marketing/campaigns/status:
+    patch:
+      operationId: changeEngagementCampaign
+      summary: Cancel a draft or record a local simulation with the current opt-in count.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - campaignId
+                - version
+                - action
+              properties:
+                campaignId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                action:
+                  type: string
+                  enum:
+                    - simulate
+                    - cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/contact-preferences:
+    get:
+      operationId: readContactPreferences
+      summary: Read the signed-in patient’s facility-scoped preferences.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactPreferences"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+    patch:
+      operationId: saveContactPreferences
+      summary: Change the signed-in patient’s opt-in for the selected facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - sms
+                - version
+              properties:
+                email:
+                  type: string
+                  enum:
+                    - "true"
+                    - "false"
+                sms:
+                  type: string
+                  enum:
+                    - "true"
+                    - "false"
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /platform/engagement:
+    patch:
+      operationId: setEngagementEntitlement
+      summary: Enable or disable CRM and Marketing at a facility.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - facilityId
+                - version
+                - engagement
+              properties:
+                facilityId:
+                  type: string
+                version:
+                  type: string
+                  pattern: ^[0-9]+$
+                engagement:
+                  type: string
+                  enum:
+                    - "true"
+                    - "false"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -5842,6 +6349,9 @@ components:
           type: 'boolean'
         publicQueue:
           type: boolean
+          engagement:
+            type: boolean
+            description: The facility’s CRM and Marketing entitlement. Defaults to enabled when absent.
         configurationVersion:
           type: integer
         active:
@@ -9277,6 +9787,280 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TransportUnitAvailability"
+    ContactPreferences:
+      type: object
+      required:
+        - email
+        - sms
+        - version
+      properties:
+        email:
+          type: boolean
+        sms:
+          type: boolean
+        version:
+          type: integer
+          minimum: 0
+    EnquiryContactAttempt:
+      type: object
+      required:
+        - id
+        - outcome
+        - occurredAt
+        - actor
+      properties:
+        id:
+          type: string
+        outcome:
+          type: string
+          enum:
+            - Reached
+            - No answer
+            - Callback requested
+        occurredAt:
+          type: integer
+          minimum: 0
+        actor:
+          type: string
+    EnquiryAppointment:
+      type: object
+      required:
+        - id
+        - day
+        - time
+        - status
+      properties:
+        id:
+          type: string
+        day:
+          type: string
+          format: date
+        time:
+          type: string
+          pattern: ^(?:[01][0-9]|2[0-3]):(?:00|15|30|45)$
+        status:
+          type: string
+          enum:
+            - Booked
+            - Checked in
+            - In consultation
+            - Completed
+            - Cancelled
+    CrmEnquiry:
+      type: object
+      required:
+        - id
+        - facilityId
+        - patientId
+        - source
+        - specialty
+        - version
+        - createdAt
+        - changedAt
+        - attempts
+        - patient
+        - status
+        - assignmentCurrent
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        patientId:
+          type: string
+        source:
+          type: string
+          enum:
+            - Phone
+            - Reception
+            - Referral
+        specialty:
+          type: string
+          enum:
+            - General Medicine
+            - Cardiology
+            - Orthopaedics
+            - Paediatrics
+            - Dermatology
+            - ENT
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        assignee:
+          type: string
+        followUpOn:
+          type: string
+          format: date
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnquiryContactAttempt"
+        appointmentId:
+          type: string
+        closedReason:
+          type: string
+          enum:
+            - Resolved without booking
+            - Patient declined
+        patient:
+          $ref: "#/components/schemas/DiagnosticsPatient"
+        status:
+          type: string
+          enum:
+            - New
+            - Assigned
+            - Contacted
+            - Booked
+            - Closed
+        booking:
+          $ref: "#/components/schemas/EnquiryAppointment"
+        assigneeName:
+          type: string
+        assignmentCurrent:
+          type: boolean
+    CrmWorkspace:
+      type: object
+      required:
+        - enquiries
+        - agents
+        - practitioners
+      properties:
+        enquiries:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrmEnquiry"
+        agents:
+          type: array
+          items:
+            type: object
+            required:
+              - account
+              - name
+            properties:
+              account:
+                type: string
+              name:
+                type: string
+        practitioners:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - facilityId
+              - name
+              - specialty
+            properties:
+              id:
+                type: string
+              facilityId:
+                type: string
+              name:
+                type: string
+              specialty:
+                type: string
+                enum:
+                  - General Medicine
+                  - Cardiology
+                  - Orthopaedics
+                  - Paediatrics
+                  - Dermatology
+                  - ENT
+    EngagementCampaign:
+      type: object
+      required:
+        - id
+        - facilityId
+        - channel
+        - template
+        - status
+        - version
+        - createdAt
+        - changedAt
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        channel:
+          type: string
+          enum:
+            - Email
+            - SMS
+        template:
+          type: string
+          enum:
+            - Facility updates
+            - Health education
+            - Community events
+        status:
+          type: string
+          enum:
+            - Draft
+            - Simulated
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        simulatedCount:
+          type: integer
+          minimum: 1
+    MarketingWorkspace:
+      type: object
+      required:
+        - campaigns
+        - conversions
+        - audience
+      properties:
+        campaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngagementCampaign"
+        conversions:
+          type: array
+          items:
+            type: object
+            required:
+              - source
+              - enquiries
+              - bookings
+            properties:
+              source:
+                type: string
+                enum:
+                  - Phone
+                  - Reception
+                  - Referral
+              enquiries:
+                type: integer
+                minimum: 0
+              bookings:
+                type: integer
+                minimum: 0
+        audience:
+          type: object
+          required:
+            - Email
+            - SMS
+          properties:
+            Email:
+              type: integer
+              minimum: 0
+            SMS:
+              type: integer
+              minimum: 0
   responses:
     Error401:
       description: 'Missing or expired session.'

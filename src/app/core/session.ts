@@ -5,7 +5,7 @@ import { configurationChanges } from './events';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, EMPTY, from, switchMap } from 'rxjs';
 import {
-  inpatientWorkspaces,
+  workspaceEnabled,
   navigation,
   platformResources,
   type Resource,
@@ -85,7 +85,7 @@ export class SessionStore {
       (platformResources.includes(resource)
         ? !!this.session()?.workspaces.includes(entry.workspace) && this.canPerform(resource)
         : !!this.access()?.workspaces.includes(entry.workspace)) &&
-      (!inpatientWorkspaces.has(entry.workspace) || !!this.facility()?.inpatient)
+      workspaceEnabled(this.facility(), entry.workspace)
     );
   }
 

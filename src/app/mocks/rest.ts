@@ -17,6 +17,8 @@ import { workforceData } from './workforce';
 import { biomedicalData } from './biomedical';
 import { supportData } from './support';
 import { transportData } from './transport';
+import { crmAvailability, crmData, crmPatients } from './crm';
+import { contactPreferences, marketingData } from './marketing';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -77,6 +79,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   }
   const isConfiguration = [
     'platform/entitlements',
+    'platform/engagement',
     'platform/activation',
     'platform/membership',
     'subscriptions',
@@ -104,6 +107,9 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'biomedical/maintenance/status',
     'hospital-support/tasks/status',
     'patient-transport/trips/status',
+    'crm/enquiries/status',
+    'marketing/campaigns/status',
+    'portal/contact-preferences',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -139,6 +145,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return recipientRequests(session);
     case 'portal/sharing':
       return patientSharing(scope(session, facilityRecord, 'D12'), session);
+    case 'portal/contact-preferences':
+      return contactPreferences(scope(session, facilityRecord, 'D12'), session);
     case 'clinical-governance':
       return clinicalGovernance(scope(session, facilityRecord, 'D07'), params);
     case 'quality':
@@ -463,6 +471,32 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
         'r',
         [db.admissions, db.beds, db.patients, db.transportRequests, db.transportUnits],
         () => transportData(facility),
+      );
+    }
+    case 'crm': {
+      const facility = scope(session, facilityRecord, 'D33');
+      return db.transaction(
+        'r',
+        [db.enquiries, db.memberships, db.practitioners, db.patients, db.appointments],
+        () => crmData(facility, session),
+      );
+    }
+    case 'crm/patients':
+      return crmPatients(
+        scope(session, facilityRecord, 'D33', 'crm'),
+        session,
+        params.get('q') ?? '',
+      );
+    case 'crm/availability': {
+      const facility = scope(session, facilityRecord, 'D33', 'crm');
+      return crmAvailability(facility, session, params);
+    }
+    case 'marketing': {
+      const facility = scope(session, facilityRecord, 'D34');
+      return db.transaction(
+        'r',
+        [db.campaigns, db.enquiries, db.appointments, db.patients, db.engagementPermissions],
+        () => marketingData(facility),
       );
     }
     case 'billing/inpatient':

@@ -26,4 +26,6 @@ The shift roster and maintenance work orders passed reflow checks at 390, 768, 1
 
 Hospital Support and Patient Transport passed reflow checks at 390, 768, 1024 and 1440 px. The mobile support queue and desktop transport dispatch passed the selected axe rules. Enter opens the request forms and Escape returns focus to each trigger. [Mobile hospital support](screenshots/hospital-support-390.png) · [Transport dispatch](screenshots/transport-1440.png)
 
+CRM and Marketing passed reflow checks at 390, 768, 1024 and 1440 px. The desktop enquiry list and mobile campaign register passed the selected axe rules. Enter opens the enquiry and campaign forms and Escape restores focus to each trigger. [CRM enquiries](screenshots/crm-1440.png) · [Mobile campaign register](screenshots/marketing-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

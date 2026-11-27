@@ -1,6 +1,6 @@
 import { staffRoles, type FacilityAccess } from '../domain/access';
 import type { Facility, Session } from '../domain/operations';
-import { inpatientWorkspaces, type Resource } from '../domain/workspaces';
+import { workspaceEnabled, type Resource } from '../domain/workspaces';
 import {
   accountNames,
   examplePatientId,
@@ -116,7 +116,7 @@ export function scope(
     !facility ||
     facility.active === false ||
     !access?.workspaces.includes(workspace) ||
-    (inpatientWorkspaces.has(workspace) && !facility.inpatient) ||
+    !workspaceEnabled(facility, workspace) ||
     (write && !access.writes.includes(write))
   ) {
     throw new ApiError(403, 'You do not have access to this operation at the selected facility.');

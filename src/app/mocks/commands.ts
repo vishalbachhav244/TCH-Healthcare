@@ -33,6 +33,8 @@ import { workforceCommand } from './workforce';
 import { biomedicalCommand } from './biomedical';
 import { supportCommand } from './support';
 import { transportCommand } from './transport';
+import { crmCommand } from './crm';
+import { campaignCommand, updateContactPreferences } from './marketing';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -108,6 +110,9 @@ export async function command(
       db.supportTasks,
       db.transportRequests,
       db.transportUnits,
+      db.enquiries,
+      db.campaigns,
+      db.engagementPermissions,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -580,6 +585,31 @@ export async function command(
             session,
             payload,
             path === 'patient-transport/trips',
+          );
+          break;
+        case 'crm/enquiries':
+        case 'crm/enquiries/status':
+          changed = await crmCommand(
+            scope(session, facilityRecord, 'D33', 'crm'),
+            session,
+            payload,
+            path === 'crm/enquiries',
+          );
+          break;
+        case 'marketing/campaigns':
+        case 'marketing/campaigns/status':
+          changed = await campaignCommand(
+            scope(session, facilityRecord, 'D34', 'marketing'),
+            session,
+            payload,
+            path === 'marketing/campaigns',
+          );
+          break;
+        case 'portal/contact-preferences':
+          changed = await updateContactPreferences(
+            scope(session, facilityRecord, 'D12', 'portal'),
+            session,
+            payload,
           );
           break;
         case 'alerts/acknowledge': {

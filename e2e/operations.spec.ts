@@ -25,6 +25,141 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('converts an assigned enquiry and simulates outreach with current permission', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(160_000);
+  await signIn(page, 'crm');
+  const agent = await page.context().newPage();
+  const engagement = await page.context().newPage();
+  const patient = await page.context().newPage();
+  await signIn(agent, 'crmagent');
+  await signIn(engagement, 'marketing');
+  await signIn(patient, 'patient');
+  const id = 'TC-MERIDIAN-01001';
+  const capture = page.getByRole('button', { name: 'Capture enquiry' });
+  const editor = page.getByRole('dialog', { name: 'Capture enquiry' });
+  await capture.focus();
+  await page.keyboard.press('Enter');
+  await expect(editor).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(capture).toBeFocused();
+  await capture.click();
+  await editor.getByLabel('Find registered patient').fill(id);
+  await editor.getByLabel('Patient', { exact: true }).selectOption(id);
+  await editor.getByLabel('Enquiry source').selectOption('Referral');
+  await editor.getByLabel('Specialty').selectOption('General Medicine');
+  await editor.getByRole('button', { name: 'Save enquiry' }).click();
+  const enquiry = page.getByRole('row', { name: new RegExp(id) });
+  const task = agent.getByRole('row', { name: new RegExp(id) });
+  await expect(enquiry).toContainText('New');
+  await expect(task).toHaveCount(0);
+  await expect(agent.getByRole('button', { name: 'Capture enquiry' })).toHaveCount(0);
+  await enquiry.getByRole('button', { name: 'Assign follow-up' }).click();
+  await page.getByLabel('Contact agent').selectOption('crmagent');
+  await page.getByRole('button', { name: 'Save assignment' }).click();
+  await expect(task).toContainText('Assigned');
+  async function record(outcome: string) {
+    await task.getByRole('button', { name: 'Record contact' }).click();
+    await agent.getByLabel('Contact outcome').selectOption(outcome);
+    await agent.getByRole('button', { name: 'Save contact outcome' }).click();
+  }
+  await record('No answer');
+  await expect(task).toContainText('No answer');
+  await expect(task.getByRole('button', { name: 'Book appointment' })).toHaveCount(0);
+  await record('Reached');
+  await expect(task).toContainText('Contacted');
+  await agent.reload();
+  await expect(task).toContainText('Contacted');
+  await task.getByRole('button', { name: 'Book appointment' }).click();
+  const booking = agent.getByRole('dialog', { name: 'Book appointment' });
+  await booking.getByLabel('Appointment date').fill(shiftDay(dayInIndia(), 1));
+  await booking.getByLabel('Clinician', { exact: true }).selectOption({ index: 1 });
+  const times = booking.getByLabel('Available time (IST)');
+  await expect(times.locator('option').nth(1)).toBeAttached();
+  await times.selectOption({ index: 1 });
+  await booking.getByRole('button', { name: 'Confirm booking' }).click();
+  await expect(enquiry).toContainText('Booked');
+  const referral = engagement.getByRole('row', { name: /Referral/ });
+  await expect(referral).toContainText('100%');
+  await expect(engagement.getByText(id)).toHaveCount(0);
+  await checkReflow(page);
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('crm-1440.png'), animations: 'disabled' });
+
+  const create = engagement.getByRole('button', { name: 'Create campaign' });
+  const draft = engagement.getByRole('dialog', { name: 'Create campaign' });
+  await create.focus();
+  await engagement.keyboard.press('Enter');
+  await expect(draft).toBeVisible();
+  await engagement.keyboard.press('Escape');
+  await expect(create).toBeFocused();
+  await create.click();
+  await draft.getByLabel('Template').selectOption('Health education');
+  await draft.getByLabel('Communication channel').selectOption('Email');
+  await draft.getByRole('button', { name: 'Save draft' }).click();
+  const campaign = engagement.getByRole('row', { name: /Health education/ });
+  await expect(campaign).toContainText('Awaiting opt-ins');
+
+  const preferences = patient.getByRole('button', { name: 'Contact preferences' });
+  const allow = patient.getByRole('button', { name: 'Allow Email' });
+  const revoke = patient.getByRole('button', { name: 'Turn off Email' });
+  await preferences.click();
+  await allow.click();
+  await expect(campaign).toContainText('1 opted in');
+  await campaign.getByRole('button', { name: 'Simulate campaign' }).click();
+  const simulate = engagement.getByRole('dialog', { name: 'Simulate campaign' });
+  await revoke.click();
+  await expect(allow).toBeVisible();
+  await simulate.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(simulate.getByRole('alert')).toHaveText('No patients currently allow this channel.');
+  await engagement.keyboard.press('Escape');
+  await expect(campaign).toContainText('Awaiting opt-ins');
+  await allow.click();
+  await campaign.getByRole('button', { name: 'Simulate campaign' }).click();
+  await simulate.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(campaign).toContainText('1 simulated');
+  await patient.reload();
+  await preferences.click();
+  await revoke.click();
+  await expect(allow).toBeVisible();
+  await engagement.reload();
+  await engagement.getByRole('button', { name: 'Campaigns', exact: true }).click();
+  await expect(campaign).toContainText('Simulated');
+  await expect(campaign).toContainText('1 simulated');
+  await checkReflow(engagement);
+  await engagement.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (
+      await new AxeBuilder({ page: engagement })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await engagement.screenshot({
+    path: testInfo.outputPath('marketing-390.png'),
+    animations: 'disabled',
+  });
+  const admin = await page.context().newPage();
+  await signIn(admin, 'platform');
+  await admin.getByRole('button', { name: /Meridian Healthcare Network/ }).click();
+  await admin
+    .getByRole('row', { name: /Meridian Medical Centre/ })
+    .getByRole('button', { name: 'Edit engagement' })
+    .click();
+  const entitlement = admin.getByRole('dialog', { name: 'Edit engagement entitlement' });
+  await entitlement.getByLabel('CRM and marketing').selectOption('false');
+  await entitlement.getByRole('button', { name: 'Save engagement' }).click();
+  for (const workspace of [page, agent, engagement]) {
+    await expect(workspace.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  }
+  await expect(allow).toBeVisible();
+  for (const workspace of [patient, agent, engagement, admin]) await workspace.close();
+});
+
 test('rosters staff and records attendance across reload', async ({ page }, testInfo) => {
   test.setTimeout(100_000);
   await signIn(page, 'workforce');

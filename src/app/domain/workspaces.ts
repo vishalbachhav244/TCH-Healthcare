@@ -28,6 +28,8 @@ export type Resource =
   | 'biomedical'
   | 'hospital-support'
   | 'patient-transport'
+  | 'crm'
+  | 'marketing'
   | 'laboratory'
   | 'radiology'
   | 'blood-bank'
@@ -253,8 +255,20 @@ export const workspaces: readonly Workspace[] = [
     resource: 'patient-transport',
     inpatient: true,
   },
-  { id: 'D33', title: 'Healthcare CRM & Contact Center', group: 'Engagement', icon: 'users' },
-  { id: 'D34', title: 'Marketing & Engagement', group: 'Engagement', icon: 'heart' },
+  {
+    id: 'D33',
+    title: 'Healthcare CRM & Contact Center',
+    group: 'Engagement',
+    icon: 'users',
+    resource: 'crm',
+  },
+  {
+    id: 'D34',
+    title: 'Marketing & Engagement',
+    group: 'Engagement',
+    icon: 'heart',
+    resource: 'marketing',
+  },
   { id: 'D35', title: 'Enterprise Analytics & BI', group: 'Intelligence', icon: 'chart' },
   { id: 'D36', title: 'AI & Automation Control Center', group: 'Intelligence', icon: 'settings' },
 ];
@@ -262,6 +276,15 @@ export const workspaces: readonly Workspace[] = [
 export const inpatientWorkspaces = new Set(
   workspaces.filter((workspace) => workspace.inpatient).map((workspace) => workspace.id),
 );
+
+export function workspaceEnabled(
+  facility: { inpatient: boolean; engagement?: boolean } | undefined,
+  workspace: string,
+) {
+  if (inpatientWorkspaces.has(workspace)) return !!facility?.inpatient;
+  if (workspace === 'D33' || workspace === 'D34') return facility?.engagement !== false;
+  return true;
+}
 
 export const navigation = [
   { title: 'Organizations', resource: 'platform', icon: 'building', workspace: 'D01' },
@@ -323,6 +346,8 @@ export const navigation = [
     workspace: 'D32',
   },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
+  { title: 'CRM & contact center', resource: 'crm', icon: 'users', workspace: 'D33' },
+  { title: 'Marketing & engagement', resource: 'marketing', icon: 'heart', workspace: 'D34' },
 ] as const;
 
 export const platformResources: readonly string[] = [

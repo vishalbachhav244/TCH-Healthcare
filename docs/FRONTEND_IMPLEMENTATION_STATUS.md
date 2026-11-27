@@ -1,6 +1,6 @@
 # Frontend implementation status
 
-The frontend is an independent project built from the supplied brief. 32 of 36 dashboard IDs have working routes with partial workflow coverage. The other 4 remain open. No dashboard has passed every acceptance criterion in the brief.
+The frontend is an independent project built from the supplied brief. 34 of 36 dashboard IDs have working routes with partial workflow coverage. The other 2 remain open. No dashboard has passed every acceptance criterion in the brief.
 
 The 137 canonical screen rows and 171 canonical requirement rows are referenced by count in the attachment. Their IDs and individual definitions were not supplied. The register uses local screen IDs and the brief's section numbers while they are unavailable. [Screen inventory](SCREEN_INVENTORY.md)
 
@@ -37,11 +37,13 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §9 Biomedical Engineering | D30 | TC-LOCAL-46 `/work/biomedical` | Partial | Equipment registration, maintenance start, functional check and release, and linked imaging availability | Scoped tags and work orders, explicit check confirmation, stale write rejection and live Radiology updates | Preventive service calendar, safety records and room-asset configuration |
 | §9 Hospital Support Services | D31 | TC-LOCAL-47 `/work/hospital-support` | Partial | Housekeeping queue and bed release, sterile supply and dietary requests, work history | Atomic bed release, versioned tasks, cross-facility checks and inpatient entitlement | Staff assignments, sterile supply lifecycle and patient meal planning |
 | §9 Ambulance & Patient Transport | D32 | TC-LOCAL-48 `/work/patient-transport` | Partial | Internal and ambulance trips from active admissions, dispatch, pickup and handoff | Live availability, assignment conflict, pickup change, in-transit guard and inpatient entitlement | Scheduled trips, emergency pickups, fleet configuration and destination records |
+| §§9,16.14 Healthcare CRM | D33 | TC-LOCAL-49 `/work/crm` | Partial | Registered-patient enquiries, assignment, contact history and linked appointment booking | Assigned-agent scope, shared scheduling rules, cancellation recovery and facility entitlement | Unregistered leads, inbound referrals and contact scheduling |
+| §§9,16.14 Marketing & Engagement | D34 | TC-LOCAL-50 and 51 `/work/marketing` and portal Contact preferences | Partial | Conversion by source, campaign drafts, Email and SMS permissions and local simulations | Current opt-in check, scoped aggregates, versioned updates and live revocation | Feedback, advanced segmentation, delivery scheduling and multi-touch attribution |
 
 Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBILITY_REPORT.md) for exact run evidence.
 
 ## Continuation checkpoint
 
-1. Continue M8 engagement and analytics D33–D36. Extend payments, insurance, diagnostic records and inventory beyond pharmacy.
+1. Continue M8 with Enterprise Analytics & BI and AI & Automation Control Center, D35–D36. Extend payments, insurance, diagnostic records and inventory beyond pharmacy.
 2. Extend M9 with uploaded and released documents, additional record formats, family access, public discovery and kiosk check-in. Keep real integrations outside this frontend phase.
 3. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.

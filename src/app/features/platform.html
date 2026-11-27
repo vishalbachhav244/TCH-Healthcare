@@ -101,6 +101,13 @@
                       <button
                         class="text-button"
                         type="button"
+                        (click)="open('engagement', editor, facility)"
+                      >
+                        Edit engagement
+                      </button>
+                      <button
+                        class="text-button"
+                        type="button"
                         (click)="open('activation', editor, facility)"
                       >
                         Edit status
@@ -209,6 +216,20 @@
           <p class="field-error" role="alert">{{ error() }}</p>
         }
         <button class="button primary" type="submit" [disabled]="busy()">Save entitlement</button>
+      </form>
+    }
+    @case ('engagement') {
+      <form class="dialog-body fields" (submit)="$event.preventDefault(); save(editor)">
+        <p>{{ activeFacility()?.name }}</p>
+        <label for="engagement-entitlement">CRM and marketing</label>
+        <select id="engagement-entitlement" [formControl]="engagement">
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">Save engagement</button>
       </form>
     }
     @case ('activation') {

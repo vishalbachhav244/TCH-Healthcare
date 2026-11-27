@@ -36,5 +36,8 @@
 | Biomedical engineer | Facility equipment and maintenance work orders. Return to service requires a recorded functional check. Registration limits locations according to the facility’s inpatient entitlement. |
 | Hospital support coordinator | Inpatient-enabled facilities. Sees bed labels and ward locations, starts and completes housekeeping, and manages structured sterile supply and dietary requests. |
 | Transport dispatcher | Inpatient-enabled facilities. Sees eligible admission identity and pickup location. Requests, dispatches and completes trips using units scoped to that facility. |
-| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications and bill balances. |
+| CRM coordinator | Engagement-enabled facilities. Searches registered tenant patients, creates enquiries, assigns contact work to active facility agents and views the facility worklist. Records contact and bookings for enquiries assigned to their account. |
+| Contact agent | Engagement-enabled facilities. Sees assigned enquiries, records contact and books eligible appointments for those enquiries. |
+| Engagement coordinator | Engagement-enabled facilities. Sees aggregate conversion and current channel opt-in counts. Manages local campaign drafts. |
+| Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications, bill balances and facility contact preferences. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

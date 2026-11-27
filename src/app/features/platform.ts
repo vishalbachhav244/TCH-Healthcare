@@ -14,6 +14,7 @@ const actions = {
   organizations: 'Create organization',
   facilities: 'Add facility',
   entitlements: 'Edit inpatient entitlement',
+  engagement: 'Edit engagement entitlement',
   activation: 'Edit facility status',
   membership: 'Manage staff access',
 } as const;
@@ -22,6 +23,7 @@ const eventLabels: Partial<Record<DomainEvent['type'], string>> = {
   OrganisationCreated: 'Organization created',
   FacilityCreated: 'Facility added',
   ModuleConfigurationChanged: 'Inpatient entitlement updated',
+  EngagementConfigurationChanged: 'Engagement entitlement updated',
   FacilityActivationChanged: 'Facility status updated',
   StaffAccessChanged: 'Staff access updated',
   SubscriptionReviewed: 'Subscription reviewed',
@@ -55,6 +57,7 @@ export class Platform {
     city: ['', Validators.required],
   });
   protected readonly inpatient = this.fb.control('false');
+  protected readonly engagement = this.fb.control('true');
   protected readonly facilityActive = this.fb.control('true');
   protected readonly staffRoleOptions = Object.entries(staffRoles);
   protected readonly staffForm = this.fb.group({
@@ -116,6 +119,7 @@ export class Platform {
     this.facilityForm.reset();
     this.activeFacility.set(facility);
     this.inpatient.setValue(String(!!facility?.inpatient));
+    this.engagement.setValue(String(facility?.engagement !== false));
     this.facilityActive.setValue(String(facility?.active !== false));
     this.staffForm.reset({ role: 'reception' });
     this.selectedRole.set('reception');
@@ -166,7 +170,9 @@ export class Platform {
         version: String(facility.configurationVersion),
         ...(task === 'activation'
           ? { active: this.facilityActive.value }
-          : { inpatient: this.inpatient.value }),
+          : task === 'engagement'
+            ? { engagement: this.engagement.value }
+            : { inpatient: this.inpatient.value }),
       };
     }
     this.busy.set(true);
@@ -192,7 +198,9 @@ export class Platform {
                 ? revoke
                   ? 'Staff access revoked.'
                   : 'Staff access saved.'
-                : 'Inpatient entitlement updated.',
+                : task === 'engagement'
+                  ? 'Engagement entitlement updated.'
+                  : 'Inpatient entitlement updated.',
       );
       this.reload.update((number) => number + 1);
       dialog.close();

@@ -31,6 +31,7 @@ export const configurationChanges = configurations.asObservable();
 export function notifyFacility(event: DomainEvent) {
   const configuration = [
     'ModuleConfigurationChanged',
+    'EngagementConfigurationChanged',
     'FacilityActivationChanged',
     'StaffAccessChanged',
     'FacilityCreated',

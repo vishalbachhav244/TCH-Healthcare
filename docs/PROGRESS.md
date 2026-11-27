@@ -1,5 +1,13 @@
 # Progress ledger
 
+## CRM and Marketing & Engagement, 27 November 2026
+
+- Added D33 `/work/crm` for registered-patient enquiries, agent assignment, contact history and slot-checked booking. Cancelling a linked appointment returns the enquiry to the worklist and updates conversion. [CRM workspace](../src/app/features/crm.ts) · [CRM adapter](../src/app/mocks/crm.ts)
+- Added D34 `/work/marketing` for conversion by source and local campaign simulations. Patient preferences govern current audience eligibility. Facility engagement can be withdrawn from both staff workspaces while patients keep access to their preferences. [Marketing workspace](../src/app/features/marketing.ts) · [Patient preferences](../src/app/features/contact-preferences.ts)
+- Added schema version 24 and 11 OpenAPI operations. Chromium confirmed the upgrade preserved saved support and transport operations and established the new role memberships. [Migration](../src/app/mocks/database.ts) · [OpenAPI](openapi.yaml)
+- Passed 44 domain and contract tests, 22 Chromium journeys, both builds and release verification. [Test evidence](TEST_REPORT.md) · [CRM enquiries](screenshots/crm-1440.png) · [Mobile campaign register](screenshots/marketing-390.png)
+- Coverage is 34 dashboard IDs with working routes and partial workflows. Unregistered leads, broader referral intake, feedback and campaign scheduling remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md)
+
 ## Hospital Support and Patient Transport, 27 November 2026
 
 - Added D31 `/work/hospital-support` for housekeeping and structured sterile supply and dietary requests. A vacated bed enters the work queue on transfer or discharge. Marking it ready updates the Admissions bed board. [Workspace](../src/app/features/hospital-support.ts) · [Bed adapter](../src/app/mocks/inpatient.ts)

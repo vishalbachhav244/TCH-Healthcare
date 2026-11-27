@@ -1,0 +1,265 @@
+<section class="page-intro">
+  <div>
+    <h1>Marketing &amp; Engagement</h1>
+    <p>Measure enquiry conversion and simulate outreach to opted-in patients.</p>
+  </div>
+  @if (store.writeAllowed('marketing')) {
+    <button class="button primary" type="button" (click)="open(editorDialog, { kind: 'draft' })">
+      <ng-icon name="plus" /> Create campaign
+    </button>
+  }
+</section>
+<div class="view-controls" role="group" aria-label="Engagement views">
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'conversions'"
+    (click)="view.set('conversions')"
+  >
+    Conversions
+  </button>
+  <button
+    class="button secondary"
+    type="button"
+    [attr.aria-pressed]="view() === 'campaigns'"
+    (click)="view.set('campaigns')"
+  >
+    Campaigns
+  </button>
+</div>
+@if (notice()) {
+  <p class="inline-notice success" role="status">{{ notice() }}</p>
+}
+@let state = data();
+@if (state.state === 'loading') {
+  <p class="panel state-panel" role="status">Loading engagement records…</p>
+} @else if (state.state === 'error') {
+  <div class="panel state-panel">
+    <p role="alert">{{ state.message }}</p>
+    <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">Retry</button>
+  </div>
+} @else if (view() === 'conversions') {
+  <div class="metric-grid compact">
+    <article class="panel metric">
+      <p>Total enquiries</p>
+      <strong>{{ totals().enquiries }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Linked bookings</p>
+      <strong>{{ totals().bookings }}</strong>
+    </article>
+    <article class="panel metric">
+      <p>Booking conversion</p>
+      <strong>{{
+        totals().enquiries ? (totals().bookings / totals().enquiries | percent: '1.0-1') : '—'
+      }}</strong>
+    </article>
+  </div>
+  <section class="panel table-panel" aria-labelledby="conversion-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="conversion-title">Enquiry conversion by source</h2>
+        <p>{{ store.facility()?.name }}</p>
+      </div>
+    </div>
+    @if (!totals().enquiries) {
+      <p class="state-panel">No enquiries have been recorded at this facility.</p>
+    } @else {
+      <div
+        class="table-scroll"
+        tabindex="0"
+        role="region"
+        aria-label="Enquiry conversion by source"
+      >
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Enquiry conversion by source
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Enquiries</th>
+              <th scope="col">Linked bookings</th>
+              <th scope="col">Conversion</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of state.data.conversions; track row.source) {
+              <tr>
+                <td>
+                  <strong>{{ row.source }}</strong>
+                </td>
+                <td>{{ row.enquiries }}</td>
+                <td>{{ row.bookings }}</td>
+                <td>
+                  {{ row.enquiries ? (row.bookings / row.enquiries | percent: '1.0-1') : '—' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+} @else {
+  <div class="metric-grid compact">
+    @for (channel of channels; track channel) {
+      <article class="panel metric">
+        <p>{{ channel }} opt-ins</p>
+        <strong>{{ state.data.audience[channel] }}</strong>
+      </article>
+    }
+  </div>
+  <section class="panel table-panel" aria-labelledby="campaign-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="campaign-title">Campaign register</h2>
+        <p>{{ store.facility()?.name }}</p>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <div class="select-control">
+        <label for="campaign-channel">Channel</label>
+        <select
+          #medium
+          id="campaign-channel"
+          [value]="channel()"
+          (change)="channel.set(medium.value); limit.set(12)"
+        >
+          <option value="">All channels</option>
+          @for (item of channels; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </div>
+      <div class="select-control">
+        <label for="campaign-status">Status</label>
+        <select
+          #filter
+          id="campaign-status"
+          [value]="status()"
+          (change)="status.set(filter.value); limit.set(12)"
+        >
+          <option value="">All statuses</option>
+          @for (item of statuses; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    @if (!rows().length) {
+      <p class="state-panel">No campaigns match these filters.</p>
+    } @else {
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Campaign register">
+        <table class="ward-record-list">
+          <caption class="sr-only">
+            Campaign register
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Campaign</th>
+              <th scope="col">Audience</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows().slice(0, limit()); track row.id) {
+              <tr>
+                <td>
+                  <strong>{{ row.template }}</strong
+                  ><small>{{ row.channel }}</small>
+                </td>
+                <td>
+                  @if (row.status === 'Draft') {
+                    {{ state.data.audience[row.channel] }} opted in
+                  } @else if (row.simulatedCount !== undefined) {
+                    {{ row.simulatedCount }} simulated
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  <span [class]="row.status | statusTone">{{ row.status }}</span
+                  ><small>{{ row.changedAt | date: 'd MMM, HH:mm' : '+0530' }} IST</small>
+                </td>
+                <td>
+                  @if (row.status === 'Draft' && store.writeAllowed('marketing')) {
+                    @if (state.data.audience[row.channel]) {
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="open(editorDialog, { kind: 'simulate', row })"
+                      >
+                        Simulate campaign
+                      </button>
+                    } @else {
+                      <small>Awaiting opt-ins</small>
+                    }
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="open(editorDialog, { kind: 'cancel', row })"
+                    >
+                      Cancel draft
+                    </button>
+                  } @else {
+                    <span aria-label="No action available">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (rows().length > limit()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="limit.set(limit() + 12)">
+            Show more campaigns
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+<dialog #editorDialog aria-labelledby="campaign-editor" (close)="editor.set(undefined)">
+  <div class="dialog-head">
+    <h2 id="campaign-editor">{{ labels[editor()?.kind ?? 'draft'].title }}</h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="editorDialog.close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (editor(); as edit) {
+    <form class="dialog-body fields" [formGroup]="form" (ngSubmit)="save(editorDialog)">
+      @if (edit.kind === 'draft') {
+        <label for="campaign-template">Template</label>
+        <select id="campaign-template" formControlName="template" required>
+          <option value="">Choose a template</option>
+          @for (item of templates; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+        <label for="campaign-draft-channel">Communication channel</label>
+        <select id="campaign-draft-channel" formControlName="channel" required>
+          <option value="">Choose a channel</option>
+          @for (item of channels; track item) {
+            <option>{{ item }}</option>
+          }
+        </select>
+      } @else {
+        <p>
+          <strong>{{ edit.row.template }}</strong> · {{ edit.row.channel }}
+        </p>
+        @if (edit.kind === 'simulate') {
+          <p>The local simulation counts patients who allow this channel when it runs.</p>
+        }
+      }
+      @if (error()) {
+        <p class="field-error" role="alert">{{ error() }}</p>
+      }
+      <button class="button primary" type="submit" [disabled]="busy()">
+        {{ labels[edit.kind].save }}
+      </button>
+    </form>
+  }
+</dialog>

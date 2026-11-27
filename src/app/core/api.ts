@@ -30,6 +30,19 @@ import type {
   MaintenanceReason,
 } from '../domain/biomedical';
 import type { ShiftAction, ShiftFields, StaffShift, WorkforceData } from '../domain/workforce';
+import type {
+  Campaign,
+  CampaignAction,
+  CampaignTemplate,
+  ContactPreferences,
+  CrmData,
+  EngagementChannel,
+  Enquiry,
+  EnquiryFields,
+  EnquiryPatient,
+  EnquiryUpdate,
+  MarketingData,
+} from '../domain/engagement';
 import type { SupportAction, SupportData, SupportFields, SupportTask } from '../domain/support';
 import type {
   TransportAction,
@@ -1108,6 +1121,89 @@ export class Api {
       token,
       facility,
       { tripId: trip.id, version: String(trip.version), action, ...(unitId ? { unitId } : {}) },
+      'PATCH',
+    );
+  }
+
+  crm(token: string, facility: string) {
+    return this.get('crm', token, facility).pipe(
+      map((value) => objectShape<CrmData>(value, ['enquiries', 'agents', 'practitioners'])),
+    );
+  }
+
+  crmPatients(token: string, facility: string, q: string) {
+    return this.get('crm/patients', token, facility, { q }).pipe(
+      map((value) => collection<EnquiryPatient>(value, ['id', 'name'])),
+    );
+  }
+
+  crmTimes(
+    token: string,
+    facility: string,
+    enquiryId: string,
+    practitionerId: string,
+    day: string,
+  ) {
+    return this.get('crm/availability', token, facility, { enquiryId, practitionerId, day }).pipe(
+      map((value) => {
+        if (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
+          throw new Error('Appointment times are unavailable.');
+        return value as string[];
+      }),
+    );
+  }
+
+  captureEnquiry(token: string, facility: string, fields: EnquiryFields) {
+    return this.execute('crm/enquiries', token, facility, { ...fields });
+  }
+
+  updateEnquiry(token: string, facility: string, enquiry: Enquiry, update: EnquiryUpdate) {
+    return this.execute(
+      'crm/enquiries/status',
+      token,
+      facility,
+      { enquiryId: enquiry.id, version: String(enquiry.version), ...update },
+      'PATCH',
+    );
+  }
+
+  marketing(token: string, facility: string) {
+    return this.get('marketing', token, facility).pipe(
+      map((value) => objectShape<MarketingData>(value, ['campaigns', 'conversions', 'audience'])),
+    );
+  }
+
+  draftCampaign(
+    token: string,
+    facility: string,
+    channel: EngagementChannel,
+    template: CampaignTemplate,
+  ) {
+    return this.execute('marketing/campaigns', token, facility, { channel, template });
+  }
+
+  updateCampaign(token: string, facility: string, campaign: Campaign, action: CampaignAction) {
+    return this.execute(
+      'marketing/campaigns/status',
+      token,
+      facility,
+      { campaignId: campaign.id, version: String(campaign.version), action },
+      'PATCH',
+    );
+  }
+
+  contactPreferences(token: string, facility: string) {
+    return this.get('portal/contact-preferences', token, facility).pipe(
+      map((value) => objectShape<ContactPreferences>(value, ['email', 'sms', 'version'])),
+    );
+  }
+
+  saveContactPreferences(token: string, facility: string, prefs: ContactPreferences) {
+    return this.execute(
+      'portal/contact-preferences',
+      token,
+      facility,
+      { email: String(prefs.email), sms: String(prefs.sms), version: String(prefs.version) },
       'PATCH',
     );
   }

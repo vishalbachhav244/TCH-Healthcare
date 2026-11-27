@@ -52,3 +52,6 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-46 | D30 | `/work/biomedical` | Equipment register, maintenance work orders, functional check and return to service |
 | TC-LOCAL-47 | D31 | `/work/hospital-support` | Bed preparation, structured sterile supply and dietary requests, task history |
 | TC-LOCAL-48 | D32 | `/work/patient-transport` | Admission-linked dispatch queue, compatible units, pickup, handoff and trip history |
+| TC-LOCAL-49 | D33 | `/work/crm` | Enquiry capture, assignment, contact history and appointment booking |
+| TC-LOCAL-50 | D34 | `/work/marketing` | Conversion by source and permission-based campaign simulation |
+| TC-LOCAL-51 | D12 and D34 | `/work/portal` → Contact preferences | Facility-scoped patient opt-in for Email and SMS |

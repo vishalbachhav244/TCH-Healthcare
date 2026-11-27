@@ -22,6 +22,7 @@ import type { BiomedicalData } from '../domain/biomedical';
 import type { WorkforceData } from '../domain/workforce';
 import type { SupportData } from '../domain/support';
 import type { TransportData } from '../domain/transport';
+import type { ContactPreferences, CrmData, MarketingData } from '../domain/engagement';
 import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
 import type { FinanceData } from '../domain/finance';
@@ -2977,5 +2978,165 @@ describe('hospital support and transport', () => {
     } finally {
       await db.facilities.update(facility, { inpatient: true });
     }
+  }, 90_000);
+});
+
+describe('CRM and engagement', () => {
+  const facility = 'mer-central';
+  const branch = 'mer-north';
+  const patientId = 'TC-MERIDIAN-01001';
+
+  it('converts an assigned enquiry into a scoped appointment and recalculates on cancellation', async () => {
+    const [crm, agent, marketing, reception, patient] = await Promise.all(
+      ['crm', 'crmagent', 'marketing', 'reception', 'patient'].map(login),
+    );
+    const fields = { patientId, source: 'Referral', specialty: 'General Medicine' };
+    const create = (changes = {}, actor = crm) =>
+      post('crm/enquiries', { ...fields, ...changes }, actor, facility);
+    await expect(create({}, agent)).rejects.toMatchObject({ status: 403 });
+    await expect(create({ patientId: 'TC-CITYCARE-01001' })).rejects.toMatchObject({ status: 404 });
+    await expect(get('crm/patients?q=an', agent, facility)).rejects.toMatchObject({ status: 403 });
+    expect(await get('crm/patients?q=' + patientId, crm, facility)).toMatchObject([
+      { id: patientId },
+    ]);
+    await expect(get('crm', marketing, facility)).rejects.toMatchObject({ status: 403 });
+    const results = await Promise.allSettled([create(), create()]);
+    expect(results.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const { id: enquiryId } = results.find((row) => row.status === 'fulfilled')!.value as {
+      id: string;
+    };
+    const list = async (actor = agent, at = facility) => (await get('crm', actor, at)) as CrmData;
+    const update = (
+      version: string,
+      action: string,
+      extra: Record<string, string> = {},
+      actor = agent,
+      at = facility,
+    ) => patch('crm/enquiries/status', { enquiryId, version, action, ...extra }, actor, at);
+    expect((await list()).enquiries).toEqual([]);
+    await expect(update('1', 'contact', { outcome: 'Reached' })).rejects.toMatchObject({
+      status: 404,
+    });
+    const day = shiftDay(dayInIndia(), 2);
+    await expect(
+      update('1', 'assign', { assignee: 'reception', followUpOn: day }, crm),
+    ).rejects.toMatchObject({ status: 422 });
+    await update('1', 'assign', { assignee: 'crmagent', followUpOn: day }, crm);
+    expect((await list(agent, branch)).enquiries).toEqual([]);
+    await expect(update('2', 'assign', { assignee: 'crm', followUpOn: day })).rejects.toMatchObject(
+      { status: 403 },
+    );
+    await expect(update('2', 'contact', { outcome: 'Reached' }, crm)).rejects.toMatchObject({
+      status: 403,
+    });
+    const booking = { day, time: '13:00', practitionerId: 'mer-central-DR-1' };
+    await update('2', 'contact', { outcome: 'No answer' });
+    await expect(update('3', 'book', booking)).rejects.toMatchObject({ status: 409 });
+    await update('3', 'contact', { outcome: 'Reached' });
+    await expect(update('3', 'close', { reason: 'Patient declined' })).rejects.toMatchObject({
+      status: 409,
+    });
+    const path =
+      'crm/availability?enquiryId=' +
+      enquiryId +
+      '&practitionerId=' +
+      booking.practitionerId +
+      '&day=' +
+      day;
+    await expect(get(path, agent, facility)).resolves.toContain('13:00');
+    await expect(get(path, crm, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      update('4', 'book', { ...booking, practitionerId: 'mer-central-DR-2' }),
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(update('4', 'book', booking)).resolves.toEqual({ id: enquiryId });
+    const converted = (await list()).enquiries[0];
+    expect(converted).toMatchObject({
+      status: 'Booked',
+      booking: { day, time: '13:00', status: 'Booked' },
+    });
+    expect(converted.booking).not.toHaveProperty('pass');
+    const appointmentId = converted.booking!.id;
+    expect(await db.appointments.get(appointmentId)).toMatchObject({
+      patientId,
+      facilityId: facility,
+    });
+    expect(((await get('portal', patient, facility)) as PatientPortal).appointments).toContainEqual(
+      expect.objectContaining({ appointment: expect.objectContaining({ id: appointmentId }) }),
+    );
+    const conversions = async () =>
+      ((await get('marketing', marketing, facility)) as MarketingData).conversions;
+    expect(await conversions()).toContainEqual({ source: 'Referral', enquiries: 1, bookings: 1 });
+    await patch('appointments/cancel', { appointmentId, version: '0' }, reception, facility);
+    expect((await list()).enquiries[0]).toMatchObject({
+      status: 'Contacted',
+      booking: { status: 'Cancelled' },
+    });
+    expect(await conversions()).toContainEqual({ source: 'Referral', enquiries: 1, bookings: 0 });
+    await expect(create()).rejects.toMatchObject({ status: 409 });
+    await update('5', 'close', { reason: 'Patient declined' });
+    expect((await list()).enquiries[0].status).toBe('Closed');
+  }, 90_000);
+
+  it('requires current patient opt-in and isolates campaign data and entitlement', async () => {
+    const [marketing, patient, admin, crm] = await Promise.all(
+      ['marketing', 'patient', 'platform', 'crm'].map(login),
+    );
+    const read = async (at = facility) => (await get('marketing', marketing, at)) as MarketingData;
+    const prefs = async () =>
+      (await get('portal/contact-preferences', patient, facility)) as ContactPreferences;
+    const preference = (version: string, email: string, actor = patient) =>
+      patch('portal/contact-preferences', { version, email, sms: 'false' }, actor, facility);
+    expect(await prefs()).toEqual({ email: false, sms: false, version: 0 });
+    await expect(preference('0', 'true', marketing)).rejects.toMatchObject({ status: 403 });
+    await expect(get('marketing', crm, facility)).rejects.toMatchObject({ status: 403 });
+    const { id: campaignId } = (await post(
+      'marketing/campaigns',
+      { template: 'Health education', channel: 'Email' },
+      marketing,
+      facility,
+    )) as { id: string };
+    const change = (version = '1', action = 'simulate', at = facility) =>
+      patch('marketing/campaigns/status', { campaignId, version, action }, marketing, at);
+    expect((await read()).audience).toEqual({ Email: 0, SMS: 0 });
+    await expect(change()).rejects.toMatchObject({ status: 409 });
+    await preference('0', 'true');
+    expect((await read()).audience).toEqual({ Email: 1, SMS: 0 });
+    expect((await read(branch)).audience).toEqual({ Email: 0, SMS: 0 });
+    expect(JSON.stringify(await read())).not.toContain(patientId);
+    await expect(change('1', 'simulate', branch)).rejects.toMatchObject({ status: 404 });
+    await expect(preference('0', 'false')).rejects.toMatchObject({ status: 409 });
+    await preference('1', 'false');
+    await expect(change()).rejects.toMatchObject({ status: 409 });
+    await preference('2', 'true');
+    const runs = await Promise.allSettled([change(), change()]);
+    expect(runs.map((row) => row.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const data = await read();
+    expect(data.campaigns).toContainEqual(
+      expect.objectContaining({ id: campaignId, status: 'Simulated', simulatedCount: 1 }),
+    );
+    expect((await read(branch)).campaigns).toEqual([]);
+
+    const site = (await db.facilities.get(facility))!;
+    await patch(
+      'platform/engagement',
+      { facilityId: facility, version: String(site.configurationVersion), engagement: 'false' },
+      admin,
+    );
+    try {
+      await expect(read()).rejects.toMatchObject({ status: 403 });
+      await expect(get('crm', crm, facility)).rejects.toMatchObject({ status: 403 });
+      await expect(change('2')).rejects.toMatchObject({ status: 403 });
+      await preference('3', 'false');
+      expect(await prefs()).toMatchObject({ email: false });
+    } finally {
+      const current = (await db.facilities.get(facility))!;
+      await patch(
+        'platform/engagement',
+        { facilityId: facility, version: String(current.configurationVersion), engagement: 'true' },
+        admin,
+      );
+    }
+    expect((await read()).campaigns[0].simulatedCount).toBe(1);
+    expect((await read()).audience.Email).toBe(0);
   }, 90_000);
 });

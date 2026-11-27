@@ -18,6 +18,7 @@ export interface Facility {
   city: string;
   inpatient: boolean;
   publicQueue?: boolean;
+  engagement?: boolean;
   configurationVersion?: number;
   active?: boolean;
 }
@@ -302,6 +303,12 @@ export type EventType =
   | 'SupportUpdated'
   | 'TransportRequested'
   | 'TransportUpdated'
+  | 'EnquiryCaptured'
+  | 'EnquiryUpdated'
+  | 'ContactPreferencesChanged'
+  | 'CampaignDrafted'
+  | 'CampaignUpdated'
+  | 'EngagementConfigurationChanged'
   | 'IncidentOpened'
   | 'IncidentInvestigating'
   | 'IncidentResolved'

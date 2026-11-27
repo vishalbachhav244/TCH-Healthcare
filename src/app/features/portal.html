@@ -98,6 +98,14 @@
     >
       Bills
     </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="active() === 'preferences'"
+      (click)="active.set('preferences')"
+    >
+      Contact preferences
+    </button>
   </div>
   @switch (active()) {
     @case ('visits') {
@@ -271,6 +279,9 @@
 }
 @if (active() === 'sharing') {
   <tc-patient-sharing />
+}
+@if (active() === 'preferences') {
+  <tc-contact-preferences />
 }
 <dialog #visitDialog aria-labelledby="portal-booking" (close)="booking.set(false)">
   <div class="dialog-head">
