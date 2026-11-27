@@ -38,4 +38,6 @@ Find care and the kiosk passed reflow checks at 390, 768, 1024 and 1440 px. The 
 
 Patient enrollment and the live kiosk preview passed reflow at 390, 768, 1024 and 1440 px. Both mobile views passed the selected axe rules. Enter starts the camera and moves focus to Stop camera. Stopping restores focus to Use camera, and a detected QR returns focus to the pass field. Escape closes the reception arrival dialog and restores focus to Verify arrival. [Mobile patient enrollment](screenshots/patient-registration-390.png) · [Mobile camera with simulated frame](screenshots/kiosk-camera-390.png)
 
+The recipient imaging and discharge previews passed reflow at 390, 768, 1024 and 1440 px. The desktop imaging preview and mobile discharge preview passed the selected axe rules. Enter opens patient consent review and Escape restores focus to Review request. Revocation replaces the preview content with a status message. [Shared imaging report](screenshots/shared-imaging-1440.png) · [Shared discharge summary](screenshots/shared-discharge-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

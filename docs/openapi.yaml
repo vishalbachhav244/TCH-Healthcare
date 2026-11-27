@@ -2192,9 +2192,13 @@ paths:
                   type: string
                 version: *a6
                 reportId: *a6
+                recordVersion:
+                  type: string
+                  pattern: '^[1-9][0-9]*$'
+                  description: Version selected by the patient. Required for imaging reports and discharge summaries.
                 recordKind:
                   type: string
-                  enum: [Laboratory report, Patient document]
+                  enum: [Laboratory report, Imaging report, Discharge summary, Patient document]
                   default: Laboratory report
                 hours:
                   type: string
@@ -2211,6 +2215,13 @@ paths:
                 - requestId
                 - version
                 - action
+              if:
+                required: [recordKind]
+                properties:
+                  action: { const: grant }
+                  recordKind: { enum: [Imaging report, Discharge summary] }
+              then:
+                required: [reportId, recordVersion, hours]
       parameters:
         - $ref: '#/components/parameters/Facility'
       responses:
@@ -2361,6 +2372,8 @@ paths:
                   report:
                     oneOf:
                       - $ref: '#/components/schemas/SharedReport'
+                      - $ref: '#/components/schemas/SharedImagingReport'
+                      - $ref: '#/components/schemas/SharedDischargeSummary'
                       - $ref: '#/components/schemas/SharedPatientDocument'
                 required:
                   - id
@@ -8245,8 +8258,7 @@ components:
         version: *a7
         expiresAt: *a7
         recordKind:
-          type: string
-          enum: [Patient document]
+          $ref: '#/components/schemas/ExchangeRecordKind'
       required:
         - id
         - source
@@ -8263,8 +8275,7 @@ components:
         source: *a6
         reportId: *a6
         recordKind:
-          type: string
-          enum: [Patient document]
+          $ref: '#/components/schemas/ExchangeRecordKind'
         connector:
           $ref: '#/components/schemas/ExchangeConnectorSummary'
         purpose:
@@ -8301,6 +8312,9 @@ components:
         - decision
         - createdAt
         - version
+    ExchangeRecordKind:
+      type: string
+      enum: [Laboratory report, Imaging report, Discharge summary, Patient document]
     PatientSharing:
       type: object
       properties:
@@ -8323,24 +8337,48 @@ components:
             properties:
               id: &a6
                 type: string
+              version: { type: integer, minimum: 1 }
               test: *a6
               accession: *a6
               publishedAt:
                 type: integer
             required:
               - id
+              - version
               - test
+              - accession
               - publishedAt
         documents:
           type: array
           items:
             $ref: '#/components/schemas/DocumentConsentOption'
+        imagingReports:
+          type: array
+          items:
+            type: object
+            required: [id, version, study, publishedAt]
+            properties:
+              id: { type: string }
+              version: { type: integer, minimum: 1 }
+              study: { '$ref': '#/components/schemas/ImagingStudy' }
+              publishedAt: { type: integer }
+        dischargeSummaries:
+          type: array
+          items:
+            type: object
+            required: [admissionId, version, releasedAt]
+            properties:
+              admissionId: { type: string }
+              version: { type: integer, minimum: 1 }
+              releasedAt: { type: integer }
       required:
         - connectors
         - requests
         - audit
         - reports
         - documents
+        - imagingReports
+        - dischargeSummaries
     MatchingCode:
       type: object
       properties:
@@ -8371,6 +8409,30 @@ components:
         - source
         - publishedAt
         - expiresAt
+    SharedImagingReport:
+      type: object
+      required: [kind, study, note, reviewer, source, publishedAt, expiresAt]
+      properties:
+        kind: { const: Imaging report }
+        study: { '$ref': '#/components/schemas/ImagingStudy' }
+        note: { '$ref': '#/components/schemas/ImagingNote' }
+        reviewer: { type: string }
+        source: { type: string }
+        publishedAt: { type: integer }
+        expiresAt: { type: integer }
+    SharedDischargeSummary:
+      allOf:
+        - { '$ref': '#/components/schemas/DischargeFields' }
+        - type: object
+          required: [kind, source, admittedAt, releasedAt, signedAt, signedBy, expiresAt]
+          properties:
+            kind: { const: Discharge summary }
+            source: { type: string }
+            admittedAt: { type: integer }
+            releasedAt: { type: integer }
+            signedAt: { type: integer }
+            signedBy: { type: string }
+            expiresAt: { type: integer }
     GovernanceReport:
       type: object
       properties:
@@ -9320,9 +9382,10 @@ components:
       allOf:
         - { '$ref': '#/components/schemas/DischargeFields' }
         - type: object
-          required: [admissionId, patientId, patientName, facilityName, ward, bed, admittedAt, releasedAt, signedAt, signedBy]
+          required: [admissionId, version, patientId, patientName, facilityName, ward, bed, admittedAt, releasedAt, signedAt, signedBy]
           properties:
             admissionId: { type: string }
+            version: { type: integer, minimum: 1 }
             patientId: { type: string }
             patientName: { type: string }
             facilityName: { type: string }
@@ -9440,6 +9503,7 @@ components:
       type: object
       required:
         - id
+        - version
         - study
         - note
         - publishedAt
@@ -9447,6 +9511,7 @@ components:
       properties:
         id:
           type: string
+        version: { type: integer, minimum: 1 }
         study:
           $ref: "#/components/schemas/ImagingStudy"
         note:
@@ -11267,12 +11332,14 @@ components:
       type: object
       required:
         - id
+        - version
         - title
         - format
         - origin
       properties:
         id:
           type: string
+        version: { type: integer, minimum: 1 }
         title:
           type: string
         format:

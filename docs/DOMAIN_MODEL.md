@@ -52,4 +52,6 @@ Facilities carry independent directory, kiosk and public queue display settings.
 
 A `PatientInvitation` belongs to one tenant and facility. Its claim creates a synthetic patient and a `PatientEnrollmentAccount` with that patient, tenant and facility. The enrollment account stores a salted password verifier. [Registration contracts](../src/app/domain/registration.ts)
 
+A `RecordReference` can identify a published imaging order or a released discharge plan by its source ID and version. Imaging publication depends on its patient encounter. A discharge release depends on the signed plan and the matching discharged admission. Recipient previews contain structured fields and source provenance. [Exchange contracts](../src/app/domain/interoperability.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

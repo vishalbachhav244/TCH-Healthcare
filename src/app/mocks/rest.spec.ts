@@ -22,7 +22,7 @@ import type {
   PatientDocuments,
 } from '../domain/patient-documents';
 import { documentFixtures } from './document-fixtures';
-import type { DischargeDocument, InpatientBillingDetail } from '../domain/discharge';
+import type { DischargeDocument, DischargePlan, InpatientBillingDetail } from '../domain/discharge';
 import type { GovernanceData, QualityView } from '../domain/governance';
 import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../domain/ward-care';
 import type { ImagingOrder, ImagingRow } from '../domain/radiology';
@@ -2075,6 +2075,220 @@ describe('consent and interoperability', () => {
     const rows = (await get('record-requests', recipient)) as RequestSummary[];
     expect(rows.find((row) => row.id === record.id)?.status).toBe('Expired');
     expect(await db.exchangeAudit.where('requestId').equals(record.id).count()).toBe(2);
+  });
+
+  it('shares only the selected published imaging version and audits a changed source', async () => {
+    const [patient, recipient, other] = await Promise.all(
+      ['patient', 'partnercare', 'partnerlab'].map(login),
+    );
+    const patientId = patient.patientId!;
+    const encounter = await db.encounters
+      .filter((row) => row.facilityId === facility && row.patientId === patientId)
+      .first();
+    const order: ImagingOrder = {
+      id: 'exchange-imaging-source',
+      facilityId: facility,
+      patientId,
+      encounterId: encounter!.id,
+      study: 'Chest radiograph',
+      status: 'Report ready',
+      version: 4,
+      orderedAt: Date.now(),
+      changedAt: Date.now(),
+      note: 'Image series documented',
+      reviewer: 'radiologist',
+    };
+    const foreign = {
+      ...order,
+      id: 'exchange-imaging-other-patient',
+      patientId: 'TC-MERIDIAN-01002',
+      status: 'Published' as const,
+      publishedAt: Date.now(),
+    };
+    await db.imagingOrders.bulkAdd([order, foreign]);
+    try {
+      const { id: requestId } = await request(recipient, (await issue(patient)).code);
+      const feed = () => get('portal/sharing', patient, facility) as Promise<PatientSharing>;
+      const grant = (source = order.id, recordVersion?: string) =>
+        patch(
+          'portal/sharing',
+          {
+            requestId,
+            version: '1',
+            action: 'grant',
+            hours: '24',
+            reportId: source,
+            recordKind: 'Imaging report',
+            ...(recordVersion ? { recordVersion } : {}),
+          },
+          patient,
+          facility,
+        );
+      expect((await feed()).imagingReports.map((row) => row.id)).not.toContain(order.id);
+      await expect(grant(order.id, '4')).rejects.toMatchObject({ status: 422 });
+      await db.imagingOrders.update(order.id, {
+        status: 'Published',
+        version: 5,
+        publishedAt: Date.now(),
+      });
+      expect((await feed()).imagingReports).toContainEqual(
+        expect.objectContaining({ id: order.id, version: 5 }),
+      );
+      await expect(grant(foreign.id, '4')).rejects.toMatchObject({ status: 422 });
+      await expect(grant()).rejects.toMatchObject({ status: 422 });
+      await expect(grant(order.id, '4')).rejects.toMatchObject({ status: 409 });
+      await grant(order.id, '5');
+      expect((await db.consentGrants.get(requestId))?.record).toEqual({
+        kind: 'Imaging report',
+        id: order.id,
+        version: 5,
+      });
+      await expect(access(other, requestId)).rejects.toMatchObject({ status: 404 });
+      const { report } = await access(recipient, requestId);
+      expect(report).toMatchObject({
+        kind: 'Imaging report',
+        study: order.study,
+        note: order.note,
+        reviewer: 'Dr. Tara Iyer',
+        source: 'Meridian Medical Centre',
+      });
+      expect(Object.keys(report).sort()).toEqual([
+        'expiresAt',
+        'kind',
+        'note',
+        'publishedAt',
+        'reviewer',
+        'source',
+        'study',
+      ]);
+      await db.imagingOrders.update(order.id, { version: 6 });
+      await expect(access(recipient, requestId)).rejects.toMatchObject({
+        status: 403,
+        message: expect.stringContaining('Source mismatch'),
+      });
+      expect(await get('record-requests', recipient)).toContainEqual(
+        expect.objectContaining({
+          id: requestId,
+          recordKind: 'Imaging report',
+          status: 'Unavailable',
+        }),
+      );
+      expect(await db.exchangeAudit.where('requestId').equals(requestId).toArray()).toContainEqual(
+        expect.objectContaining({ outcome: 'Source mismatch' }),
+      );
+    } finally {
+      await db.imagingOrders.bulkDelete([order.id, foreign.id]);
+    }
+  });
+
+  it('shares a signed discharge summary after discharge and rejects broken admission provenance', async () => {
+    const [patient, recipient] = await Promise.all(['patient', 'partnercare'].map(login));
+    const admittedAt = Date.now() - 86_400_000;
+    const releasedAt = Date.now();
+    const admissionId = 'exchange-discharge-source';
+    const plan: DischargePlan = {
+      admissionId,
+      facilityId: facility,
+      patientId: patient.patientId!,
+      version: 2,
+      updatedAt: releasedAt - 2_000,
+      updatedBy: 'wardphysician',
+      signedAt: releasedAt - 1_000,
+      signedBy: 'wardphysician',
+      course: 'Ward care reviewed',
+      destination: 'Home',
+      followUp: 'Arrange outpatient review',
+    };
+    await db.admissions.add({
+      id: admissionId,
+      facilityId: facility,
+      patientId: plan.patientId,
+      admittedAt,
+      requestedAt: admittedAt,
+      bedId: 'contract-bed',
+      status: 'Admitted',
+      version: 1,
+    });
+    await db.dischargePlans.add(plan);
+    try {
+      const { id: requestId } = await request(recipient, (await issue(patient)).code);
+      const feed = () => get('portal/sharing', patient, facility) as Promise<PatientSharing>;
+      const grant = (recordVersion: string) =>
+        patch(
+          'portal/sharing',
+          {
+            requestId,
+            version: '1',
+            action: 'grant',
+            recordVersion,
+            recordKind: 'Discharge summary',
+            reportId: admissionId,
+            hours: '168',
+          },
+          patient,
+          facility,
+        );
+      expect((await feed()).dischargeSummaries.map((row) => row.admissionId)).not.toContain(
+        admissionId,
+      );
+      await expect(grant('2')).rejects.toMatchObject({ status: 422 });
+      await db.dischargePlans.update(admissionId, {
+        version: 3,
+        release: {
+          admittedAt,
+          releasedAt,
+          patientName: 'Ananya Sharma',
+          facilityName: 'Meridian Medical Centre',
+          bed: 'Private bed label',
+          ward: 'Private ward label',
+        },
+      });
+      await expect(grant('3')).rejects.toMatchObject({ status: 422 });
+      await db.admissions.update(admissionId, {
+        status: 'Discharged',
+        dischargedAt: releasedAt,
+        version: 2,
+      });
+      expect((await feed()).dischargeSummaries).toContainEqual({
+        admissionId,
+        version: 3,
+        releasedAt,
+      });
+      await expect(grant('2')).rejects.toMatchObject({ status: 409 });
+      await grant('3');
+      expect((await db.consentGrants.get(requestId))?.record).toEqual({
+        kind: 'Discharge summary',
+        id: admissionId,
+        version: 3,
+      });
+      const { report } = await access(recipient, requestId);
+      expect(report).toMatchObject({
+        kind: 'Discharge summary',
+        admittedAt,
+        releasedAt,
+        signedBy: 'Dr. Mira Desai',
+        course: plan.course,
+        destination: plan.destination,
+        followUp: plan.followUp,
+      });
+      for (const field of ['patientId', 'patientName', 'admissionId', 'ward', 'bed'])
+        expect(report).not.toHaveProperty(field);
+      await db.admissions.update(admissionId, { dischargedAt: releasedAt + 1 });
+      await expect(access(recipient, requestId)).rejects.toMatchObject({
+        status: 403,
+        message: expect.stringContaining('Source mismatch'),
+      });
+      expect(await get('record-requests', recipient)).toContainEqual(
+        expect.objectContaining({
+          id: requestId,
+          recordKind: 'Discharge summary',
+          status: 'Unavailable',
+        }),
+      );
+    } finally {
+      await db.dischargePlans.delete(admissionId);
+      await db.admissions.delete(admissionId);
+    }
   });
 });
 

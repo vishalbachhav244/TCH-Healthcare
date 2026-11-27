@@ -1,6 +1,7 @@
 import {
   connectorStandards,
   consentHours,
+  exchangeRecordKinds,
   requestPurposes,
   type AuditSummary,
   type ConsentGrant,
@@ -16,10 +17,13 @@ import {
   type SharedRecord,
 } from '../domain/interoperability';
 import type { DomainEvent, Facility, Session } from '../domain/operations';
+import type { LabOrder } from '../domain/diagnostics';
 import { ApiError, patientSubject, requireSession, scope } from './access';
 import { integrationAccount, recordRecipients } from './accounts';
 import { db } from './database';
 import { describeDocument, documentDetail, findAvailableDocument } from './patient-documents';
+import { findReleasedImaging, releasedImaging } from './radiology';
+import { findReleasedDischarge, patientDischargeSummaries } from './discharge';
 
 function requireIntegration(session: Session) {
   if (session.account !== integrationAccount)
@@ -70,8 +74,13 @@ async function summarize(
   includeSelection = false,
 ): Promise<RequestSummary> {
   let status = requestStatus(request, connector, facility, grant, now);
-  if (status === 'Granted' && grant?.record.kind === 'Patient document') {
-    const record = await findAvailableDocument(facility, request.patientId, grant.record.id);
+  if (status === 'Granted' && grant) {
+    const record = await releasedSource(
+      facility,
+      request.patientId,
+      grant.record.kind,
+      grant.record.id,
+    );
     if (!record || record.version !== grant.record.version) status = 'Unavailable';
   }
   return {
@@ -83,7 +92,7 @@ async function summarize(
     createdAt: request.createdAt,
     version: request.version,
     expiresAt: grant?.expiresAt,
-    ...(grant?.record.kind === 'Patient document' ? { recordKind: grant.record.kind } : {}),
+    ...(grant ? { recordKind: grant.record.kind } : {}),
     ...(includeSelection ? { reportId: grant?.record.id, decision: request.status } : {}),
   };
 }
@@ -142,29 +151,36 @@ export async function patientSharing(
   const patientId = patientSubject(session);
   if ((await db.patients.get(patientId))?.tenantId !== facility.tenantId)
     throw new ApiError(404, 'Patient profile unavailable.');
-  const [connectors, requests, reports, documentRows] = await Promise.all([
-    db.connectors.where('facilityId').equals(facility.id).toArray(),
-    db.recordRequests
-      .where('patientId')
-      .equals(patientId)
-      .filter((row) => row.facilityId === facility.id)
-      .toArray(),
-    db.labOrders
-      .where('patientId')
-      .equals(patientId)
-      .filter(
-        (row) =>
-          row.facilityId === facility.id &&
-          row.status === 'Published' &&
-          !!row.accession &&
-          !!row.authorisedBy,
-      )
-      .toArray(),
-    db.patientDocuments
-      .where('[facilityId+patientId]')
-      .equals([facility.id, patientId])
-      .filter((row) => row.status === 'Available')
-      .toArray(),
+  const [connectors, requests, reports, documentRows, imagingReports, summaries] =
+    await Promise.all([
+      db.connectors.where('facilityId').equals(facility.id).toArray(),
+      db.recordRequests
+        .where('patientId')
+        .equals(patientId)
+        .filter((row) => row.facilityId === facility.id)
+        .toArray(),
+      db.labOrders
+        .where('patientId')
+        .equals(patientId)
+        .filter(
+          (row) =>
+            row.facilityId === facility.id &&
+            row.status === 'Published' &&
+            !!row.accession &&
+            !!row.authorisedBy,
+        )
+        .toArray(),
+      db.patientDocuments
+        .where('[facilityId+patientId]')
+        .equals([facility.id, patientId])
+        .filter((row) => row.status === 'Available')
+        .toArray(),
+      releasedImaging(facility, patientId),
+      patientDischargeSummaries(facility, patientId),
+    ]);
+  const [labReleases, documents] = await Promise.all([
+    Promise.all(reports.map((report) => labProvenance(facility, patientId, report))),
+    Promise.all(documentRows.map(({ id }) => findAvailableDocument(facility, patientId, id))),
   ]);
   const grants = await grantsByRequest(requests);
   const now = Date.now();
@@ -186,20 +202,34 @@ export async function patientSharing(
       [facility],
       requests.map((request) => request.id),
     ),
-    reports: reports
-      .sort((a, b) => b.changedAt - a.changedAt)
-      .map(({ id, test, accession, changedAt }) => ({
+    reports: labReleases
+      .filter((release) => release !== undefined)
+      .sort((a, b) => b.report.changedAt - a.report.changedAt)
+      .map(({ report: { id, version, test, changedAt }, accession }) => ({
         id,
+        version,
         test,
         accession,
         publishedAt: changedAt,
       })),
-    documents: documentRows
+    documents: documents
+      .filter((row) => row !== undefined)
       .sort((a, b) => b.addedAt - a.addedAt)
       .map((row) => {
-        const { id, title, format, origin } = describeDocument(row);
-        return { id, title, format, origin };
+        const { id, version, title, format, origin } = describeDocument(row);
+        return { id, version, title, format, origin };
       }),
+    imagingReports: imagingReports.map(({ id, version, study, publishedAt }) => ({
+      id,
+      version,
+      study,
+      publishedAt,
+    })),
+    dischargeSummaries: summaries.map(({ admissionId, version, releasedAt }) => ({
+      admissionId,
+      version,
+      releasedAt,
+    })),
   };
 }
 
@@ -388,21 +418,86 @@ async function requestRecord(session: Session, input: Record<string, unknown>, n
   return emit(session, 'RecordRequested', facility.id, id, now);
 }
 
-async function provenance(request: RecordRequest, facility: Facility, reportId: string) {
-  const report = await db.labOrders.get(reportId);
+async function labProvenance(facility: Facility, patientId: string, report: LabOrder | undefined) {
   if (
     report?.status !== 'Published' ||
     !report.finding ||
     !report.accession ||
     !report.authorisedBy ||
     report.facilityId !== facility.id ||
-    report.patientId !== request.patientId
+    report.patientId !== patientId
   )
     return undefined;
   const encounter = await db.encounters.get(report.encounterId);
-  if (encounter?.facilityId !== facility.id || encounter.patientId !== request.patientId)
-    return undefined;
+  if (encounter?.facilityId !== facility.id || encounter.patientId !== patientId) return undefined;
   return { report, finding: report.finding, accession: report.accession };
+}
+
+type SharedPreview<T = SharedRecord> = T extends SharedRecord ? Omit<T, 'expiresAt'> : never;
+
+async function releasedSource(
+  facility: Facility,
+  patientId: string,
+  kind: RecordReference['kind'],
+  id: string,
+): Promise<{ version: number; preview: SharedPreview } | undefined> {
+  if ((await db.patients.get(patientId))?.tenantId !== facility.tenantId) return undefined;
+  const source = facility.name;
+  switch (kind) {
+    case 'Laboratory report': {
+      const release = await labProvenance(facility, patientId, await db.labOrders.get(id));
+      if (!release) return undefined;
+      const { report, finding, accession } = release;
+      return {
+        version: report.version,
+        preview: { test: report.test, finding, accession, source, publishedAt: report.changedAt },
+      };
+    }
+    case 'Imaging report': {
+      const release = await findReleasedImaging(facility, patientId, id);
+      if (!release) return undefined;
+      const { version, study, note, publishedAt, reviewer } = release;
+      return { version, preview: { kind, study, note, publishedAt, reviewer, source } };
+    }
+    case 'Discharge summary': {
+      const release = await findReleasedDischarge(facility, patientId, id);
+      if (!release) return undefined;
+      const {
+        version,
+        facilityName,
+        admittedAt,
+        releasedAt,
+        signedAt,
+        signedBy,
+        destination,
+        course,
+        followUp,
+      } = release;
+      return {
+        version,
+        preview: {
+          kind,
+          source: facilityName,
+          admittedAt,
+          releasedAt,
+          signedAt,
+          signedBy,
+          destination,
+          course,
+          followUp,
+        },
+      };
+    }
+    case 'Patient document': {
+      const release = await findAvailableDocument(facility, patientId, id);
+      if (!release) return undefined;
+      const { title, format, origin, body, addedAt } = documentDetail(release, facility);
+      return {
+        version: release.version,
+        preview: { kind, title, format, origin, body, addedAt, source },
+      };
+    }
+  }
 }
 
 async function decide(
@@ -421,25 +516,28 @@ async function decide(
     const connector = await db.connectors.get(request.connectorId);
     if (connector?.status !== 'Enabled' || connector.facilityId !== facility.id)
       throw new ApiError(409, 'This connector is unavailable.');
-    const kind = input['recordKind'] ?? 'Laboratory report';
+    const kind = exchangeRecordKinds.find(
+      (option) => option === (input['recordKind'] ?? 'Laboratory report'),
+    );
     const duration = consentHours.find((value) => String(value) === input['hours']);
-    let record: RecordReference | undefined;
-    if (kind === 'Laboratory report') {
-      const source = await provenance(request, facility, key(input['reportId']));
-      if (source) record = { kind, id: source.report.id, version: source.report.version };
-    } else if (kind === 'Patient document') {
-      const document = await findAvailableDocument(
-        facility,
-        request.patientId,
-        key(input['reportId']),
-      );
-      if (document) record = { kind, id: document.id, version: document.version };
-    }
-    if (!record || !duration)
+    const id = key(input['reportId']);
+    const source = kind && (await releasedSource(facility, request.patientId, kind, id));
+    if (!kind || !source || !duration)
       throw new ApiError(422, 'Choose an available record and a consent duration.');
+    const selectedVersion = input['recordVersion'];
+    if (
+      (kind === 'Imaging report' || kind === 'Discharge summary') &&
+      selectedVersion === undefined
+    )
+      throw new ApiError(422, 'Select the current released record version.');
+    if (selectedVersion !== undefined && selectedVersion !== String(source.version))
+      throw new ApiError(
+        409,
+        'The selected record changed. Select it again before granting access.',
+      );
     await db.consentGrants.add({
       requestId: request.id,
-      record,
+      record: { kind, id, version: source.version },
       expiresAt: now + duration * 3_600_000,
       revoked: false,
     });
@@ -476,34 +574,16 @@ async function retrieve(session: Session, input: Record<string, unknown>, now: n
   else if (grant.expiresAt <= now) outcome = 'Expired';
   else if (!facility || facility.active === false || connector.status !== 'Enabled')
     outcome = 'Connector unavailable';
-  else if (grant.record.kind === 'Patient document') {
-    const document = await findAvailableDocument(facility, request.patientId, grant.record.id);
-    if (document && document.version === grant.record.version) {
-      const { title, format, origin, body, source, addedAt } = documentDetail(document, facility);
+  else {
+    const source = await releasedSource(
+      facility,
+      request.patientId,
+      grant.record.kind,
+      grant.record.id,
+    );
+    if (source && source.version === grant.record.version) {
       outcome = 'Released';
-      report = {
-        kind: 'Patient document',
-        title,
-        format,
-        origin,
-        body,
-        source,
-        addedAt,
-        expiresAt: grant.expiresAt,
-      };
-    } else outcome = 'Source mismatch';
-  } else {
-    const source = await provenance(request, facility, grant.record.id);
-    if (source && source.report.version === grant.record.version) {
-      outcome = 'Released';
-      report = {
-        test: source.report.test,
-        finding: source.finding,
-        accession: source.accession,
-        source: facility.name,
-        publishedAt: source.report.changedAt,
-        expiresAt: grant.expiresAt,
-      };
+      report = { ...source.preview, expiresAt: grant.expiresAt };
     } else outcome = 'Source mismatch';
   }
   await db.exchangeAudit.add({
@@ -542,6 +622,9 @@ export async function exchangeCommand(
       db.labOrders,
       db.encounters,
       db.patientDocuments,
+      db.imagingOrders,
+      db.dischargePlans,
+      db.admissions,
       db.patients,
       db.events,
     ],

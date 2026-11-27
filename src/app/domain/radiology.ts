@@ -53,6 +53,7 @@ export interface ImagingRow {
 
 export interface ReleasedImagingReport {
   id: string;
+  version: number;
   study: ImagingStudy;
   note: ImagingNote;
   publishedAt: number;

@@ -43,6 +43,9 @@ export function notifyFacility(event: DomainEvent) {
     'ConsentChanged',
     'RecordAccessed',
     'PatientDocumentWithdrawn',
+    'LabResultPublished',
+    'ImagingReportPublished',
+    'PatientDischarged',
     'FacilityActivationChanged',
   ].includes(event.type);
   channel?.postMessage({ facilityId: event.facilityId, configuration, exchange });

@@ -2,6 +2,7 @@ import {
   dayInIndia,
   shiftDay,
   type DomainEvent,
+  type Encounter,
   type Facility,
   type Session,
 } from '../domain/operations';
@@ -87,20 +88,37 @@ export async function releasedImaging(
     .toArray();
   const encounters = await db.encounters.bulkGet(orders.map((row) => row.encounterId));
   return orders
-    .flatMap((row, i) => {
-      const encounter = encounters[i];
-      const { id, study, note, publishedAt, reviewer } = row;
-      if (
-        encounter?.facilityId !== facility.id ||
-        encounter.patientId !== patientId ||
-        !note ||
-        publishedAt === undefined ||
-        !reviewer
-      )
-        return [];
-      return [{ id, study, note, publishedAt, reviewer: accountNames[reviewer] }];
-    })
+    .map((row, i) => imagingRelease(row, encounters[i], facility, patientId))
+    .filter((row) => row !== undefined)
     .sort((a, b) => b.publishedAt - a.publishedAt);
+}
+
+function imagingRelease(
+  order: ImagingOrder,
+  encounter: Encounter | undefined,
+  facility: Facility,
+  patientId: string,
+): ReleasedImagingReport | undefined {
+  const { id, version, study, note, publishedAt, reviewer } = order;
+  if (
+    order.status !== 'Published' ||
+    order.facilityId !== facility.id ||
+    order.patientId !== patientId ||
+    encounter?.facilityId !== facility.id ||
+    encounter.patientId !== patientId ||
+    !note ||
+    publishedAt === undefined ||
+    !reviewer ||
+    !Object.hasOwn(accountNames, reviewer)
+  )
+    return undefined;
+  return { id, version, study, note, publishedAt, reviewer: accountNames[reviewer] };
+}
+
+export async function findReleasedImaging(facility: Facility, patientId: string, id: string) {
+  const order = await db.imagingOrders.get(id);
+  if (order?.facilityId !== facility.id || order.patientId !== patientId) return undefined;
+  return imagingRelease(order, await db.encounters.get(order.encounterId), facility, patientId);
 }
 
 export async function requestImaging(

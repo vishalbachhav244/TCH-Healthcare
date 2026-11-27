@@ -8,7 +8,7 @@
 | Customer success | Reviews subscriptions and changes compatible plans. |
 | Platform operations | Tracks incidents and views activity metadata and counts. |
 | Integration administrator | Manages connector configuration and masked audit metadata. Cannot open report content or impersonate recipients. |
-| Record recipient | Can redeem its own matching codes and view the exact laboratory report or document version covered by current consent to its connector. |
+| Record recipient | Can redeem its own matching codes and preview the exact laboratory report, imaging report, discharge summary or patient document version covered by current consent to its connector. |
 | Network executive | Compares active, assigned facilities within the selected tenant and drills into their overviews. |
 | Medical director | Reviews eligible published reports at assigned facilities and sees linked case status. |
 | Quality coordinator | Creates and claims quality cases within assigned facilities. Resolution requires ownership. Clinical referrals expose a process description and status. |

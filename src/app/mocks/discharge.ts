@@ -130,6 +130,7 @@ function releasedDocument(
     !plan.release ||
     plan.signedAt === undefined ||
     !plan.signedBy ||
+    !Object.hasOwn(accountNames, plan.signedBy) ||
     admission?.id !== plan.admissionId ||
     admission.facilityId !== facility.id ||
     admission.patientId !== plan.patientId ||
@@ -139,6 +140,7 @@ function releasedDocument(
     return undefined;
   return {
     admissionId: plan.admissionId,
+    version: plan.version,
     patientId: plan.patientId,
     ...plan.release,
     signedAt: plan.signedAt,
@@ -158,6 +160,18 @@ export async function admissionDischargeDocument(facility: Facility, admissionId
   if (!document)
     throw new ApiError(404, 'No released discharge summary was found for this admission.');
   return document;
+}
+
+export async function findReleasedDischarge(
+  facility: Facility,
+  patientId: string,
+  admissionId: string,
+) {
+  const [plan, admission] = await Promise.all([
+    db.dischargePlans.get(admissionId),
+    db.admissions.get(admissionId),
+  ]);
+  return plan?.patientId === patientId ? releasedDocument(plan, admission, facility) : undefined;
 }
 
 export async function patientDischargeSummaries(facility: Facility, patientId: string) {

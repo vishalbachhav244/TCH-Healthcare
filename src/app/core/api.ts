@@ -120,6 +120,8 @@ import type {
   RequestSummary,
   SharedReport,
   SharedDocument,
+  SharedDischargeSummary,
+  SharedImagingReport,
   RecordReference,
 } from '../domain/interoperability';
 import type { Disposition, GovernanceData, QualityCase, QualityView } from '../domain/governance';
@@ -1626,6 +1628,8 @@ export class Api {
           'audit',
           'reports',
           'documents',
+          'imagingReports',
+          'dischargeSummaries',
         ]),
       ),
     );
@@ -1636,7 +1640,12 @@ export class Api {
     facility: string,
     request: Pick<RequestSummary, 'id' | 'version'>,
     action: ConsentAction,
-    grant?: { reportId: string; hours: string; recordKind?: RecordReference['kind'] },
+    grant?: {
+      reportId: string;
+      hours: string;
+      recordKind: RecordReference['kind'];
+      recordVersion: string;
+    },
   ) {
     return this.execute(
       'portal/sharing',
@@ -1673,22 +1682,43 @@ export class Api {
       ['id', 'report'],
     );
     const report = response.report;
-    if (
-      typeof report === 'object' &&
-      report &&
-      'kind' in report &&
-      report.kind === 'Patient document'
-    ) {
-      return objectShape<SharedDocument>(report, [
-        'kind',
-        'title',
-        'format',
-        'origin',
-        'body',
-        'source',
-        'addedAt',
-        'expiresAt',
-      ]);
+    if (report && typeof report === 'object' && 'kind' in report) {
+      switch (report.kind) {
+        case 'Patient document':
+          return objectShape<SharedDocument>(report, [
+            'kind',
+            'title',
+            'format',
+            'origin',
+            'body',
+            'source',
+            'addedAt',
+            'expiresAt',
+          ]);
+        case 'Imaging report':
+          return objectShape<SharedImagingReport>(report, [
+            'kind',
+            'study',
+            'note',
+            'reviewer',
+            'publishedAt',
+            'source',
+            'expiresAt',
+          ]);
+        case 'Discharge summary':
+          return objectShape<SharedDischargeSummary>(report, [
+            'kind',
+            'source',
+            'admittedAt',
+            'releasedAt',
+            'signedAt',
+            'signedBy',
+            'destination',
+            'course',
+            'followUp',
+            'expiresAt',
+          ]);
+      }
     }
     return objectShape<SharedReport>(report, [
       'test',

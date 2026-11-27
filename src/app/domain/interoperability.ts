@@ -1,9 +1,17 @@
 import type { LabFinding, LabTest } from './diagnostics';
 import type { DocumentFormat, DocumentSummary } from './patient-documents';
+import type { DischargeDocument, DischargeFields } from './discharge';
+import type { ReleasedImagingReport } from './radiology';
 
 export const connectorStandards = ['HL7 FHIR', 'Document exchange'] as const;
 export const requestPurposes = ['Continuation of care', 'Specialist review'] as const;
 export const consentHours = [24, 168] as const;
+export const exchangeRecordKinds = [
+  'Laboratory report',
+  'Imaging report',
+  'Discharge summary',
+  'Patient document',
+] as const;
 export type ConsentAction = 'grant' | 'decline' | 'revoke';
 export type ConnectorAction = 'validate' | 'enable' | 'pause';
 export type RequestStatus = 'Pending' | 'Granted' | 'Declined' | 'Revoked';
@@ -47,7 +55,7 @@ export interface RecordRequest {
 }
 
 export interface RecordReference {
-  kind: 'Laboratory report' | 'Patient document';
+  kind: (typeof exchangeRecordKinds)[number];
   id: string;
   version: number;
 }
@@ -89,6 +97,7 @@ export interface RequestSummary {
 }
 
 export interface SharedReport {
+  kind?: 'Laboratory report';
   test: LabTest;
   finding: LabFinding;
   accession: string;
@@ -108,7 +117,30 @@ export interface SharedDocument {
   expiresAt: number;
 }
 
-export type SharedRecord = SharedReport | SharedDocument;
+export interface SharedImagingReport extends Pick<
+  ReleasedImagingReport,
+  'study' | 'note' | 'publishedAt' | 'reviewer'
+> {
+  kind: 'Imaging report';
+  source: string;
+  expiresAt: number;
+}
+
+export interface SharedDischargeSummary extends DischargeFields {
+  kind: 'Discharge summary';
+  source: string;
+  admittedAt: number;
+  releasedAt: number;
+  signedAt: number;
+  signedBy: string;
+  expiresAt: number;
+}
+
+export type SharedRecord =
+  | SharedReport
+  | SharedDocument
+  | SharedImagingReport
+  | SharedDischargeSummary;
 
 export interface AuditSummary {
   id: string;
@@ -129,6 +161,8 @@ export interface PatientSharing {
   connectors: ConnectorSummary[];
   requests: RequestSummary[];
   audit: AuditSummary[];
-  reports: { id: string; test: LabTest; accession?: string; publishedAt: number }[];
-  documents: Pick<DocumentSummary, 'id' | 'title' | 'format' | 'origin'>[];
+  reports: { id: string; version: number; test: LabTest; accession: string; publishedAt: number }[];
+  documents: Pick<DocumentSummary, 'id' | 'version' | 'title' | 'format' | 'origin'>[];
+  imagingReports: Pick<ReleasedImagingReport, 'id' | 'version' | 'study' | 'publishedAt'>[];
+  dischargeSummaries: Pick<DischargeDocument, 'admissionId' | 'version' | 'releasedAt'>[];
 }

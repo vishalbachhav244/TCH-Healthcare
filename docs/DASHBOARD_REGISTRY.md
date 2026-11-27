@@ -7,7 +7,7 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D01 | SaaS Super Admin | `/work/platform` | Partial | Department setup, account creation, and additional entitlement policies |
 | D02 | Customer Success & Subscriptions | `/work/subscriptions` | Partial | Renewals, plan authoring and billing integration |
 | D03 | Platform Operations | `/work/platform-operations` | Partial | Service health probes, alert ownership, escalation and audit exports |
-| D04 | Interoperability & Integration | `/work/integrations`, `/work/record-requests` | Partial | Endpoint validation, real transport adapters and sharing of additional records such as imaging and discharge summaries |
+| D04 | Interoperability & Integration | `/work/integrations`, `/work/record-requests` | Partial | Endpoint validation, production transport adapters and external record import |
 | D05 | Healthcare Network Executive | `/work/network` | Partial | Trend comparisons, longer reporting periods and network exports |
 | D06 | Hospital Executive | `/work/overview` | Partial | Staff capacity, approvals and deeper analytics |
 | D07 | Medical Director | `/work/clinical-governance` | Partial | Peer review, additional clinical indicators and approvals |

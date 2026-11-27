@@ -9,7 +9,7 @@ The 137 canonical screen rows and 171 canonical requirement rows are referenced 
 | §§10,16.11 Platform onboarding | D01 | TC-LOCAL-13 `/work/platform` | Partial | Provisioning, facility activation, named memberships, inpatient entitlements and public access controls | Cross-tab authorization and stale-write checks | Staff account creation, department setup and more entitlements |
 | §§8,10 Account subscriptions | D02 | TC-LOCAL-14 `/work/subscriptions` | Partial | Review dates and compatible versioned plan changes | Review and downgrade policy checked | Renewals, plan authoring and billing integration |
 | §8 Platform operations | D03 | TC-LOCAL-15 `/work/platform-operations` | Partial | Incident open, investigate and resolve and activity metadata | Persisted incident lifecycle and conflict checks | Health probes, alert ownership and escalation |
-| §§8,16.4,16.12 Interoperability | D04 | TC-LOCAL-18–19 `/work/integrations`, `/work/record-requests` | Partial | Connector lifecycle, one-time matching, lab report and document preview, and access audit | Recipient scope, exact versions, expiry, provenance, pause, revocation and source withdrawal | Actual transport, endpoint verification, imaging and discharge exchange |
+| §§8,16.4,16.12 Interoperability | D04 | TC-LOCAL-18–19 `/work/integrations`, `/work/record-requests` | Partial | Connector lifecycle, one-time matching, consent for laboratory reports, imaging reports, discharge summaries and patient documents, and redacted access audit | Recipient scope, exact versions, expiry, provenance, pause, revocation and source withdrawal | Transport, endpoint verification, import and raw imaging exchange |
 | §§8–9 Network leadership | D05 | TC-LOCAL-16 `/work/network` | Partial | Tenant and facility scoped metrics and drill-down | Branch scope and navigation checked | Trend comparisons, longer reporting periods and exports |
 | §§18–19 Authentication and scopes | Shared | TC-LOCAL-01–02 `/sign-in`, `/denied` | Partial | Session create, restore and end, allowed facility list | Route and API denial, expiry tests | Password reset, account settings, OIDC boundary |
 | §§9,15 Executive overview | D06 | TC-LOCAL-03 `/work/overview` | Partial | Overview and alert acknowledgement | Filters, export and refresh tested. Automated desktop/mobile a11y. | Additional dated metrics, approvals, staffing and analytics |
@@ -46,6 +46,6 @@ Refer to the [test report](TEST_REPORT.md) and [accessibility report](ACCESSIBIL
 
 ## Continuation checkpoint
 
-1. Continue M9 with additional released record formats, expanded invitation management and additional family relationship types.
+1. Continue M9 with expanded invitation management, additional family relationship types and other released record formats.
 2. Expand the partial workflows in the dashboard registry, including payments, insurance, diagnostic records and inventory beyond pharmacy.
 3. Complete the canonical inventory reconciliation after the missing catalogues are provided. Continue with cross-browser, assistive-technology and per-workflow acceptance before enabling any release integration. The default build remains inactive.

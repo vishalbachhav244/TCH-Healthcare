@@ -49,6 +49,7 @@ export type DischargePlanView = DischargeFields & {
 export type DischargeDocument = DischargeFields &
   DischargeRelease & {
     admissionId: string;
+    version: number;
     patientId: string;
     signedAt: number;
     signedBy: string;

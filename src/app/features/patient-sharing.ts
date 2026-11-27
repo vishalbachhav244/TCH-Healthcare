@@ -1,5 +1,6 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, formatDate } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   FormControl,
   NonNullableFormBuilder,
@@ -10,7 +11,23 @@ import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
-import type { ConsentAction, RecordReference, RequestSummary } from '../domain/interoperability';
+import {
+  exchangeRecordKinds,
+  type ConsentAction,
+  type RecordReference,
+  type RequestSummary,
+} from '../domain/interoperability';
+
+const recordLabels: Record<RecordReference['kind'], string> = {
+  'Laboratory report': 'Report',
+  'Imaging report': 'Imaging report',
+  'Discharge summary': 'Discharge summary',
+  'Patient document': 'Document',
+};
+
+function releaseDate(time: number) {
+  return formatDate(time, 'd MMM y, HH:mm', 'en', '+0530') + ' IST';
+}
 
 @Component({
   selector: 'tc-patient-sharing',
@@ -25,6 +42,8 @@ export class PatientSharing {
   protected readonly notice = signal('');
   protected readonly error = signal('');
   protected readonly busy = signal(false);
+  protected readonly recordKinds = exchangeRecordKinds;
+  protected readonly labels = recordLabels;
   protected readonly connector = new FormControl('', {
     nonNullable: true,
     validators: [Validators.required],
@@ -37,7 +56,7 @@ export class PatientSharing {
     recordKind: new FormControl<RecordReference['kind']>('Laboratory report', {
       nonNullable: true,
     }),
-    reportId: ['', Validators.required],
+    recordSelection: ['', Validators.required],
     hours: ['24', Validators.required],
   });
   private readonly scope = computed(() => ({
@@ -48,6 +67,40 @@ export class PatientSharing {
   protected readonly response = facilityQuery(this.scope, ({ token, facility }) =>
     this.api.patientSharing(token, facility),
   );
+  protected readonly recordKind = toSignal(this.grant.controls.recordKind.valueChanges, {
+    initialValue: this.grant.controls.recordKind.value,
+  });
+  protected readonly choices = computed(() => {
+    const response = this.response();
+    if (response.state !== 'ready') return [];
+    const data = response.data;
+    switch (this.recordKind()) {
+      case 'Laboratory report':
+        return data.reports.map(({ id, version, test, accession }) => ({
+          id,
+          version,
+          label: test + ' · ' + accession,
+        }));
+      case 'Imaging report':
+        return data.imagingReports.map(({ id, version, study, publishedAt }) => ({
+          id,
+          version,
+          label: study + ' · ' + releaseDate(publishedAt),
+        }));
+      case 'Discharge summary':
+        return data.dischargeSummaries.map(({ admissionId, version, releasedAt }) => ({
+          id: admissionId,
+          version,
+          label: 'Discharge summary · ' + releaseDate(releasedAt),
+        }));
+      case 'Patient document':
+        return data.documents.map(({ id, version, title, format }) => ({
+          id,
+          version,
+          label: title + ' · ' + format,
+        }));
+    }
+  });
 
   protected async issue() {
     if (this.busy() || this.connector.invalid) return;
@@ -91,23 +144,21 @@ export class PatientSharing {
     this.notice.set('');
     this.error.set('');
     try {
+      const { recordSelection, hours, recordKind } = this.grant.getRawValue();
+      const [reportId, recordVersion] = recordSelection.split('|');
       await this.api.decideReportConsent(
         token,
         facility,
         target.request,
         target.action,
-        target.action === 'grant' ? this.grant.getRawValue() : undefined,
+        target.action === 'grant' ? { reportId, recordVersion, hours, recordKind } : undefined,
       );
       this.notice.set(
         target.action === 'grant'
-          ? this.grant.controls.recordKind.value === 'Patient document'
-            ? 'Document access granted.'
-            : 'Report access granted.'
+          ? recordLabels[recordKind] + ' access granted.'
           : target.action === 'decline'
             ? 'Request declined.'
-            : target.request.recordKind === 'Patient document'
-              ? 'Document access revoked.'
-              : 'Report access revoked.',
+            : recordLabels[target.request.recordKind ?? 'Laboratory report'] + ' access revoked.',
       );
       dialog.close();
     } catch (error) {

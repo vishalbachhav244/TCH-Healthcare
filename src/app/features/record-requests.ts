@@ -15,10 +15,17 @@ import { SessionStore } from '../core/session';
 import {
   requestPurposes,
   type RecordRequest,
+  type RecordReference,
   type RequestSummary,
   type SharedRecord,
-  type SharedDocument,
 } from '../domain/interoperability';
+
+const sharedLabels: Record<RecordReference['kind'], string> = {
+  'Laboratory report': 'report',
+  'Imaging report': 'imaging report',
+  'Discharge summary': 'discharge summary',
+  'Patient document': 'document',
+};
 
 @Component({
   imports: [DatePipe, NgIcon, ReactiveFormsModule],
@@ -36,7 +43,8 @@ export class RecordRequests {
   protected readonly viewed = signal<{ requestId: string; report: SharedRecord } | undefined>(
     undefined,
   );
-  protected readonly documentPreview = signal(false);
+  protected readonly previewKind = signal<RecordReference['kind']>('Laboratory report');
+  protected readonly sharedLabels = sharedLabels;
   private readonly forms = inject(NonNullableFormBuilder);
   protected readonly form = this.forms.group({
     code: ['', Validators.required],
@@ -107,7 +115,7 @@ export class RecordRequests {
     this.viewed.set(undefined);
     try {
       const report = await this.api.sharedReport(this.scope().token, request.id);
-      this.documentPreview.set(this.isDocument(report));
+      this.previewKind.set(report.kind ?? 'Laboratory report');
       this.viewed.set({ requestId: request.id, report });
       dialog.showModal();
     } catch (error) {
@@ -115,9 +123,5 @@ export class RecordRequests {
     } finally {
       this.busy.set(false);
     }
-  }
-
-  protected isDocument(record: SharedRecord): record is SharedDocument {
-    return 'kind' in record;
   }
 }

@@ -26,6 +26,43 @@ async function checkReflow(page: Page) {
   }
 }
 
+async function shareClinicalRelease(
+  patient: Page,
+  kind: 'Imaging report' | 'Discharge summary',
+  option: RegExp,
+) {
+  await patient.getByRole('button', { name: 'Record sharing' }).click();
+  await patient.getByLabel('Recipient', { exact: true }).selectOption('mer-referral-records');
+  await patient.getByRole('button', { name: 'Generate matching code' }).click();
+  const code = await patient.getByTestId('issued-matching-code').innerText();
+  const recipient = await patient.context().newPage();
+  await signIn(recipient, 'partnercare');
+  await recipient.getByRole('button', { name: 'Request record', exact: true }).click();
+  const request = recipient.getByRole('dialog', { name: 'Request record' });
+  await request.getByLabel('Patient-issued matching code').fill(code);
+  await request.getByRole('button', { name: 'Send request' }).click();
+  const view = recipient.getByRole('button', { name: 'View shared ' + kind.toLowerCase() });
+  await expect(view).toHaveCount(0);
+  const review = patient.getByRole('button', { name: 'Review request' });
+  await review.focus();
+  await patient.keyboard.press('Enter');
+  const consent = patient.getByRole('dialog', { name: 'Review record request' });
+  await expect(consent.getByRole('button', { name: 'Close' })).toBeFocused();
+  await patient.keyboard.press('Escape');
+  await expect(review).toBeFocused();
+  await review.click();
+  await consent.getByLabel('Record type').selectOption(kind);
+  const records = consent.getByLabel(kind + ' to share');
+  const label = await records.locator('option').filter({ hasText: option }).innerText();
+  await records.selectOption({ label });
+  await consent.getByRole('button', { name: 'Grant ' + kind.toLowerCase() + ' access' }).click();
+  await expect(patient.getByText(kind + ' access granted.')).toBeVisible();
+  await view.click();
+  const preview = recipient.getByRole('dialog', { name: 'Shared ' + kind.toLowerCase() });
+  await expect(preview).toBeVisible();
+  return { recipient, preview };
+}
+
 type CameraProbe = {
   mode: 'denied' | 'preview' | 'pass';
   requests: MediaStreamConstraints[];
@@ -1212,6 +1249,34 @@ test('schedules imaging and releases the reviewed report to the patient', async 
     path: testInfo.outputPath('imaging-report-390.png'),
     animations: 'disabled',
   });
+  await report.getByRole('button', { name: 'Close' }).click();
+  const { recipient, preview } = await shareClinicalRelease(
+    patient,
+    'Imaging report',
+    /^Chest radiograph/,
+  );
+  await expect(preview).toContainText('Image series documented');
+  await expect(preview).toContainText('Dr. Tara Iyer');
+  await expect(preview).not.toContainText(patientId);
+  await checkReflow(recipient);
+  expect(
+    (
+      await new AxeBuilder({ page: recipient })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await recipient.screenshot({
+    path: testInfo.outputPath('shared-imaging-1440.png'),
+    animations: 'disabled',
+  });
+  await patient.getByRole('button', { name: 'Revoke access' }).click();
+  await patient.getByRole('button', { name: 'Confirm revocation' }).click();
+  await expect(preview).toContainText(
+    'This imaging report is no longer available to this recipient.',
+  );
+  await expect(preview).not.toContainText('Image series documented');
+  await recipient.close();
   await patient.goto('/work/radiology');
   await expect(patient.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   for (const tab of [patient, clinician, technician, reviewer, engineer]) await tab.close();
@@ -1713,6 +1778,36 @@ test('hands an admitted patient from ward care through discharge and inpatient b
   await expect(patient.getByRole('article').filter({ hasText: 'Inpatient stay' })).toContainText(
     'Paid',
   );
+  const { recipient, preview } = await shareClinicalRelease(
+    patient,
+    'Discharge summary',
+    /^Discharge summary ·/,
+  );
+  await expect(preview).toContainText('Arrange outpatient review');
+  await expect(preview).toContainText('Signed by');
+  await expect(preview).not.toContainText(patientId);
+  await expect(preview).not.toContainText('Ananya Sharma');
+  await expect(preview).not.toContainText('Critical care');
+  await checkReflow(recipient);
+  await recipient.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (
+      await new AxeBuilder({ page: recipient })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await recipient.screenshot({
+    path: testInfo.outputPath('shared-discharge-390.png'),
+    animations: 'disabled',
+  });
+  await patient.getByRole('button', { name: 'Revoke access' }).click();
+  await patient.getByRole('button', { name: 'Confirm revocation' }).click();
+  await expect(preview).toContainText(
+    'This discharge summary is no longer available to this recipient.',
+  );
+  await expect(preview).not.toContainText('Arrange outpatient review');
+  await recipient.close();
   await patient.close();
   await cashier.close();
   await page.goto('/work/inpatient-physician');

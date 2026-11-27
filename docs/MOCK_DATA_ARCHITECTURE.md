@@ -31,3 +31,5 @@ Schema version 27 adds family relationships and family appointment passes. The p
 Schema version 28 adds directory and kiosk flags to existing facility records. The directory initially lists Meridian Medical Centre, Meridian North Hospital and Sunrise Clinic. The kiosk starts enabled at Meridian Medical Centre. The migration checks the expected facility and tenant and preserves activation, configuration versions and all booking records. Newly provisioned facilities begin with public access disabled.
 
 Schema version 29 adds invitation and enrollment account stores. Fresh workspaces receive the sample invitations. Upgrades add invitations only where the expected facility and tenant exist. The sample patient indexes sit outside the staff registration range. The local adapter derives a salted PBKDF2 verifier and stores it with the account. Video frames stay in memory and are released when scanning ends.
+
+Imaging and discharge exchange reuse the versioned consent store and the source records already in the evaluation database. Existing laboratory and patient document grants keep their stored references. The new previews require no database migration.

@@ -78,11 +78,7 @@
                       [disabled]="busy()"
                       (click)="view(row, preview)"
                     >
-                      {{
-                        row.recordKind === 'Patient document'
-                          ? 'View shared document'
-                          : 'View shared report'
-                      }}
+                      {{ 'View shared ' + sharedLabels[row.recordKind ?? 'Laboratory report'] }}
                     </button>
                   } @else {
                     <span>—</span>
@@ -130,45 +126,90 @@
 </dialog>
 <dialog #preview aria-labelledby="shared-report-title" (close)="viewed.set(undefined)">
   <div class="dialog-head">
-    <h2 id="shared-report-title">{{ documentPreview() ? 'Shared document' : 'Shared report' }}</h2>
+    <h2 id="shared-report-title">Shared {{ sharedLabels[previewKind()] }}</h2>
     <button type="button" class="icon-button" aria-label="Close" (click)="preview.close()">
       <ng-icon name="close" />
     </button>
   </div>
   <div class="dialog-body fields">
     @if (viewed()?.report; as report) {
-      @if (isDocument(report)) {
-        <h3>{{ report.title }}</h3>
-        @for (line of report.body; track $index) {
-          <p>{{ line }}</p>
+      @switch (report.kind) {
+        @case ('Patient document') {
+          <h3>{{ report.title }}</h3>
+          @for (line of report.body; track $index) {
+            <p>{{ line }}</p>
+          }
+          <p>
+            <strong>Provenance</strong><br />{{ report.origin }} · {{ report.format }} ·
+            {{ report.addedAt | date: 'd MMM y' : '+0530' }}
+          </p>
+          <p><strong>Source facility</strong><br />{{ report.source }}</p>
         }
-        <p>
-          <strong>Provenance</strong><br />{{ report.origin }} · {{ report.format }} ·
-          {{ report.addedAt | date: 'd MMM y' : '+0530' }}
-        </p>
-        <p><strong>Source facility</strong><br />{{ report.source }}</p>
-      } @else {
-        <h3>{{ report.test }}</h3>
-        <p>{{ report.finding }}</p>
-        <p><strong>Source facility</strong><br />{{ report.source }}</p>
-        <p><strong>Accession</strong><br />{{ report.accession }}</p>
-        <p>
-          <strong>Published</strong><br />{{
-            report.publishedAt | date: 'd MMM y, HH:mm' : '+0530'
-          }}
-          IST
-        </p>
+        @case ('Imaging report') {
+          <h3>{{ report.study }}</h3>
+          <p>{{ report.note }}</p>
+          <p><strong>Source facility</strong><br />{{ report.source }}</p>
+          <p><strong>Reviewed by</strong><br />{{ report.reviewer }}</p>
+          <p>
+            <strong>Published</strong><br />{{
+              report.publishedAt | date: 'd MMM y, HH:mm' : '+0530'
+            }}
+            IST
+          </p>
+        }
+        @case ('Discharge summary') {
+          <dl class="document-facts">
+            <div>
+              <dt>Source facility</dt>
+              <dd>{{ report.source }}</dd>
+            </div>
+            <div>
+              <dt>Admitted</dt>
+              <dd>{{ report.admittedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST</dd>
+            </div>
+            <div>
+              <dt>Discharged</dt>
+              <dd>{{ report.releasedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST</dd>
+            </div>
+            <div>
+              <dt>Course of care</dt>
+              <dd>{{ report.course }}</dd>
+            </div>
+            <div>
+              <dt>Destination</dt>
+              <dd>{{ report.destination }}</dd>
+            </div>
+            <div>
+              <dt>Follow-up</dt>
+              <dd>{{ report.followUp }}</dd>
+            </div>
+            <div>
+              <dt>Signed by</dt>
+              <dd>
+                {{ report.signedBy }} · {{ report.signedAt | date: 'd MMM y, HH:mm' : '+0530' }} IST
+              </dd>
+            </div>
+          </dl>
+        }
+        @default {
+          <h3>{{ report.test }}</h3>
+          <p>{{ report.finding }}</p>
+          <p><strong>Source facility</strong><br />{{ report.source }}</p>
+          <p><strong>Accession</strong><br />{{ report.accession }}</p>
+          <p>
+            <strong>Published</strong><br />{{
+              report.publishedAt | date: 'd MMM y, HH:mm' : '+0530'
+            }}
+            IST
+          </p>
+        }
       }
       <p class="subtle">
         Consent expires {{ report.expiresAt | date: 'd MMM y, HH:mm' : '+0530' }} IST.
       </p>
     } @else {
       <p role="status">
-        {{
-          documentPreview()
-            ? 'This document is no longer available to this recipient.'
-            : 'This report is no longer available to this recipient.'
-        }}
+        This {{ sharedLabels[previewKind()] }} is no longer available to this recipient.
       </p>
     }
   </div>

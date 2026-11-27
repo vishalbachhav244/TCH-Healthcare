@@ -7,18 +7,21 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test -- --testTimeout 45000` | All 54 contract and domain tests passed across 3 files while the browser suite was running. |
-| `npm run e2e -- --fully-parallel --workers=2` | All 30 Chromium journeys passed, including invitation enrollment, booking handoff, camera permission denial, QR detection and camera release. |
+| `npm test -- --testTimeout 45000` | All 56 contract and domain tests passed across 3 files. |
+| `npm run e2e -- --fully-parallel --workers=2` | All 30 Chromium journeys passed, including imaging publication, discharge release, consent, recipient previews and live revocation for both formats. |
 | `npm run build` | Passed. Initial assets approximately 385 kB raw and 99 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 388 kB raw and 100 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 389 kB raw and 100 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks evaluation routes and excludes local credentials, sample invitations and persistence. The evaluation build rejects non-loopback access, including enrollment, the directory and the kiosk. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
 | Browser-local migration | Verified 28 to 29 in Chromium. The upgrade restored an existing session and patient pass, preserved the facility configuration version and issued an invitation only for a matching tenant and facility. A separate patient profile enrolled successfully. |
+| Persisted consent compatibility | Opened a saved laboratory grant and a saved patient document grant from a version 29 Chromium database. Its schema version stayed at 29. |
 | Sample PDF | Poppler `pdfinfo` parsed one US Letter page from the generated PDF 1.4 sample. |
 | OpenAPI | 190 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
+
+- Publish an imaging report and release a signed discharge summary through their existing clinical workflows. Grant each exact version to a matched recipient, verify the shared content and revoke access with each preview open. Verify both previews clear without a reload.
 
 - Select a visit at Sunrise Clinic and open enrollment with the facility prefilled. Reject a password mismatch and a facility mismatch. Claim an invitation, return to the selected time and book. Reload the appointment, deny the staff route, reject a repeated invitation and sign in with the new account.
 - Deny camera permission and verify the manual field remains available. Use a simulated live video feed to scan an appointment pass and verify the camera releases on cancel, detection and reception dialog close. Confirm the kiosk check-in and verify focus restoration.
@@ -99,3 +102,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Find care](screenshots/find-care-1440.png) · [Mobile kiosk receipt](screenshots/kiosk-token-390.png)
 
 [Mobile patient enrollment](screenshots/patient-registration-390.png) · [Mobile camera with simulated frame](screenshots/kiosk-camera-390.png)
+
+[Shared imaging report](screenshots/shared-imaging-1440.png) · [Shared discharge summary](screenshots/shared-discharge-390.png)

@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Imaging and discharge record exchange, 27 November 2026
+
+- Added published imaging reports and released discharge summaries to the patient consent picker. New approvals carry the selected source version. The exchange rejects drafts, stale versions and mismatched patient, facility or clinical relationships. [Patient consent](../src/app/features/patient-sharing.ts) · [Exchange adapter](../src/app/mocks/interoperability.ts)
+- Added recipient previews with source and release details. Shared discharge summaries present the course, destination and follow-up without patient identity or bed details. Revocation clears both preview types in an open recipient tab. [Recipient workspace](../src/app/features/record-requests.html)
+- Opened saved laboratory and document grants from a version 29 database in Chromium. Imaging and discharge reuse the existing grant store and require no database migration. [OpenAPI](openapi.yaml) · [Test evidence](TEST_REPORT.md)
+- Passed 56 contract and domain tests, 30 Chromium journeys, keyboard and responsive checks, both builds and release verification. [Test report](TEST_REPORT.md) · [Accessibility report](ACCESSIBILITY_REPORT.md)
+- Raw imaging exchange and external record import remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Shared imaging report](screenshots/shared-imaging-1440.png) · [Shared discharge summary](screenshots/shared-discharge-390.png)
+
 ## Patient enrollment and live QR scanning, 27 November 2026
 
 - Added invitation-based patient enrollment. The adapter validates facility and tenant, creates a separate synthetic patient and credential, claims the invitation and starts a patient session in one transaction. Registration resumes a selected booking when its facility matches the invitation. [Registration screen](../src/app/features/patient-registration.ts) · [Registration adapter](../src/app/mocks/registration.ts)

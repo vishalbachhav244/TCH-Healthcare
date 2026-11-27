@@ -58,6 +58,9 @@
         <div>
           <strong>{{ item.connector.recipient }}</strong>
           <p>{{ item.purpose }} · {{ item.createdAt | date: 'd MMM' : '+0530' }}</p>
+          @if (item.recordKind) {
+            <p>{{ item.recordKind }}</p>
+          }
           @if (item.expiresAt) {
             <p>Consent expires {{ item.expiresAt | date: 'd MMM, HH:mm' : '+0530' }} IST</p>
           }
@@ -122,9 +125,9 @@
           ? 'Review record request'
           : selected()?.action === 'decline'
             ? 'Decline record request'
-            : selected()?.request?.recordKind === 'Patient document'
-              ? 'Revoke document access'
-              : 'Revoke report access'
+            : 'Revoke ' +
+              labels[selected()?.request?.recordKind ?? 'Laboratory report'].toLowerCase() +
+              ' access'
       }}
     </h2>
     <button type="button" class="icon-button" aria-label="Close" (click)="editor.close()">
@@ -141,31 +144,21 @@
         <select
           id="approved-record-kind"
           formControlName="recordKind"
-          (change)="grant.controls.reportId.reset()"
+          (change)="grant.controls.recordSelection.reset()"
         >
-          <option>Laboratory report</option>
-          <option>Patient document</option>
+          @for (kind of recordKinds; track kind) {
+            <option [value]="kind">{{ kind }}</option>
+          }
         </select>
-        @if (grant.controls.recordKind.value === 'Patient document') {
-          <label for="approved-document">Document to share</label>
-          <select id="approved-document" formControlName="reportId" required>
-            <option value="">Choose an available document</option>
-            @if (state.state === 'ready') {
-              @for (document of state.data.documents; track document.id) {
-                <option [value]="document.id">{{ document.title }} · {{ document.format }}</option>
-              }
-            }
-          </select>
-        } @else {
-          <label for="approved-report">Report to share</label>
-          <select id="approved-report" formControlName="reportId" required>
-            <option value="">Choose a released report</option>
-            @if (state.state === 'ready') {
-              @for (report of state.data.reports; track report.id) {
-                <option [value]="report.id">{{ report.test }} · {{ report.accession }}</option>
-              }
-            }
-          </select>
+        <label for="approved-record">{{ labels[recordKind()] }} to share</label>
+        <select id="approved-record" formControlName="recordSelection" required>
+          <option value="">Choose an available record</option>
+          @for (record of choices(); track record.id) {
+            <option [value]="record.id + '|' + record.version">{{ record.label }}</option>
+          }
+        </select>
+        @if (state.state === 'ready' && !choices().length) {
+          <p class="subtle" role="status">There are no available records of this type.</p>
         }
         <label for="consent-duration">Consent duration</label
         ><select id="consent-duration" formControlName="hours">
@@ -188,9 +181,7 @@
       >
         {{
           target.action === 'grant'
-            ? grant.controls.recordKind.value === 'Patient document'
-              ? 'Grant document access'
-              : 'Grant report access'
+            ? 'Grant ' + labels[recordKind()].toLowerCase() + ' access'
             : target.action === 'decline'
               ? 'Confirm decline'
               : 'Confirm revocation'
