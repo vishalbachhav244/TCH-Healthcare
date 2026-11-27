@@ -185,6 +185,7 @@ test('registers an invited patient and resumes the selected appointment at their
   await guest.getByRole('button', { name: 'Create account' }).click();
   await expect(guest.getByRole('alert')).toContainText('This invitation has already been used.');
   await guest.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(guest.getByRole('heading', { name: 'Welcome to TrueCare' })).toBeVisible();
   await guest.getByLabel('Account ID').fill(account);
   await guest.getByLabel('Password', { exact: true }).fill(password);
   await guest.getByRole('button', { name: 'Sign in', exact: true }).click();

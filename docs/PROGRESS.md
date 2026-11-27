@@ -5,6 +5,9 @@
 - Preserved the existing commit history at [TCH-Healthcare on GitHub](https://github.com/vishalbachhav244/TCH-Healthcare). Added a separate Angular build for the public synthetic demo and kept the local evaluation and inactive release configurations. [Build configuration](../angular.json) · [Deployment guide](DEPLOYMENT_GUIDE.md)
 - The hosted build reuses the evaluation interceptor and only activates at its assigned HTTPS origin. Its sign-in displays synthetic sample credentials. [Hosted evaluation](../src/app/core/evaluation.hosted.ts) · [Sign-in](../src/app/features/sign-in.html)
 - Release verification checks the inactive bundle, loopback and hosted origin restrictions, rejected credentials, patient sign-in, reload and restricted workspace access. [Verification script](../scripts/verify-release.mjs)
+- Cloudflare Pages built `main` from GitHub using Node 24.22.3. Verified the public sign-in, patient session after reload, restricted administrator route and direct links to Find care and the kiosk. Lint, formatting, 56 unit and contract tests, all three builds and release verification passed. [Live demo](https://tch-healthcare-demo.pages.dev) · [Sign-in screenshot](screenshots/cloudflare-demo-sign-in.jpg)
+- Three Playwright journeys passed against Cloudflare, covering invited patient enrollment, care discovery and booking, and document upload, sharing and withdrawal. These journeys include keyboard, responsive and automated accessibility checks. The enrollment test now waits for the sign-in page before filling its Account ID field. [Browser scenarios](../e2e/operations.spec.ts)
+- Production healthcare operations still require the backend and authoritative access controls. [Deployment guide](DEPLOYMENT_GUIDE.md)
 
 ## Imaging and discharge record exchange, 27 November 2026
 
