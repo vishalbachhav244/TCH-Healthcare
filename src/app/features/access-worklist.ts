@@ -17,6 +17,7 @@ import { ClinicalPrescriptions } from './clinical-prescriptions';
 import { ClinicalVisitDocuments } from './clinical-visit-documents';
 import { ConsultationImaging } from './consultation-imaging';
 import { ConsultationContinuity } from './consultation-continuity';
+import { LivePassCamera } from './live-pass-camera';
 
 const headings = {
   appointments: 'Appointments',
@@ -41,6 +42,7 @@ const states = {
     ConsultationImaging,
     ConsultationContinuity,
     DatePipe,
+    LivePassCamera,
     NgIcon,
     ReactiveFormsModule,
     RouterLink,
@@ -90,6 +92,7 @@ export class AccessWorklist {
     channel: ['Scheduled'],
   });
   protected readonly checkInCode = this.fb.control('', Validators.required);
+  protected readonly checkInOpen = signal(false);
   protected readonly active = signal<AppointmentRow | undefined>(undefined);
   protected readonly observation = this.fb.control('', Validators.required);
   protected readonly observations = observations;
@@ -354,6 +357,7 @@ export class AccessWorklist {
   protected openCheckIn(dialog: HTMLDialogElement) {
     this.checkInCode.reset();
     this.dialogFailure.set('');
+    this.checkInOpen.set(true);
     dialog.showModal();
   }
 

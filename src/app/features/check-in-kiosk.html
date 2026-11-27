@@ -36,7 +36,7 @@
         <section class="panel kiosk-panel" aria-labelledby="kiosk-title">
           <h1 id="kiosk-title">Self-service check-in</h1>
           <p>Use your appointment pass for today's visit at this facility.</p>
-          <form class="fields" (submit)="$event.preventDefault(); checkIn()">
+          <form class="fields" (submit)="$event.preventDefault(); camera.stop(); checkIn()">
             <div class="public-field">
               <label for="kiosk-code">Appointment pass code</label>
               <input
@@ -57,9 +57,14 @@
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 [disabled]="scanning() || busy()"
-                (change)="scan($event)"
+                (change)="camera.stop(); scan($event)"
               />
             </div>
+            <tc-live-pass-camera
+              #camera
+              [active]="!busy() && !scanning()"
+              (detected)="usePass($event)"
+            />
             @if (scanning()) {
               <p role="status">Reading your QR image…</p>
             }

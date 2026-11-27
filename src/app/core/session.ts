@@ -11,6 +11,7 @@ import {
   type Resource,
 } from '../domain/workspaces';
 import type { Facility, Session } from '../domain/operations';
+import type { PatientRegistration } from '../domain/registration';
 
 @Injectable({ providedIn: 'root' })
 export class SessionStore {
@@ -70,6 +71,10 @@ export class SessionStore {
 
   async signIn(account: string, password: string) {
     await this.accept(await this.api.login(account, password));
+  }
+
+  async registerPatient(fields: PatientRegistration) {
+    await this.accept(await this.api.registerPatient(fields));
   }
 
   async signOut() {

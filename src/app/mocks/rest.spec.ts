@@ -84,6 +84,122 @@ function headers(session?: Session, facility?: string) {
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
 
+describe('patient self-registration', () => {
+  const password = 'Synthetic-Dawn-28';
+  const central = { facilityId: 'mer-central', invitation: 'H4K9-M7Q2-V6N3' };
+  const sunrise = { facilityId: 'sunrise', invitation: 'B7Q4-N2H8-P5R3' };
+  const register = (body: Record<string, string>) =>
+    post('public/registrations', { password, ...body }) as Promise<Session>;
+  const signIn = (account: string, supplied = password) =>
+    post('session', { account, password: supplied }) as Promise<Session>;
+
+  async function removeRegistration(account: string, invitation: string) {
+    const enrolled = await db.patientAccounts.get(account);
+    if (enrolled) {
+      await db.patients.delete(enrolled.patientId);
+      await db.patientAccounts.delete(account);
+      await db.events
+        .filter(
+          (event) => event.entityId === enrolled.patientId && event.actor === 'self-registration',
+        )
+        .delete();
+    }
+    await db.sessions.filter((session) => session.account === account).delete();
+    await db.patientInvitations.update(invitation, { claimedAt: undefined });
+  }
+
+  it('creates a separate patient account at the invitation facility and restores access with its own password', async () => {
+    const account = 'arisun5';
+    await expect(register({ ...sunrise, account, password: 'short' })).rejects.toMatchObject({
+      status: 422,
+    });
+    await expect(
+      register({ ...sunrise, account, facilityId: central.facilityId }),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(register({ ...sunrise, account: 'reception' })).rejects.toMatchObject({
+      status: 409,
+    });
+    try {
+      const session = await register({ ...sunrise, account, patientId: 'TC-MERIDIAN-01001' });
+      expect(session).toMatchObject({
+        account,
+        patientId: 'TC-SUNRISE-21002',
+        facilityIds: ['sunrise'],
+        workspaces: ['D12'],
+        writes: ['portal'],
+      });
+      const accountRow = (await db.patientAccounts.get(account))!;
+      expect(accountRow.salt).toHaveLength(16);
+      expect(accountRow.verifier).toMatch(/^[a-f0-9]{64}$/);
+      expect(accountRow).not.toHaveProperty('password');
+      const event = await db.events
+        .where('facilityId')
+        .equals(sunrise.facilityId)
+        .filter((row) => row.type === 'PatientRegistered' && row.entityId === session.patientId)
+        .first();
+      expect(event?.actor).toBe('self-registration');
+      expect(Object.keys(event!).sort()).toEqual([
+        'actor',
+        'entityId',
+        'facilityId',
+        'id',
+        'occurredAt',
+        'type',
+      ]);
+      await expect(signIn(account, 'TrueCare-Local-2026')).rejects.toMatchObject({ status: 401 });
+      await expect(signIn(account)).resolves.toMatchObject({ patientId: session.patientId });
+      await expect(get('portal', session, 'mer-central')).rejects.toMatchObject({ status: 403 });
+      await expect(get('patients', session, 'sunrise')).rejects.toMatchObject({ status: 403 });
+      const portal = (await get(
+        'portal?patientId=TC-MERIDIAN-01001',
+        session,
+        'sunrise',
+      )) as PatientPortal;
+      expect(portal.patient.id).toBe(session.patientId);
+      expect(portal.appointments).toEqual([]);
+      await expect(get('portal/family-access', session, 'sunrise')).resolves.toEqual([]);
+      await expect(register({ ...sunrise, account: 'replay5' })).rejects.toMatchObject({
+        status: 409,
+      });
+      await expect(register({ ...central, account })).rejects.toMatchObject({ status: 409 });
+      expect((await db.patientInvitations.get(central.invitation))?.claimedAt).toBeUndefined();
+    } finally {
+      await removeRegistration(account, sunrise.invitation);
+    }
+  });
+
+  it('rejects a disabled facility and claims each invitation only once under concurrent requests', async () => {
+    const [first, second] = ['firstclaim1', 'secondclaim2'];
+    const old = (await db.facilities.get(central.facilityId))!;
+    try {
+      await db.facilities.update(central.facilityId, { publicDiscovery: false });
+      await expect(register({ ...central, account: first })).rejects.toMatchObject({ status: 404 });
+      expect((await db.patientInvitations.get(central.invitation))?.claimedAt).toBeUndefined();
+      await db.facilities.put(old);
+      const claims = await Promise.allSettled(
+        [first, second].map((account) => register({ ...central, account })),
+      );
+      const winner = claims.find((claim) => claim.status === 'fulfilled')?.value;
+      expect(claims.find((claim) => claim.status === 'rejected')?.reason).toMatchObject({
+        status: 409,
+      });
+      expect(winner?.patientId).toBe('TC-MERIDIAN-21002');
+      expect(await db.patientAccounts.where('patientId').equals(winner!.patientId!).count()).toBe(
+        1,
+      );
+      await db.facilities.update(central.facilityId, { active: false });
+      await expect(get('portal', winner, central.facilityId)).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(get('session', winner)).resolves.toMatchObject({ facilityIds: [] });
+    } finally {
+      await db.facilities.put(old);
+      await removeRegistration(first, central.invitation);
+      await removeRegistration(second, central.invitation);
+    }
+  });
+});
+
 describe('public access and arrival', () => {
   const facility = 'mer-central';
   const branch = 'mer-north';

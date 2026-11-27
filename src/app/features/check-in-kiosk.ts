@@ -22,9 +22,10 @@ import { refreshingQuery } from '../core/query';
 import { Brand } from '../design-system/brand';
 import type { KioskReceipt } from '../domain/public-care';
 import { appointmentPassPattern } from '../domain/scheduling';
+import { LivePassCamera } from './live-pass-camera';
 
 @Component({
-  imports: [Brand, NgIcon, ReactiveFormsModule, RouterLink],
+  imports: [Brand, LivePassCamera, NgIcon, ReactiveFormsModule, RouterLink],
   templateUrl: './check-in-kiosk.html',
   styleUrl: './check-in-kiosk.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -81,8 +82,7 @@ export class CheckInKiosk {
     try {
       const pass = await readAppointmentPass(file);
       if (this.facility() === facility && this.site().state !== 'error') {
-        this.code.setValue(pass);
-        this.passField()?.nativeElement.focus();
+        this.usePass(pass);
       }
     } catch {
       if (this.facility() === facility)
@@ -90,6 +90,12 @@ export class CheckInKiosk {
     } finally {
       this.scanning.set(false);
     }
+  }
+
+  protected usePass(pass: string) {
+    this.code.setValue(pass);
+    this.error.set('');
+    this.passField()?.nativeElement.focus();
   }
 
   protected async checkIn() {

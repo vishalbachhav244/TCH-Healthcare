@@ -514,23 +514,31 @@
   }
 </dialog>
 
-<dialog #checkInDialog aria-labelledby="check-in-heading">
+<dialog #checkInDialog aria-labelledby="check-in-heading" (close)="checkInOpen.set(false)">
   <div class="dialog-head">
     <h2 id="check-in-heading">Verify arrival</h2>
     <button class="icon-button" aria-label="Close" type="button" (click)="checkInDialog.close()">
       <ng-icon name="close" />
     </button>
   </div>
-  <form class="dialog-body fields" (submit)="$event.preventDefault(); verify(checkInDialog)">
+  <form
+    class="dialog-body fields"
+    (submit)="$event.preventDefault(); camera.stop(); verify(checkInDialog)"
+  >
     <label for="qr-file">Scan a QR pass image</label
     ><input
       id="qr-file"
       type="file"
       accept="image/png,image/jpeg,image/webp"
-      (change)="readQr($event)"
+      (change)="camera.stop(); readQr($event)"
     />
     <label for="pass-code">Appointment pass code</label
-    ><input id="pass-code" autocomplete="off" [formControl]="checkInCode" required />
+    ><input #passCode id="pass-code" autocomplete="off" [formControl]="checkInCode" required />
+    <tc-live-pass-camera
+      #camera
+      [active]="checkInOpen() && !busy()"
+      (detected)="checkInCode.setValue($event); dialogFailure.set(''); passCode.focus()"
+    />
     @if (dialogFailure()) {
       <p class="field-error" role="alert">{{ dialogFailure() }}</p>
     }

@@ -531,6 +531,7 @@ export async function exchangeCommand(
     'rw',
     [
       db.sessions,
+      db.patientAccounts,
       db.memberships,
       db.facilities,
       db.connectors,

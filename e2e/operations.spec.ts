@@ -26,6 +26,237 @@ async function checkReflow(page: Page) {
   }
 }
 
+type CameraProbe = {
+  mode: 'denied' | 'preview' | 'pass';
+  requests: MediaStreamConstraints[];
+  tracks: MediaStreamTrack[];
+};
+type CameraTestWindow = Window & { trueCareCameraProbe: CameraProbe };
+
+function useSyntheticCamera(page: Page, qr: string, mode: CameraProbe['mode']) {
+  return page.addInitScript(
+    ({ qr, mode }) => {
+      const probe: CameraProbe = { mode, requests: [], tracks: [] };
+      (window as CameraTestWindow).trueCareCameraProbe = probe;
+      const image = new Image();
+      image.src = qr;
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        value: async (constraints: MediaStreamConstraints) => {
+          probe.requests.push(constraints);
+          if (probe.mode === 'denied')
+            throw new DOMException('Permission denied in the test.', 'NotAllowedError');
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 480;
+          const context = canvas.getContext('2d')!;
+          const paint = () => {
+            context.fillStyle = '#283b34';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            if (probe.mode === 'pass') {
+              context.imageSmoothingEnabled = false;
+              context.drawImage(image, 165, 85, 310, 310);
+            } else {
+              context.strokeStyle = '#e1efe8';
+              context.lineWidth = 6;
+              context.strokeRect(165, 85, 310, 310);
+            }
+          };
+          paint();
+          const stream = canvas.captureStream(10);
+          const track = stream.getVideoTracks()[0];
+          probe.tracks.push(track);
+          const timer = setInterval(() => {
+            if (track.readyState === 'ended') clearInterval(timer);
+            else paint();
+          }, 75);
+          return stream;
+        },
+      });
+    },
+    { qr, mode },
+  );
+}
+
+test('registers an invited patient and resumes the selected appointment at their facility', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(95_000);
+  const account = 'sunrisepatient8';
+  const password = 'Local-Fiction-739';
+  const invitation = 'B7Q4-N2H8-P5R3';
+  await page.goto('/find-care');
+  await page.getByLabel('Facility', { exact: true }).selectOption('sunrise');
+  await page
+    .getByRole('button', { name: 'View times for Dr. Nandita Rao at Sunrise Clinic' })
+    .click();
+  const booking = page.getByRole('dialog', { name: 'Choose an appointment' });
+  const time = booking.getByLabel('Time (IST)', { exact: true });
+  await time.selectOption({ index: 1 });
+  const selectedTime = await time.inputValue();
+  await booking.getByRole('link', { name: 'Create patient account' }).click();
+  await expect(page).toHaveURL(/\/register\?/);
+  const facility = page.getByLabel('Facility', { exact: true });
+  await expect(facility).toHaveValue('sunrise');
+  await checkReflow(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('patient-registration-390.png'),
+    animations: 'disabled',
+  });
+  await page.getByLabel('Invitation code').fill(invitation);
+  await page.getByLabel('Account ID').fill(account);
+  await page.getByLabel('Demo password').fill(password);
+  const confirm = page.getByLabel('Confirm password');
+  await confirm.fill('Different-password');
+  await confirm.press('Enter');
+  await expect(page.getByRole('alert')).toContainText('The passwords do not match.');
+  await confirm.fill(password);
+  await facility.selectOption('mer-central');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'This invitation is unavailable for the selected facility.',
+  );
+  await facility.selectOption('sunrise');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/\/find-care\?/);
+  await expect(time).toHaveValue(selectedTime);
+  await booking.getByRole('button', { name: 'Confirm appointment' }).click();
+  await page
+    .getByRole('dialog', { name: 'Appointment booked' })
+    .getByRole('link', { name: 'Open My care' })
+    .click();
+  await expect(page).toHaveURL('/work/portal');
+  await page.reload();
+  await expect(
+    page.getByRole('article').filter({ hasText: selectedTime + ' IST · Dr. Nandita Rao' }),
+  ).toContainText('Booked');
+  await page.goto('/work/patients');
+  await expect(page).toHaveURL('/denied');
+
+  const guest = await page.context().newPage();
+  await guest.goto('/register');
+  await guest.getByLabel('Facility', { exact: true }).selectOption('sunrise');
+  await guest.getByLabel('Invitation code').fill(invitation);
+  await guest.getByLabel('Account ID').fill('secondpatient9');
+  await guest.getByLabel('Demo password').fill(password);
+  await guest.getByLabel('Confirm password').fill(password);
+  await guest.getByRole('button', { name: 'Create account' }).click();
+  await expect(guest.getByRole('alert')).toContainText('This invitation has already been used.');
+  await guest.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await guest.getByLabel('Account ID').fill(account);
+  await guest.getByLabel('Password', { exact: true }).fill(password);
+  await guest.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(guest).toHaveURL('/work/portal');
+  await expect(
+    guest.getByRole('article').filter({ hasText: selectedTime + ' IST · Dr. Nandita Rao' }),
+  ).toContainText('Booked');
+});
+
+test('scans a live camera pass and releases the camera on detection or dialog close', async ({
+  page: patient,
+}, testInfo) => {
+  test.setTimeout(95_000);
+  await signIn(patient, 'patient');
+  await patient.getByRole('button', { name: 'Book a visit' }).click();
+  const booking = patient.getByRole('dialog', { name: 'Book a visit' });
+  await booking.getByLabel('Find a clinician').selectOption('mer-central-DR-6');
+  await booking.getByLabel('Time', { exact: true }).selectOption({ index: 1 });
+  await booking.getByRole('button', { name: 'Book appointment' }).click();
+  const pass = patient.getByRole('dialog', { name: 'Appointment pass' });
+  const code = await pass.locator('code').innerText();
+  const qr = (await pass.getByRole('img', { name: /QR appointment pass/ }).getAttribute('src'))!;
+
+  const kiosk = await patient.context().newPage();
+  await useSyntheticCamera(kiosk, qr, 'denied');
+  await kiosk.goto('/kiosk/mer-central');
+  const start = kiosk.getByRole('button', { name: 'Use camera' });
+  await expect(start).toBeVisible();
+  expect(
+    await kiosk.evaluate(() => (window as CameraTestWindow).trueCareCameraProbe.requests.length),
+  ).toBe(0);
+  await start.click();
+  await expect(
+    kiosk.getByText('Camera access was denied. Scan a QR image or enter the pass code.'),
+  ).toBeVisible();
+  await expect(kiosk.getByLabel('Appointment pass code')).toBeEnabled();
+  await kiosk.evaluate(() => {
+    (window as CameraTestWindow).trueCareCameraProbe.mode = 'preview';
+  });
+  await start.focus();
+  await kiosk.keyboard.press('Enter');
+  const stop = kiosk.getByRole('button', { name: 'Stop camera' });
+  await expect(stop).toBeFocused();
+  await expect(
+    kiosk.getByText('Hold the appointment QR code inside the camera view.'),
+  ).toBeVisible();
+  await checkReflow(kiosk);
+  await kiosk.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() => kiosk.locator('video').evaluate((video) => video.readyState))
+    .toBeGreaterThanOrEqual(2);
+  expect(
+    (await new AxeBuilder({ page: kiosk }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await kiosk.screenshot({
+    path: testInfo.outputPath('kiosk-camera-390.png'),
+    animations: 'disabled',
+  });
+  await stop.click();
+  await expect(start).toBeFocused();
+  await expect
+    .poll(() =>
+      kiosk.evaluate(() => (window as CameraTestWindow).trueCareCameraProbe.tracks[0]?.readyState),
+    )
+    .toBe('ended');
+  await start.click();
+  await expect(stop).toBeVisible();
+  await kiosk.evaluate(() => {
+    (window as CameraTestWindow).trueCareCameraProbe.mode = 'pass';
+  });
+  await expect(kiosk.getByLabel('Appointment pass code')).toHaveValue(code, { timeout: 15_000 });
+  await expect(kiosk.getByLabel('Appointment pass code')).toBeFocused();
+  const probe = await kiosk.evaluate(() => {
+    const { requests, tracks } = (window as CameraTestWindow).trueCareCameraProbe;
+    return {
+      audio: requests.map((request) => request.audio),
+      tracks: tracks.map((track) => track.readyState),
+    };
+  });
+  expect(probe).toEqual({ audio: [false, false, false], tracks: ['ended', 'ended'] });
+  await kiosk.getByRole('button', { name: 'Check in', exact: true }).click();
+  await expect(kiosk.getByRole('heading', { name: "You're checked in" })).toBeVisible();
+
+  const reception = await patient.context().newPage();
+  await useSyntheticCamera(reception, qr, 'preview');
+  await signIn(reception, 'reception');
+  await reception
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  const verify = reception.getByRole('button', { name: 'Verify arrival' });
+  await verify.click();
+  const check = reception.getByRole('dialog', { name: 'Verify arrival' });
+  await check.getByRole('button', { name: 'Use camera' }).click();
+  await expect(
+    check.getByText('Hold the appointment QR code inside the camera view.'),
+  ).toBeVisible();
+  await reception.keyboard.press('Escape');
+  await expect(verify).toBeFocused();
+  await expect
+    .poll(() =>
+      reception.evaluate(
+        () => (window as CameraTestWindow).trueCareCameraProbe.tracks[0]?.readyState,
+      ),
+    )
+    .toBe('ended');
+});
+
 test('finds published care and preserves the selected visit through patient sign-in', async ({
   page,
 }, testInfo) => {

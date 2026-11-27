@@ -36,4 +36,6 @@ Family profiles passed reflow checks at 390, 768, 1024 and 1440 px. The mobile f
 
 Find care and the kiosk passed reflow checks at 390, 768, 1024 and 1440 px. The desktop directory and mobile kiosk receipt passed the selected axe rules. Enter opens appointment selection and Escape returns focus to the clinician’s button. Scanning a QR image moves focus to the pass field. The receipt receives focus after check-in and its timed reset returns focus to the pass field. [Find care](screenshots/find-care-1440.png) · [Kiosk receipt](screenshots/kiosk-token-390.png)
 
+Patient enrollment and the live kiosk preview passed reflow at 390, 768, 1024 and 1440 px. Both mobile views passed the selected axe rules. Enter starts the camera and moves focus to Stop camera. Stopping restores focus to Use camera, and a detected QR returns focus to the pass field. Escape closes the reception arrival dialog and restores focus to Verify arrival. [Mobile patient enrollment](screenshots/patient-registration-390.png) · [Mobile camera with simulated frame](screenshots/kiosk-camera-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

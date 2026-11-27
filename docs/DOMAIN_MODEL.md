@@ -50,4 +50,6 @@ A `FamilyRelationship` links two verified synthetic patients at one facility wit
 
 Facilities carry independent directory, kiosk and public queue display settings. `PublicAppointment` contains a selected facility, clinician, day and time. Confirming the selection uses the same persisted `Appointment` as the patient portal. Kiosk arrivals create the shared `Ticket` and return a receipt with only its queue number. [Public care contracts](../src/app/domain/public-care.ts)
 
+A `PatientInvitation` belongs to one tenant and facility. Its claim creates a synthetic patient and a `PatientEnrollmentAccount` with that patient, tenant and facility. The enrollment account stores a salted password verifier. [Registration contracts](../src/app/domain/registration.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

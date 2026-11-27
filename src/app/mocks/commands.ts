@@ -84,6 +84,7 @@ export async function command(
     'rw',
     [
       db.patients,
+      db.patientAccounts,
       db.practitioners,
       db.appointments,
       db.tickets,

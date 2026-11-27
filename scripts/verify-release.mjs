@@ -9,7 +9,7 @@ const evaluation = 'dist/evaluation/browser';
 const scripts = (await readdir(inactive)).filter((name) => name.endsWith('.js'));
 const code = await Promise.all(scripts.map((name) => readFile(join(inactive, name), 'utf8')));
 assert(
-  !code.some((source) => /TrueCare-Local-2026|truecare-evaluation-v1/.test(source)),
+  !code.some((source) => /TrueCare-Local-2026|truecare-evaluation-v1|H4K9-M7Q2-V6N3/.test(source)),
   'The inactive build includes evaluation authentication or persistence',
 );
 assert(!(await readdir(inactive)).includes('ngsw-worker.js'));
@@ -53,6 +53,7 @@ try {
   for (const route of [
     '/',
     '/sign-in',
+    '/register',
     '/work/overview',
     '/display/mer-central',
     '/find-care',
@@ -72,7 +73,7 @@ try {
   });
   await page.goto('http://truecare.invalid/');
   await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
-  for (const route of ['/find-care', '/kiosk/mer-central']) {
+  for (const route of ['/find-care', '/kiosk/mer-central', '/register']) {
     await page.goto('http://truecare.invalid' + route);
     await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
   }

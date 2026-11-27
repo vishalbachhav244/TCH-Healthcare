@@ -1,0 +1,17 @@
+.registration-content {
+  max-width: 680px;
+}
+
+.registration-panel {
+  padding: clamp(18px, 5vw, 38px);
+}
+
+.registration-panel > p {
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.registration-panel form {
+  gap: 14px;
+  margin-top: 24px;
+}

@@ -61,4 +61,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-55 | D13 | `/work/clinical` → Signed consultation → Visit documents | Attendance note release, withdrawal and patient portal handoff |
 | TC-LOCAL-56 | D12 | `/work/portal` → Family profiles | Time-limited permissions, family appointment booking and pass, shared document preview and revocation |
 | TC-LOCAL-57 | D12 | `/find-care` | Facility and clinician discovery, availability, sign-in handoff and confirmed booking |
-| TC-LOCAL-58 | D11 | `/kiosk/:facility` | Pass code and QR image entry, token-only receipt and automatic reset |
+| TC-LOCAL-58 | D11 | `/kiosk/:facility` | Live QR camera, pass code and QR image entry, token-only receipt and automatic reset |
+| TC-LOCAL-59 | D12 | `/register` | Facility invitation, patient account enrolment and scoped booking handoff |

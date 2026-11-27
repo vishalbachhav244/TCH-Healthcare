@@ -34,6 +34,14 @@ const publicDiscovery: CanActivateFn = async () => {
   return true;
 };
 
+const patientEnrollment: CanActivateFn = async () => {
+  const router = inject(Router);
+  const session = inject(SessionStore);
+  if (!evaluationAvailable) return router.parseUrl('/unavailable');
+  await session.restore();
+  return session.session() ? router.parseUrl(session.home()) : true;
+};
+
 export const routes: Routes = [
   {
     path: '',
@@ -45,6 +53,13 @@ export const routes: Routes = [
     path: 'sign-in',
     loadComponent: () => import('./features/sign-in').then((m) => m.SignIn),
     title: 'Sign in · TrueCare',
+  },
+  {
+    path: 'register',
+    canActivate: [patientEnrollment],
+    loadComponent: () =>
+      import('./features/patient-registration').then((m) => m.PatientRegistrationPage),
+    title: 'Create a patient account · TrueCare',
   },
   {
     path: 'unavailable',

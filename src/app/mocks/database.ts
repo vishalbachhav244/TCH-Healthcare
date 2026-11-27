@@ -60,12 +60,16 @@ import type { Campaign, EngagementPermission, Enquiry } from '../domain/engageme
 import type { DocumentationDraft, FacilityDocumentationPolicy } from '../domain/intelligence';
 import type { PatientDocument } from '../domain/patient-documents';
 import type { FamilyPass, FamilyRelationship } from '../domain/family-access';
+import type { PatientEnrollmentAccount, PatientInvitation } from '../domain/registration';
+import { patientInvitations } from './enrollment-fixtures';
 import { initialBedPreparations, initialTransportUnits } from './support-seed';
 import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
 
 export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>;
+  patientAccounts: EntityTable<PatientEnrollmentAccount, 'account'>;
+  patientInvitations: EntityTable<PatientInvitation, 'code'>;
   practitioners: EntityTable<Practitioner, 'id'>;
   appointments: EntityTable<Appointment, 'id'>;
   tickets: EntityTable<Ticket, 'id'>;
@@ -608,6 +612,20 @@ db.version(28)
     }
   });
 
+db.version(29)
+  .stores({
+    patientAccounts: 'account, &patientId',
+    patientInvitations: 'code',
+  })
+  .upgrade(async (transaction) => {
+    const sites = transaction.table<Facility, string>('facilities');
+    const invitations = transaction.table<PatientInvitation, string>('patientInvitations');
+    for (const invitation of patientInvitations) {
+      if ((await sites.get(invitation.facilityId))?.tenantId === invitation.tenantId)
+        await invitations.add(invitation);
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -615,6 +633,7 @@ export function initialize() {
       [
         db.metadata,
         db.patients,
+        db.patientInvitations,
         db.familyRelationships,
         db.practitioners,
         db.appointments,
@@ -653,6 +672,7 @@ export function initialize() {
         const pharmacy = pharmacyFixtures(initialFacilities, data.encounters, referenceDay);
         await Promise.all([
           db.patients.bulkAdd(data.patients),
+          db.patientInvitations.bulkAdd(patientInvitations),
           db.familyRelationships.add(initialFamilyRelationship),
           db.practitioners.bulkAdd(data.practitioners),
           db.appointments.bulkAdd(data.appointments),

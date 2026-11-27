@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Patient enrollment and live QR scanning, 27 November 2026
+
+- Added invitation-based patient enrollment. The adapter validates facility and tenant, creates a separate synthetic patient and credential, claims the invitation and starts a patient session in one transaction. Registration resumes a selected booking when its facility matches the invitation. [Registration screen](../src/app/features/patient-registration.ts) · [Registration adapter](../src/app/mocks/registration.ts)
+- Added a shared live QR camera scanner for the kiosk and reception. It starts on request, decodes frames in the browser without audio, fills the existing pass field and releases the stream. Image and manual code entry remain available. [Camera scanner](../src/app/features/live-pass-camera.ts)
+- Verified the version 28 to 29 upgrade in Chromium. An existing session and appointment pass survived, and a separate patient registered with an invitation from the matching facility and tenant. [Migration](../src/app/mocks/database.ts) · [OpenAPI](openapi.yaml)
+- Passed 54 contract and domain tests, 30 Chromium journeys, mobile axe and responsive checks, both builds and release verification. [Test report](TEST_REPORT.md) · [Accessibility report](ACCESSIBILITY_REPORT.md)
+- Camera tests use a simulated Chromium stream. Physical-device acceptance and invitation administration remain open. [Mobile enrollment](screenshots/patient-registration-390.png) · [Mobile camera with simulated frame](screenshots/kiosk-camera-390.png)
+
 ## Public discovery, booking and kiosk check-in, 27 November 2026
 
 - Added Find care with published facility and clinician search, specialty filters, available dates and times, and a booking selection that survives patient sign-in. Confirmation rechecks the patient facility scope and current slot and writes the shared appointment. [Discovery workspace](../src/app/features/care-discovery.ts) · [Public adapter](../src/app/mocks/public-care.ts)

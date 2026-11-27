@@ -152,6 +152,7 @@ export interface Alert {
 }
 
 export interface Session {
+  patientId?: string;
   token: string;
   account: string;
   name: string;

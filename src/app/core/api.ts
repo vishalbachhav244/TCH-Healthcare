@@ -20,6 +20,7 @@ import type {
   WardBloodRequest,
 } from '../domain/blood-bank';
 import type { PatientPortal } from '../domain/portal';
+import type { PatientRegistration } from '../domain/registration';
 import type {
   CareDirectory,
   KioskReceipt,
@@ -195,6 +196,14 @@ export class Api {
     return firstValueFrom(
       this.http
         .post<unknown>(this.base + 'session', { account, password })
+        .pipe(map((value) => this.sessionShape(value))),
+    );
+  }
+
+  registerPatient(fields: PatientRegistration) {
+    return firstValueFrom(
+      this.http
+        .post<unknown>(this.base + 'public/registrations', fields)
         .pipe(map((value) => this.sessionShape(value))),
     );
   }

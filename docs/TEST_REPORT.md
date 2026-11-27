@@ -7,18 +7,21 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test -- --testTimeout 45000` | All 52 contract and domain tests passed across 3 files. The retry used a longer per-test timeout while the browser suite was running. |
-| `npm run e2e -- --fully-parallel --workers=2` | All 28 Chromium journeys passed, including booking through sign-in, QR image check-in, pass replay rejection and live kiosk withdrawal. |
+| `npm test -- --testTimeout 45000` | All 54 contract and domain tests passed across 3 files while the browser suite was running. |
+| `npm run e2e -- --fully-parallel --workers=2` | All 30 Chromium journeys passed, including invitation enrollment, booking handoff, camera permission denial, QR detection and camera release. |
 | `npm run build` | Passed. Initial assets approximately 385 kB raw and 99 kB estimated transfer. |
 | `npm run build:evaluation` | Passed. Initial assets approximately 388 kB raw and 100 kB estimated transfer. |
-| `npm run verify:release` | Passed. The default build blocks evaluation routes and excludes local authentication and persistence. The evaluation build rejects non-loopback access, including the directory and kiosk. |
+| `npm run verify:release` | Passed. The default build blocks evaluation routes and excludes local credentials, sample invitations and persistence. The evaluation build rejects non-loopback access, including enrollment, the directory and the kiosk. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 27 to 28 in Chromium. The upgrade preserved a saved patient pass, active family grant and facility versions. An inactive facility stayed hidden. Earlier checks covered the document and family schema upgrades. |
+| Browser-local migration | Verified 28 to 29 in Chromium. The upgrade restored an existing session and patient pass, preserved the facility configuration version and issued an invitation only for a matching tenant and facility. A separate patient profile enrolled successfully. |
 | Sample PDF | Poppler `pdfinfo` parsed one US Letter page from the generated PDF 1.4 sample. |
-| OpenAPI | 189 operations, unique IDs and checked internal references. |
+| OpenAPI | 190 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
+
+- Select a visit at Sunrise Clinic and open enrollment with the facility prefilled. Reject a password mismatch and a facility mismatch. Claim an invitation, return to the selected time and book. Reload the appointment, deny the staff route, reject a repeated invitation and sign in with the new account.
+- Deny camera permission and verify the manual field remains available. Use a simulated live video feed to scan an appointment pass and verify the camera releases on cancel, detection and reception dialog close. Confirm the kiosk check-in and verify focus restoration.
 
 - Find a published clinician by city, facility and specialty. Open appointment selection with Enter and verify focus restoration with Escape. Choose an available time, carry it through patient sign-in and confirm it. Reload My care and verify the visit persists.
 - Open a kiosk at an enabled facility, reject an invalid image, decode a QR pass and issue one token. Verify reception sees the arrival and a duplicate submission is rejected. Advance the kiosk clock to clear the receipt and revoke kiosk access in an open tab.
@@ -94,3 +97,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Desktop family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)
 
 [Find care](screenshots/find-care-1440.png) · [Mobile kiosk receipt](screenshots/kiosk-token-390.png)
+
+[Mobile patient enrollment](screenshots/patient-registration-390.png) · [Mobile camera with simulated frame](screenshots/kiosk-camera-390.png)

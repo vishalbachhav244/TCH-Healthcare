@@ -1,0 +1,96 @@
+<header class="public-header">
+  <a routerLink="/find-care" aria-label="TrueCare home"><tc-brand /></a>
+  <a class="button secondary" routerLink="/sign-in" [queryParams]="selectedVisit">Sign in</a>
+</header>
+<main class="public-content registration-content">
+  <section class="panel registration-panel" aria-labelledby="registration-title">
+    <h1 id="registration-title">Create a patient account</h1>
+    <p>
+      Use the invitation for your sample facility. Choose an account ID and password for this
+      evaluation.
+    </p>
+    @let directory = state();
+    @if (directory.state === 'loading') {
+      <p class="state-panel" role="status">Loading facilities…</p>
+    } @else if (directory.state === 'error') {
+      <p class="state-panel" role="alert">{{ directory.message }}</p>
+      <button class="button secondary" type="button" (click)="reload.set(reload() + 1)">
+        Retry
+      </button>
+    } @else if (!directory.data.facilities.length) {
+      <p class="state-panel">No facilities are accepting patient registration.</p>
+    } @else {
+      <form class="fields" [formGroup]="form" (ngSubmit)="create()">
+        <div class="public-field">
+          <label for="registration-facility">Facility</label>
+          <select id="registration-facility" formControlName="facilityId" required>
+            <option value="">Choose the facility that issued your invitation</option>
+            @for (site of directory.data.facilities; track site.id) {
+              <option [value]="site.id">{{ site.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="public-field">
+          <label for="registration-invitation">Invitation code</label>
+          <input
+            id="registration-invitation"
+            formControlName="invitation"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            maxlength="16"
+            required
+          />
+        </div>
+        <div class="public-field">
+          <label for="registration-account">Account ID</label>
+          <input
+            id="registration-account"
+            formControlName="account"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            maxlength="24"
+            aria-describedby="registration-account-hint"
+            required
+          />
+          <p class="subtle" id="registration-account-hint">
+            3 to 24 lowercase letters and numbers, starting with a letter.
+          </p>
+        </div>
+        <div class="public-field">
+          <label for="registration-password">Demo password</label>
+          <input
+            id="registration-password"
+            type="password"
+            formControlName="password"
+            autocomplete="new-password"
+            maxlength="128"
+            aria-describedby="registration-password-hint"
+            required
+          />
+          <p class="subtle" id="registration-password-hint">
+            Use at least 10 characters. Keep your real passwords private.
+          </p>
+        </div>
+        <div class="public-field">
+          <label for="registration-confirmation">Confirm password</label>
+          <input
+            id="registration-confirmation"
+            type="password"
+            formControlName="confirmation"
+            autocomplete="new-password"
+            maxlength="128"
+            required
+          />
+        </div>
+        @if (error()) {
+          <p class="field-error" role="alert">{{ error() }}</p>
+        }
+        <button class="button primary" type="submit" [disabled]="busy()">
+          {{ busy() ? 'Creating account…' : 'Create account' }}
+        </button>
+      </form>
+    }
+  </section>
+</main>

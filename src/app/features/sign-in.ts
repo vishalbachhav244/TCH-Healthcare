@@ -7,6 +7,7 @@ import { evaluationAvailable } from '../core/evaluation';
 import { errorMessage } from '../core/api';
 import { Brand } from '../design-system/brand';
 import { readPublicAppointment } from '../domain/public-care';
+import { accountPattern } from '../domain/registration';
 
 @Component({
   imports: [Brand, NgIcon, ReactiveFormsModule, RouterLink],
@@ -20,7 +21,7 @@ export class SignIn {
     inject(ActivatedRoute).snapshot.queryParamMap,
   );
   protected readonly form = inject(NonNullableFormBuilder).group({
-    account: ['', [Validators.required, Validators.pattern(/^[a-z]+$/)]],
+    account: ['', [Validators.required, Validators.pattern(accountPattern)]],
     password: ['', Validators.required],
   });
   protected readonly busy = signal(false);

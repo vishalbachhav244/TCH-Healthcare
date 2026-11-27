@@ -44,5 +44,6 @@
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released records, synthetic sample uploads, dispensed medications, bill balances and facility contact preferences. Can withdraw their uploads and grant or revoke sharing for an available record version. |
 | Family caregiver | An independent patient account with a verified facility relationship. A current patient-issued grant can authorize appointment listing, booking and passes, document reading and download, or both. Each request checks the relationship, both patient identities, facility, tenant, expiry and applicable permission. Only the patient who owns the profile can change the grant. |
 | Public directory visitor | Can search published active facilities and their clinicians and view free times. Creating an appointment requires the signed-in patient and matching facility access. |
+| Invited patient | Can claim one unused invitation for a published active facility. Registration establishes a new synthetic patient identity and access to the portal at that facility. |
 | Kiosk visitor | Can check in with a valid same-day appointment pass for the enabled facility. Receives the token number. Queue staff retain the assigned facility worklist. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

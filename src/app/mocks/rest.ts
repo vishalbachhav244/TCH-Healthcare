@@ -28,6 +28,7 @@ import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
 import { portal } from './portal';
 import { directory, kioskCheckIn, kioskLocation, publicAvailability } from './public-care';
+import { registerPatient } from './registration';
 import { subscriptions, updateSubscription } from './subscriptions';
 import { availability } from './scheduling';
 import { schedulingDay } from './scheduling-workspace';
@@ -50,6 +51,11 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
   const token = request.headers.get('Authorization')?.match(/^Bearer ([\da-f-]+)$/i)?.[1] ?? null;
   await initialize();
   if (path === 'session' && request.method === 'POST') return startSession(request.body);
+  if (path === 'public/registrations' && request.method === 'POST') {
+    const { event, session } = await registerPatient(request.body);
+    notifyFacility(event);
+    return session;
+  }
   if (path === 'queue-display' && request.method === 'GET')
     return queueDisplay(url.searchParams.get('facility'));
   if (request.method === 'GET' && path === 'public/directory') return directory();

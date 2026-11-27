@@ -1,5 +1,6 @@
 import { staffRoles, type FacilityAccess } from '../domain/access';
 import type { Facility, Session } from '../domain/operations';
+import { accountPattern } from '../domain/registration';
 import { workspaceEnabled, type Resource } from '../domain/workspaces';
 import {
   accountNames,
@@ -10,6 +11,7 @@ import {
   subscriptionAccount,
 } from './accounts';
 import { db } from './database';
+import { passwordVerifier } from './credentials';
 
 export class ApiError extends Error {
   constructor(
@@ -24,14 +26,26 @@ type Identity = Pick<Session, 'token' | 'account' | 'expiresAt'>;
 const patientAccess: FacilityAccess = { workspaces: ['D12'], writes: ['portal'] };
 
 async function project(identity: Identity): Promise<Session> {
-  const name = accountNames[identity.account];
-  if (!Object.hasOwn(accountNames, identity.account) || !name)
-    throw new ApiError(401, 'Sign in to continue.');
+  const builtIn = Object.hasOwn(accountNames, identity.account);
+  const enrolled = builtIn ? undefined : await db.patientAccounts.get(identity.account);
+  const global = Object.hasOwn(globalAccess, identity.account)
+    ? globalAccess[identity.account]
+    : undefined;
+  let name = builtIn ? accountNames[identity.account] : undefined;
+  const patientId = enrolled?.patientId ?? patientIdentity(identity.account);
   let facilityAccess: Session['facilityAccess'] = {};
-  if (patientIdentity(identity.account)) {
-    const facility = await db.facilities.get(patientFacility);
-    if (facility && facility.active !== false) facilityAccess[patientFacility] = patientAccess;
-  } else if (!Object.hasOwn(globalAccess, identity.account)) {
+  if (patientId) {
+    const facilityId = enrolled?.facilityId ?? patientFacility;
+    const [facility, patient] = await Promise.all([
+      db.facilities.get(facilityId),
+      db.patients.get(patientId),
+    ]);
+    if (!patient || (enrolled && patient.tenantId !== enrolled.tenantId))
+      throw new ApiError(401, 'Sign in to continue.');
+    name = patient.name;
+    if (facility?.tenantId === patient.tenantId && facility.active !== false)
+      facilityAccess[facilityId] = patientAccess;
+  } else if (builtIn && !global) {
     const grants = await db.memberships
       .where('account')
       .equals(identity.account)
@@ -56,41 +70,51 @@ async function project(identity: Identity): Promise<Session> {
       }),
     );
   }
+  if (!name) throw new ApiError(401, 'Sign in to continue.');
   const grants = Object.values(facilityAccess);
   return {
     ...identity,
     name,
+    ...(patientId ? { patientId } : {}),
     facilityAccess,
     facilityIds: Object.keys(facilityAccess),
-    workspaces: globalAccess[identity.account]
-      ? globalAccess[identity.account].workspaces
-      : [...new Set(grants.flatMap((grant) => grant.workspaces))],
-    writes: globalAccess[identity.account]
-      ? globalAccess[identity.account].writes
-      : [...new Set(grants.flatMap((grant) => grant.writes))],
+    workspaces: global?.workspaces ?? [...new Set(grants.flatMap((grant) => grant.workspaces))],
+    writes: global?.writes ?? [...new Set(grants.flatMap((grant) => grant.writes))],
   };
 }
 
 export function patientSubject(session: Session) {
-  const patientId = patientIdentity(session.account);
+  const patientId = session.patientId;
   if (!patientId) throw new ApiError(403, 'Patient access is unavailable.');
   return patientId;
 }
 
 export async function startSession(body: unknown): Promise<Session> {
+  const invalid = () => new ApiError(401, 'The account ID or password was not recognised.');
+  if (!body || typeof body !== 'object' || !('account' in body) || !('password' in body))
+    throw invalid();
+  const { account, password } = body;
   if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('account' in body) ||
-    !('password' in body) ||
-    typeof body.account !== 'string' ||
-    body.password !== 'TrueCare-Local-2026' ||
-    !Object.hasOwn(accountNames, body.account)
-  ) {
-    throw new ApiError(401, 'The account ID or password was not recognised.');
+    typeof account !== 'string' ||
+    !accountPattern.test(account) ||
+    typeof password !== 'string' ||
+    !password ||
+    password.length > 128
+  )
+    throw invalid();
+  if (Object.hasOwn(accountNames, account)) {
+    if (password !== 'TrueCare-Local-2026') throw invalid();
+  } else {
+    const enrolled = await db.patientAccounts.get(account);
+    if (!enrolled || (await passwordVerifier(password, enrolled.salt)) !== enrolled.verifier)
+      throw invalid();
   }
+  return issueSession(account);
+}
+
+export async function issueSession(account: string) {
   const session = await project({
-    account: body.account,
+    account,
     token: crypto.randomUUID(),
     expiresAt: Date.now() + 8 * 60 * 60_000,
   });

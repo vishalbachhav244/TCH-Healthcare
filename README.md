@@ -15,6 +15,16 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 
 Open [Find care](http://127.0.0.1:4280/find-care) to browse published sample facilities and times. Select an appointment and sign in with `patient` or `family` to book at Meridian Medical Centre. On the appointment day, open the [self-service kiosk](http://127.0.0.1:4280/kiosk/mer-central) and enter the appointment code or scan a QR pass image.
 
+To create a separate patient account, open [Create a patient account](http://127.0.0.1:4280/register) or start from an appointment selected in Find care. Use the invitation for your chosen facility and choose a fictional password.
+
+| Evaluation facility | Single-use invitation |
+| --- | --- |
+| Meridian Medical Centre | `H4K9-M7Q2-V6N3` |
+| Meridian North Hospital | `T8L3-R6P7-K4V2` |
+| Sunrise Clinic | `B7Q4-N2H8-P5R3` |
+
+The kiosk and reception arrival form can scan a QR pass using a camera after the visitor or receptionist grants browser permission. Both also accept a QR image or the printed code.
+
 | Account | Workspace |
 | --- | --- |
 | `platform` | Organization provisioning, facility activation, staff roles, inpatient entitlements and public access settings |

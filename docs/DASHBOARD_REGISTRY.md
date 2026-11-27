@@ -14,8 +14,8 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D08 | Quality & Compliance | `/work/quality` | Partial | Corrective actions, escalations and wider compliance audit |
 | D09 | Front Desk & Reception | `/work/patients` | Partial | Duplicate adjudication, contact data boundary and appointment history |
 | D10 | Appointments & Scheduling | `/work/appointments`, `/work/scheduling` | Partial | Recurring schedules, calendar views and resource availability |
-| D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility`, `/kiosk/:facility` | Partial | Live camera entry, delay notifications and queue performance reports |
-| D12 | Patient & Family | `/work/portal`, `/find-care` | Partial | Patient self-registration, additional family relationship types, general file intake and notifications |
+| D11 | Smart Queue Command Center | `/work/queue`, `/display/:facility`, `/kiosk/:facility` | Partial | Physical camera acceptance, delay notifications and queue performance reports |
+| D12 | Patient & Family | `/work/portal`, `/find-care`, `/register` | Partial | Invitation administration, additional family relationship types, general file intake and notifications |
 | D13 | Doctor / OPD Workspace | `/work/clinical` | Partial | Clinical history and vitals, prescriptions, referrals and follow-up |
 | D14 | IPD Physician Workspace | `/work/inpatient-physician` | Partial | Inpatient prescribing, expanded charting and post-signature amendments |
 | D15 | Nursing Station | `/work/nursing-station` | Partial | Medication administration, detailed vitals and shift roster |
