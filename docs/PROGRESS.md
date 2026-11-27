@@ -7,6 +7,8 @@
 - Release verification checks the inactive bundle, loopback and hosted origin restrictions, rejected credentials, patient sign-in, reload and restricted workspace access. [Verification script](../scripts/verify-release.mjs)
 - Cloudflare Pages built `main` from GitHub using Node 24.22.3. Verified the public sign-in, patient session after reload, restricted administrator route and direct links to Find care and the kiosk. Lint, formatting, 56 unit and contract tests, all three builds and release verification passed. [Live demo](https://tch-healthcare-demo.pages.dev) · [Sign-in screenshot](screenshots/cloudflare-demo-sign-in.jpg)
 - Three Playwright journeys passed against Cloudflare, covering invited patient enrollment, care discovery and booking, and document upload, sharing and withdrawal. These journeys include keyboard, responsive and automated accessibility checks. The enrollment test now waits for the sign-in page before filling its Account ID field. [Browser scenarios](../e2e/operations.spec.ts)
+- The local Chromium pass completed 29 of 30 journeys. The document scenario timed out during the full run and passed on an isolated local rerun and against Cloudflare.
+- GitHub access for the Cloudflare Workers and Pages app was approved and saved for `TCH-Healthcare` under selected-repository access. The Pages production branch is `main`.
 - Production healthcare operations still require the backend and authoritative access controls. [Deployment guide](DEPLOYMENT_GUIDE.md)
 
 ## Imaging and discharge record exchange, 27 November 2026
