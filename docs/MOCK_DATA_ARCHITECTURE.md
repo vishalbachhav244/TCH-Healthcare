@@ -25,3 +25,5 @@ Schema version 24 adds enquiries, contact preferences and campaigns, and establi
 Schema version 25 adds facility documentation policies and synthetic drafts. It establishes the analyst and automation supervisor memberships where their assigned demo facilities exist. Draft generation defaults to paused. Clinical source observations use existing synthetic records and appear only to the assigned clinician. Supervisors receive aggregate usage and status timestamps.
 
 Schema version 26 adds patient documents. A record points to a catalogue sample or a signed encounter. Withdrawal advances the version and retains provenance. Previously issued laboratory consent grants keep their existing references.
+
+Schema version 27 adds family relationships and family appointment passes. The pre-verified Meridian Central relationship begins inactive. An upgrade adds it when both patients and the facility match the expected tenant. Patient documents and existing appointment passes retain their stored values.

@@ -59,3 +59,4 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-53 | D36 | `/work/automation` | Facility documentation policy, daily usage, supervisor activity, clinician draft and decision history |
 | TC-LOCAL-54 | D12 | `/work/portal` → Documents | Synthetic PDF and TXT upload, available and withdrawn statuses, provenance, preview and download |
 | TC-LOCAL-55 | D13 | `/work/clinical` → Signed consultation → Visit documents | Attendance note release, withdrawal and patient portal handoff |
+| TC-LOCAL-56 | D12 | `/work/portal` → Family profiles | Time-limited permissions, family appointment booking and pass, shared document preview and revocation |

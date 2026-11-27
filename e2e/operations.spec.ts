@@ -26,6 +26,129 @@ async function checkReflow(page: Page) {
   }
 }
 
+test('shares selected family permissions, books a visit and revokes a previously issued pass', async ({
+  page: owner,
+}, testInfo) => {
+  test.setTimeout(100_000);
+  const familyProfiles = (page: Page) =>
+    page.getByRole('button', { name: 'Family profiles', exact: true });
+  await signIn(owner, 'family');
+  await owner.getByRole('button', { name: 'Documents', exact: true }).click();
+  await owner.getByRole('button', { name: 'Upload document' }).click();
+  const upload = owner.getByRole('dialog', { name: 'Upload document' });
+  const downloading = owner.waitForEvent('download');
+  await upload.getByRole('button', { name: 'Download sample referral (PDF)' }).click();
+  const sample = await downloading;
+  const bytes = await readFile((await sample.path())!);
+  await upload.getByLabel('Sample file').setInputFiles({
+    name: sample.suggestedFilename(),
+    mimeType: 'application/pdf',
+    buffer: bytes,
+  });
+  await upload.getByRole('button', { name: 'Upload sample' }).click();
+  await expect(owner.getByRole('row', { name: /Sample referral/ })).toBeVisible();
+
+  const caregiver = await owner.context().newPage();
+  await signIn(caregiver, 'patient');
+  await familyProfiles(caregiver).click();
+  await expect(caregiver.getByText('Waiting for permission.')).toBeVisible();
+  await expect(caregiver.getByRole('button', { name: 'Open family profile' })).toHaveCount(0);
+  await expect(caregiver.getByRole('heading', { name: 'Your next appointment' })).toHaveCount(0);
+  await familyProfiles(owner).click();
+  const newGrant = owner.getByRole('button', { name: 'Grant access' });
+  await newGrant.focus();
+  await owner.keyboard.press('Enter');
+  const editor = owner.getByRole('dialog', { name: /Share access with/ });
+  await expect(editor.getByRole('button', { name: 'Close' })).toBeFocused();
+  await owner.keyboard.press('Escape');
+  await expect(newGrant).toBeFocused();
+  await newGrant.click();
+  await expect(editor.getByRole('button', { name: 'Save access' })).toBeDisabled();
+  await editor.getByLabel('View and download documents').check();
+  await editor.getByRole('button', { name: 'Save access' }).click();
+  await expect(owner.getByText('Family access saved.')).toBeVisible();
+
+  await caregiver.reload();
+  await familyProfiles(caregiver).click();
+  await caregiver.getByRole('button', { name: 'Open family profile' }).click();
+  const sharedCare = caregiver.getByRole('region', { name: 'Rajesh Patel’s care' });
+  await expect(sharedCare.getByText('Appointment access has not been shared.')).toBeVisible();
+  await expect(sharedCare.getByRole('button', { name: 'Book family appointment' })).toHaveCount(0);
+  const openDocument = sharedCare.getByRole('button', { name: 'View shared document' });
+  await openDocument.click();
+  const preview = caregiver.getByRole('dialog', { name: 'Sample referral' });
+  await expect(preview).toContainText('Synthetic referral for a scheduled specialist visit.');
+  const sharedDownload = caregiver.waitForEvent('download');
+  await preview.getByRole('button', { name: 'Download PDF' }).click();
+  expect(await readFile((await (await sharedDownload).path())!)).toEqual(bytes);
+  await preview.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await owner.getByRole('button', { name: 'Edit access' }).click();
+  await editor.getByLabel(/View and book appointments/).check();
+  await editor.getByRole('button', { name: 'Save access' }).click();
+  await expect(sharedCare.getByRole('button', { name: 'Book family appointment' })).toBeVisible();
+  await checkReflow(caregiver);
+  await caregiver.screenshot({
+    path: testInfo.outputPath('family-profiles-1440.png'),
+    animations: 'disabled',
+  });
+  await sharedCare.getByRole('button', { name: 'Book family appointment' }).click();
+  const booking = caregiver.getByRole('dialog', { name: 'Book for Rajesh Patel' });
+  const clinician = booking.getByLabel('Clinician', { exact: true });
+  await clinician.selectOption('mer-central-DR-6');
+  const time = booking.getByLabel('Time (IST)', { exact: true });
+  await time.selectOption({ index: 1 });
+  const bookedTime = await time.inputValue();
+  await booking.getByRole('button', { name: 'Confirm family appointment' }).click();
+  await expect(caregiver.getByText('Appointment booked for Rajesh Patel.')).toBeVisible();
+  await caregiver.setViewportSize({ width: 390, height: 844 });
+  await sharedCare
+    .locator('article')
+    .filter({ hasText: new RegExp(bookedTime + ' IST') })
+    .getByRole('button', { name: 'Family appointment pass' })
+    .first()
+    .click();
+  const pass = caregiver.getByRole('dialog', { name: 'Appointment pass for Rajesh Patel' });
+  const code = await pass.locator('code').innerText();
+  await expect(pass.getByRole('img', { name: 'Family appointment QR code' })).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page: caregiver })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await caregiver.screenshot({
+    path: testInfo.outputPath('family-pass-390.png'),
+    animations: 'disabled',
+  });
+  await caregiver.keyboard.press('Escape');
+  await openDocument.click();
+  await expect(preview.getByRole('button', { name: 'Download PDF' })).toBeVisible();
+
+  await owner.getByRole('button', { name: 'Revoke access' }).click();
+  await owner.getByRole('button', { name: 'Confirm revocation' }).click();
+  await expect(owner.getByText('Family access revoked.')).toBeVisible();
+  await expect(preview).toHaveCount(0);
+  await expect(sharedCare).toHaveCount(0);
+  await expect(caregiver.getByRole('heading', { name: 'Family profiles' })).toBeFocused();
+  await expect(caregiver.getByText('This profile is unavailable.')).toBeVisible();
+
+  const reception = await owner.context().newPage();
+  await signIn(reception, 'reception');
+  await reception
+    .getByRole('navigation', { name: 'Workspace' })
+    .getByRole('link', { name: 'Consultation queue' })
+    .click();
+  await reception.getByRole('button', { name: 'Verify arrival' }).click();
+  const check = reception.getByRole('dialog', { name: 'Verify arrival' });
+  await check.getByLabel('Appointment pass code').fill(code);
+  await check.getByRole('button', { name: 'Check in patient' }).click();
+  await expect(check.getByRole('alert')).toContainText(
+    'Appointment pass not found for this facility.',
+  );
+});
+
 test('uploads a synthetic sample and invalidates a shared document when withdrawn', async ({
   page,
 }, testInfo) => {

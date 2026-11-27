@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Patient family profiles, 27 November 2026
+
+- Added Family profiles to My care. Rajesh can give Ananya 24 hours or 7 days of access to appointments, documents or both. Ananya can book within the facility schedule, issue a separate family pass and preview or download available document versions. [Family workspace](../src/app/features/family-access.ts) · [Adapter](../src/app/mocks/family-access.ts)
+- Enforced account, facility, tenant, relationship, version and permission checks. Revocation closes open family content. Reception rejects outdated family passes while the patient's own pass stays valid. [Authorization matrix](AUTHORIZATION_MATRIX.md) · [Contract tests](../src/app/mocks/rest.spec.ts) · [Browser journey](../e2e/operations.spec.ts)
+- Added schema version 27 and seven OpenAPI operations. Chromium upgraded an existing version 26 database, preserved a saved document and appointment pass, and created an inactive family relationship. [Migration](../src/app/mocks/database.ts) · [OpenAPI](openapi.yaml)
+- Passed 50 contract and domain tests, 26 Chromium journeys, responsive and keyboard checks, both builds and release verification. [Test report](TEST_REPORT.md) · [Accessibility report](ACCESSIBILITY_REPORT.md)
+- Family access currently uses one pre-verified synthetic relationship at Meridian Central. Family onboarding, public discovery and kiosk check-in remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md) · [Desktop family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)
+
 ## Patient documents and exchange, 27 November 2026
 
 - Added the patient document library and sample-file picker. A patient can load a supplied PDF or TXT, preview provenance, download the file or withdraw their upload. The adapter validates exact sample bytes and keeps one immutable catalogue reference. [Patient library](../src/app/features/patient-documents.ts) · [Document adapter](../src/app/mocks/patient-documents.ts)

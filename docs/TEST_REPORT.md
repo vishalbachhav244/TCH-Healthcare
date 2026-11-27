@@ -7,18 +7,20 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
 | Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
-| `npm test` | 48 contract and domain tests passed across 3 files |
-| `npm run e2e -- --fully-parallel --workers=2` | All 25 Chromium journeys passed, including exact PDF download after reload, signed visit note release and live withdrawal of shared document access. |
-| `npm run build` | Passed. Initial assets approximately 382 kB raw and 98 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 385 kB raw and 99 kB estimated transfer. |
+| `npm test` | 50 contract and domain tests passed across 3 files |
+| `npm run e2e -- --fully-parallel --workers=2` | All 26 Chromium journeys passed, including family grant and revocation, delegated booking and rejection of a revoked family pass. |
+| `npm run build` | Passed. Initial assets approximately 383 kB raw and 99 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 386 kB raw and 99 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 25 to 26 in Chromium. The new document library opened, a saved laboratory grant could still be retrieved and a saved approved draft survived. |
+| Browser-local migration | Verified 26 to 27 in Chromium. A saved document and patient pass survived, and the family relationship began inactive. Earlier checks verified 25 to 26 with a saved laboratory grant and approved draft. |
 | Sample PDF | Poppler `pdfinfo` parsed one US Letter page from the generated PDF 1.4 sample. |
-| OpenAPI | 176 operations, unique IDs and checked internal references. |
+| OpenAPI | 183 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
+
+- Use Enter to open a family grant and Escape to restore focus. Share documents first and verify the caregiver cannot book. Reload, download the exact PDF, enable appointments, book a visit and issue a family pass. Revoke while the document preview is open, verify it closes and restores focus to the heading, and verify reception rejects the pass.
 
 - Reject a non-catalogue document, upload the downloaded synthetic PDF and verify its exact bytes after portal reload. Grant the document version to a matched recipient, preview it, then withdraw the upload and clear the recipient’s live preview.
 - Switch Analytics from a 7- to 14-day window and download the aggregate CSV. Verify its schema and row count, open the specialty report, check the historical empty state and switch to the authorized North facility.
@@ -85,3 +87,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Analytics report](screenshots/analytics-1440.png) · [Mobile automation activity](screenshots/automation-390.png)
 
 [Mobile patient document](screenshots/patient-document-390.png) · [Desktop shared document](screenshots/shared-document-1440.png)
+
+[Desktop family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)

@@ -22,6 +22,7 @@ import { contactPreferences, marketingData } from './marketing';
 import { analyticsReport } from './analytics';
 import { automationData } from './automation';
 import { clinicalDocuments, portalDocument, portalDocuments } from './patient-documents';
+import { delegatedAccess, familyAccess, familyCare, familyDocument } from './family-access';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -116,6 +117,7 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'automation/policy',
     'automation/drafts/status',
     'portal/documents/withdraw',
+    'portal/family-access',
     'clinical/documents/withdraw',
   ].includes(path);
   const incidentWrite =
@@ -154,6 +156,55 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       return patientSharing(scope(session, facilityRecord, 'D12'), session);
     case 'portal/contact-preferences':
       return contactPreferences(scope(session, facilityRecord, 'D12'), session);
+    case 'portal/family-access':
+    case 'portal/family':
+    case 'portal/family/documents/detail':
+    case 'portal/family/availability':
+      return db.transaction(
+        'r',
+        [
+          db.facilities,
+          db.familyRelationships,
+          db.patients,
+          db.appointments,
+          db.practitioners,
+          db.patientDocuments,
+          db.encounters,
+          db.scheduleExceptions,
+        ],
+        async () => {
+          const facility = scope(
+            session,
+            facilityId ? await db.facilities.get(facilityId) : undefined,
+            'D12',
+          );
+          const id = params.get('relationshipId') ?? '';
+          switch (path) {
+            case 'portal/family-access':
+              return familyAccess(facility, session);
+            case 'portal/family':
+              return familyCare(facility, session, id);
+            case 'portal/family/documents/detail':
+              return familyDocument(
+                facility,
+                session,
+                id,
+                params.get('documentId') ?? '',
+                params.get('version'),
+              );
+            default: {
+              const { patient } = await delegatedAccess(facility, session, id, 'appointments');
+              return availability(
+                facility,
+                params.get('practitionerId') ?? '',
+                params.get('day') ?? '',
+                undefined,
+                patient.id,
+              );
+            }
+          }
+        },
+      );
     case 'portal/documents':
       return portalDocuments(scope(session, facilityRecord, 'D12'), session);
     case 'portal/documents/detail':

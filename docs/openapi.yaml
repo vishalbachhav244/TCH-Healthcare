@@ -6492,6 +6492,207 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /portal/family-access:
+    get:
+      operationId: listFamilyAccess
+      summary: List the signed-in patient’s verified family relationships at the selected facility.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FamilyAccessEntry"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "503":
+          $ref: "#/components/responses/Error503"
+    patch:
+      operationId: changeFamilyAccess
+      summary: Grant or revoke the current patient’s versioned family access.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FamilyAccessChange"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/family:
+    get:
+      operationId: getFamilyCare
+      summary: Read only the authorized sections of an active family profile.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - $ref: "#/components/parameters/FamilyRelationshipId"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FamilyCare"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/family/availability:
+    get:
+      operationId: getFamilyAvailability
+      summary: List available appointment times for the delegated patient.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - $ref: "#/components/parameters/FamilyRelationshipId"
+        - name: day
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: practitionerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/family/appointments:
+    post:
+      operationId: bookFamilyAppointment
+      summary: Book a visit for a patient with an active appointments grant.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FamilyBooking"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/family/passes:
+    post:
+      operationId: issueFamilyAppointmentPass
+      summary: Issue an arrival pass bound to the current family grant and appointment version.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FamilyPassRequest"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /portal/family/documents/detail:
+    get:
+      operationId: getFamilyDocumentVersion
+      summary: Read an available document version covered by the current family grant.
+      parameters:
+        - $ref: "#/components/parameters/Facility"
+        - $ref: "#/components/parameters/FamilyRelationshipId"
+        - name: documentId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[1-9][0-9]*$'
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientDocumentDetail"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "503":
+          $ref: "#/components/responses/Error503"
   /portal/documents:
     get:
       operationId: getPatientDocuments
@@ -6755,6 +6956,13 @@ components:
       required: true
       schema:
         type: 'string'
+    FamilyRelationshipId:
+      name: relationshipId
+      in: query
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     Error:
       type: 'object'
@@ -10792,6 +11000,132 @@ components:
           enum:
             - Patient upload
             - Facility release
+    FamilyPermissions:
+      type: object
+      required: [appointments, documents]
+      properties:
+        appointments:
+          type: boolean
+        documents:
+          type: boolean
+    FamilyAccessEntry:
+      type: object
+      required: [id, name, direction, permissions, status, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        direction:
+          type: string
+          enum: [granted, received]
+        permissions:
+          $ref: "#/components/schemas/FamilyPermissions"
+        status:
+          type: string
+          enum: [Inactive, Active, Expired, Revoked]
+        expiresAt:
+          type: integer
+          description: Epoch milliseconds.
+        version:
+          type: integer
+          minimum: 1
+    FamilyAccessChange:
+      type: object
+      required: [relationshipId, version, action]
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        action:
+          type: string
+          enum: [grant, revoke]
+        appointments:
+          type: boolean
+        documents:
+          type: boolean
+        hours:
+          type: integer
+          enum: [24, 168]
+      if:
+        properties:
+          action:
+            const: grant
+      then:
+        required: [appointments, documents, hours]
+        anyOf:
+          - properties:
+              appointments:
+                const: true
+          - properties:
+              documents:
+                const: true
+    FamilyBooking:
+      type: object
+      required: [relationshipId, practitionerId, day, time]
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        practitionerId:
+          type: string
+        day:
+          type: string
+          format: date
+        time:
+          type: string
+          pattern: '^[0-9]{2}:[0-9]{2}$'
+    FamilyPassRequest:
+      type: object
+      required: [relationshipId, appointmentId]
+      properties:
+        relationshipId:
+          type: string
+          format: uuid
+        appointmentId:
+          type: string
+    FamilyCare:
+      type: object
+      required: [access, appointments, clinicians, documents]
+      properties:
+        access:
+          $ref: "#/components/schemas/FamilyAccessEntry"
+        appointments:
+          type: array
+          items:
+            type: object
+            required: [appointment, practitioner]
+            properties:
+              appointment:
+                type: object
+                required: [id, day, time, status, version]
+                properties:
+                  id:
+                    type: string
+                  day:
+                    type: string
+                    format: date
+                  time:
+                    type: string
+                  status:
+                    $ref: "#/components/schemas/Appointment/properties/status"
+                  version:
+                    type: integer
+                    minimum: 0
+              practitioner:
+                $ref: "#/components/schemas/Practitioner"
+        clinicians:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practitioner"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatientDocumentSummary"
     PatientDocumentSummary:
       type: object
       required:

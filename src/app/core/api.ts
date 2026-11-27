@@ -20,6 +20,12 @@ import type {
   WardBloodRequest,
 } from '../domain/blood-bank';
 import type { PatientPortal } from '../domain/portal';
+import type {
+  FamilyAccessEntry,
+  FamilyAccessUpdate,
+  FamilyBooking,
+  FamilyCare,
+} from '../domain/family-access';
 import type { FinanceData, RefundOutcome } from '../domain/finance';
 import type {
   BiomedicalAsset,
@@ -1445,6 +1451,87 @@ export class Api {
     );
   }
 
+  familyAccess(token: string, facility: string) {
+    return this.get('portal/family-access', token, facility).pipe(
+      map((value) =>
+        collection<FamilyAccessEntry>(value, [
+          'id',
+          'name',
+          'direction',
+          'status',
+          'permissions',
+          'version',
+        ]),
+      ),
+    );
+  }
+
+  updateFamilyAccess(
+    token: string,
+    facility: string,
+    entry: FamilyAccessEntry,
+    update: FamilyAccessUpdate,
+  ) {
+    return this.mutate<CommandResult>(
+      'portal/family-access',
+      token,
+      facility,
+      {
+        relationshipId: entry.id,
+        version: entry.version,
+        action: update.action,
+        ...(update.action === 'grant' ? { ...update.permissions, hours: update.hours } : {}),
+      },
+      'PATCH',
+      ['id'],
+    );
+  }
+
+  familyCare(token: string, facility: string, relationshipId: string) {
+    return this.get('portal/family', token, facility, { relationshipId }).pipe(
+      map((value) =>
+        objectShape<FamilyCare>(value, ['access', 'appointments', 'clinicians', 'documents']),
+      ),
+    );
+  }
+
+  familyAvailableTimes(
+    token: string,
+    facility: string,
+    relationshipId: string,
+    day: string,
+    practitionerId: string,
+  ) {
+    return this.get('portal/family/availability', token, facility, {
+      relationshipId,
+      day,
+      practitionerId,
+    }).pipe(map(timeSlots));
+  }
+
+  bookFamilyVisit(token: string, facility: string, relationshipId: string, booking: FamilyBooking) {
+    return this.execute('portal/family/appointments', token, facility, {
+      ...booking,
+      relationshipId,
+    });
+  }
+
+  issueFamilyPass(token: string, facility: string, relationshipId: string, appointmentId: string) {
+    return this.execute('portal/family/passes', token, facility, { relationshipId, appointmentId });
+  }
+
+  familyDocument(token: string, facility: string, relationshipId: string, record: DocumentSummary) {
+    return this.get('portal/family/documents/detail', token, facility, {
+      relationshipId,
+      documentId: record.id,
+      version: record.version,
+    }).pipe(
+      map((value) =>
+        objectShape<DocumentDetail>(value, ['id', 'title', 'body', 'file', 'source', 'version']),
+      ),
+    );
+  }
+
   uploadPatientDocument(token: string, facility: string, format: DocumentFormat, data: string) {
     return this.execute('portal/documents', token, facility, { format, data });
   }
@@ -1564,7 +1651,7 @@ export class Api {
     path: string,
     token: string,
     facility: string,
-    body: Record<string, string>,
+    body: Record<string, string | number | boolean>,
     method: 'POST' | 'PATCH',
     required: readonly (keyof T)[],
   ) {

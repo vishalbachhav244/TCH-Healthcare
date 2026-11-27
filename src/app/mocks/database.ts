@@ -19,7 +19,7 @@ import { facilities, organisations, seed } from './seed';
 import { labFixtures, type LabOrder } from '../domain/diagnostics';
 import type { Organisation } from '../domain/platform';
 import type { StaffMembership } from '../domain/access';
-import { initialStaff } from './accounts';
+import { initialFamilyRelationship, initialStaff } from './accounts';
 import type { Prescription, StockLot, StockMovement } from '../domain/pharmacy';
 import { openingStock, pharmacyFixtures, type LegacyDispensingMovement } from './pharmacy-seed';
 import type { PlatformIncident } from '../domain/platform-operations';
@@ -59,6 +59,7 @@ import type { TransportRequest, TransportUnit } from '../domain/transport';
 import type { Campaign, EngagementPermission, Enquiry } from '../domain/engagement';
 import type { DocumentationDraft, FacilityDocumentationPolicy } from '../domain/intelligence';
 import type { PatientDocument } from '../domain/patient-documents';
+import type { FamilyPass, FamilyRelationship } from '../domain/family-access';
 import { initialBedPreparations, initialTransportUnits } from './support-seed';
 import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
@@ -97,6 +98,8 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   automationPolicies: EntityTable<FacilityDocumentationPolicy, 'facilityId'>;
   documentationDrafts: EntityTable<DocumentationDraft, 'id'>;
   patientDocuments: EntityTable<PatientDocument, 'id'>;
+  familyRelationships: EntityTable<FamilyRelationship, 'id'>;
+  familyPasses: EntityTable<FamilyPass, 'code'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -574,6 +577,26 @@ db.version(26).stores({
   patientDocuments: 'id, [facilityId+patientId], [facilityId+encounterId]',
 });
 
+db.version(27)
+  .stores({
+    familyRelationships: 'id, facilityId',
+    familyPasses: 'code, [relationshipId+appointmentId]',
+  })
+  .upgrade(async (transaction) => {
+    const relationship = initialFamilyRelationship;
+    const facility = await transaction
+      .table<Facility, string>('facilities')
+      .get(relationship.facilityId);
+    const members = await transaction
+      .table<Patient, string>('patients')
+      .bulkGet([relationship.patientId, relationship.caregiverPatientId]);
+    if (
+      facility?.tenantId === relationship.tenantId &&
+      members.every((patient) => patient?.tenantId === relationship.tenantId)
+    )
+      await transaction.table<FamilyRelationship, string>('familyRelationships').add(relationship);
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -581,6 +604,7 @@ export function initialize() {
       [
         db.metadata,
         db.patients,
+        db.familyRelationships,
         db.practitioners,
         db.appointments,
         db.tickets,
@@ -618,6 +642,7 @@ export function initialize() {
         const pharmacy = pharmacyFixtures(initialFacilities, data.encounters, referenceDay);
         await Promise.all([
           db.patients.bulkAdd(data.patients),
+          db.familyRelationships.add(initialFamilyRelationship),
           db.practitioners.bulkAdd(data.practitioners),
           db.appointments.bulkAdd(data.appointments),
           db.tickets.bulkAdd(data.tickets),

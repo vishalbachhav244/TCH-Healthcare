@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 import { Api, errorMessage } from '../core/api';
-import { downloadBlob } from '../core/download';
+import { downloadDocument } from '../core/download';
 import { facilityQuery } from '../core/query';
 import { SessionStore } from '../core/session';
 import { StatusTone } from '../design-system/format';
@@ -139,8 +139,6 @@ export class PatientDocumentLibrary {
   }
 
   protected download(file: DocumentFile) {
-    const bytes = Uint8Array.from(atob(file.data), (character) => character.charCodeAt(0));
-    const type = file.format === 'PDF' ? 'application/pdf' : 'text/plain';
-    downloadBlob(file.filename, new Blob([bytes], { type }));
+    downloadDocument(file);
   }
 }

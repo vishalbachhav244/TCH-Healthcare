@@ -315,6 +315,7 @@ export type EventType =
   | 'PatientDocumentUploaded'
   | 'PatientDocumentReleased'
   | 'PatientDocumentWithdrawn'
+  | 'FamilyAccessChanged'
   | 'IncidentOpened'
   | 'IncidentInvestigating'
   | 'IncidentResolved'

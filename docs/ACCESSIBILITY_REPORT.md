@@ -32,4 +32,6 @@ Enterprise Analytics and the Automation supervisor worklist passed reflow checks
 
 The patient document library and recipient preview passed reflow checks at 390, 768, 1024 and 1440 px. Mobile patient and desktop recipient previews passed the selected axe rules. Enter opens the upload form and Escape restores focus to the upload button. [Patient document preview](screenshots/patient-document-390.png) · [Recipient document preview](screenshots/shared-document-1440.png)
 
+Family profiles passed reflow checks at 390, 768, 1024 and 1440 px. The mobile family pass passed the selected axe rules. Enter opens the grant dialog and Escape returns focus to its trigger. Revocation moves focus from the closed document preview to the Family profiles heading. [Family profiles](screenshots/family-profiles-1440.png) · [Mobile family pass](screenshots/family-pass-390.png)
+
 A complete WCAG review still requires keyboard-only journeys in every workspace, manual screen-reader testing, zoom and text-spacing checks, and current Firefox and WebKit coverage.

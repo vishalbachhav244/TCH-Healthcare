@@ -42,4 +42,5 @@
 | Enterprise analyst | Reads and exports daily and specialty aggregates for assigned facilities. |
 | Automation supervisor | Configures facility draft policy and reads aggregate usage and redacted activity. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released records, synthetic sample uploads, dispensed medications, bill balances and facility contact preferences. Can withdraw their uploads and grant or revoke sharing for an available record version. |
+| Family caregiver | An independent patient account with a verified facility relationship. A current patient-issued grant can authorize appointment listing, booking and passes, document reading and download, or both. Each request checks the relationship, both patient identities, facility, tenant, expiry and applicable permission. Only the patient who owns the profile can change the grant. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

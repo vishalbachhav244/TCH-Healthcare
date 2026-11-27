@@ -52,7 +52,8 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `marketing` | Enquiry conversion, current opt-in counts and local campaign simulations |
 | `analyst` | Facility reporting, specialty activity and aggregate CSV exports |
 | `automation` | Documentation simulation policy, daily limits and redacted activity |
-| `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
+| `patient` | Ananya Sharma’s own care and any active permissions Rajesh shares in Family profiles |
+| `family` | Rajesh Patel’s own care and Family profiles controls to grant, edit or revoke Ananya’s access |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
 Registration accepts evaluation codes such as `REG-1001` that generate a fictional profile. A new appointment yields a QR image and opaque code for same-date reception check-in. Booking, check-in, consultation, laboratory and invoice records persist in this browser across role sign-ins.

@@ -5,14 +5,16 @@
     <h1>My care</h1>
     <p>{{ store.facility()?.name }}</p>
   </div>
-  <button
-    class="button primary"
-    type="button"
-    [disabled]="response.state !== 'ready'"
-    (click)="open(visitDialog)"
-  >
-    <ng-icon name="calendar" /> Book a visit
-  </button>
+  @if (active() !== 'family') {
+    <button
+      class="button primary"
+      type="button"
+      [disabled]="response.state !== 'ready'"
+      (click)="open(visitDialog)"
+    >
+      <ng-icon name="calendar" /> Book a visit
+    </button>
+  }
 </section>
 @if (message()) {
   <p class="inline-notice success" role="status">{{ message() }}</p>
@@ -25,38 +27,41 @@
     <button class="button secondary" (click)="reload.set(reload() + 1)">Retry</button>
   </div>
 } @else {
-  <section class="portal-next panel">
-    <span class="square-icon teal"><ng-icon name="calendar" /></span>
-    <div>
-      <h2>Your next appointment</h2>
-      @if (next(); as visit) {
-        <p>{{ visit.practitioner.name }} · {{ visit.practitioner.specialty }}</p>
-        <p>
-          {{ visit.appointment.day + 'T12:00:00Z' | date: 'EEE, d MMM y' : 'UTC' }} ·
-          {{ visit.appointment.time }} IST
-        </p>
-        @if (visit.ticket) {
+  @if (active() !== 'family') {
+    <section class="portal-next panel">
+      <span class="square-icon teal"><ng-icon name="calendar" /></span>
+      <div>
+        <h2>Your next appointment</h2>
+        @if (next(); as visit) {
+          <p>{{ visit.practitioner.name }} · {{ visit.practitioner.specialty }}</p>
           <p>
-            <span [class]="visit.ticket.status | statusTone">{{ visit.ticket.status }}</span> Token
-            {{ visit.ticket.number }}
+            {{ visit.appointment.day + 'T12:00:00Z' | date: 'EEE, d MMM y' : 'UTC' }} ·
+            {{ visit.appointment.time }} IST
           </p>
+          @if (visit.ticket) {
+            <p>
+              <span [class]="visit.ticket.status | statusTone">{{ visit.ticket.status }}</span>
+              Token
+              {{ visit.ticket.number }}
+            </p>
+          }
+        } @else {
+          <p>You have no upcoming appointments.</p>
         }
-      } @else {
-        <p>You have no upcoming appointments.</p>
+      </div>
+      @if (next(); as visit) {
+        @if (visit.appointment.status === 'Booked') {
+          <button
+            class="button secondary"
+            type="button"
+            (click)="open(visitDialog, visit.appointment.id)"
+          >
+            <ng-icon name="scan" /> Appointment pass
+          </button>
+        }
       }
-    </div>
-    @if (next(); as visit) {
-      @if (visit.appointment.status === 'Booked') {
-        <button
-          class="button secondary"
-          type="button"
-          (click)="open(visitDialog, visit.appointment.id)"
-        >
-          <ng-icon name="scan" /> Appointment pass
-        </button>
-      }
-    }
-  </section>
+    </section>
+  }
   <div class="view-controls portal-controls" aria-label="My care views">
     <button
       class="button secondary"
@@ -113,6 +118,14 @@
       (click)="active.set('preferences')"
     >
       Contact preferences
+    </button>
+    <button
+      class="button secondary"
+      type="button"
+      [attr.aria-pressed]="active() === 'family'"
+      (click)="active.set('family'); message.set('')"
+    >
+      Family profiles
     </button>
   </div>
   @switch (active()) {
@@ -293,6 +306,9 @@
 }
 @if (active() === 'preferences') {
   <tc-contact-preferences />
+}
+@if (active() === 'family') {
+  <tc-family-access />
 }
 <dialog #visitDialog aria-labelledby="portal-booking" (close)="booking.set(false)">
   <div class="dialog-head">

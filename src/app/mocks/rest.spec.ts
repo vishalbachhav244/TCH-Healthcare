@@ -14,6 +14,7 @@ import {
 import type { SchedulingDay } from '../domain/scheduling';
 import type { BookingContext, ClinicalContinuity } from '../domain/continuity';
 import type { PatientPortal } from '../domain/portal';
+import type { FamilyAccessEntry, FamilyCare } from '../domain/family-access';
 import type {
   DocumentDetail,
   DocumentSummary,
@@ -61,7 +62,12 @@ function post(path: string, body: Record<string, string>, session?: Session, fac
   );
 }
 
-function patch(path: string, body: Record<string, string>, session: Session, facility?: string) {
+function patch(
+  path: string,
+  body: Record<string, string | number | boolean>,
+  session: Session,
+  facility?: string,
+) {
   return handle(
     new HttpRequest('PATCH', '/api/v1/' + path, body, { headers: headers(session, facility) }),
   );
@@ -76,6 +82,225 @@ function headers(session?: Session, facility?: string) {
 
 const login = (account: string) =>
   post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+
+describe('patient family profiles', () => {
+  const facility = 'mer-central';
+  const directory = (session: Session) =>
+    get('portal/family-access', session, facility) as Promise<FamilyAccessEntry[]>;
+  const grant = (
+    owner: Session,
+    entry: FamilyAccessEntry,
+    appointments: boolean,
+    documents: boolean,
+  ) =>
+    patch(
+      'portal/family-access',
+      {
+        action: 'grant',
+        relationshipId: entry.id,
+        version: entry.version,
+        appointments,
+        documents,
+        hours: 24,
+      },
+      owner,
+      facility,
+    );
+  const revoke = (owner: Session, entry: FamilyAccessEntry) =>
+    patch(
+      'portal/family-access',
+      { action: 'revoke', relationshipId: entry.id, version: entry.version },
+      owner,
+      facility,
+    );
+
+  it('keeps both patient identities separate and checks document grants, versions and expiry', async () => {
+    const [owner, caregiver, staff] = await Promise.all(
+      ['family', 'patient', 'reception'].map(login),
+    );
+    const [entry] = await directory(owner);
+    expect(entry).toMatchObject({
+      name: 'Ananya Sharma',
+      direction: 'granted',
+      status: 'Inactive',
+    });
+    expect((await directory(caregiver))[0]).toMatchObject({
+      name: 'Rajesh Patel',
+      direction: 'received',
+    });
+    const key = 'relationshipId=' + entry.id;
+    const carePath = 'portal/family?' + key;
+    const { patient: relative } = (await get('portal', owner, facility)) as PatientPortal;
+    const { patient: self } = (await get(
+      'portal?patientId=' + relative.id,
+      caregiver,
+      facility,
+    )) as PatientPortal;
+    expect(self.id).not.toBe(relative.id);
+    await expect(get(carePath, caregiver, facility)).rejects.toMatchObject({ status: 403 });
+    await expect(get(carePath, caregiver, 'mer-north')).rejects.toMatchObject({ status: 403 });
+    await expect(directory(staff)).rejects.toMatchObject({ status: 403 });
+    await expect(grant(caregiver, entry, true, true)).rejects.toMatchObject({ status: 403 });
+    await expect(grant(owner, entry, false, false)).rejects.toMatchObject({ status: 422 });
+
+    const sample = documentFixtures['synthetic-referral-v1'].sample;
+    const { id: documentId } = (await post(
+      'portal/documents',
+      { format: sample.format, data: sample.data },
+      owner,
+      facility,
+    )) as { id: string };
+    try {
+      await grant(owner, entry, false, true);
+      await expect(grant(owner, entry, true, true)).rejects.toMatchObject({ status: 409 });
+      const care = (await get(carePath, caregiver, facility)) as FamilyCare;
+      expect(care.appointments).toEqual([]);
+      expect(care.clinicians).toEqual([]);
+      expect(care.documents).toMatchObject([{ id: documentId, version: 1 }]);
+      await expect(
+        get('portal/family/availability?' + key, caregiver, facility),
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(get(carePath, owner, facility)).rejects.toMatchObject({ status: 403 });
+      const detail = 'portal/family/documents/detail?' + key + '&documentId=' + documentId;
+      await expect(get(detail + '&version=9', caregiver, facility)).rejects.toMatchObject({
+        status: 404,
+      });
+      await expect(get(detail + '&version=1', caregiver, facility)).resolves.toMatchObject({
+        title: sample.title,
+      });
+      await expect(
+        get('portal/documents/detail?documentId=' + documentId + '&version=1', caregiver, facility),
+      ).rejects.toMatchObject({ status: 404 });
+      await patch('portal/documents/withdraw', { documentId, version: '1' }, owner, facility);
+      await expect(get(detail + '&version=1', caregiver, facility)).rejects.toMatchObject({
+        status: 404,
+      });
+      await db.familyRelationships.update(entry.id, { expiresAt: Date.now() - 1 });
+      expect((await directory(caregiver))[0].status).toBe('Expired');
+      await expect(get(carePath, caregiver, facility)).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await db.patientDocuments.delete(documentId);
+      await db.familyRelationships.update(entry.id, {
+        version: entry.version,
+        revoked: false,
+        expiresAt: undefined,
+        permissions: entry.permissions,
+      });
+    }
+  });
+
+  it('keeps arrival passes tied to a live grant and version while preserving the patient pass', async () => {
+    const [owner, caregiver, reception] = await Promise.all(
+      ['family', 'patient', 'reception'].map(login),
+    );
+    const [entry] = await directory(owner);
+    const relationshipId = entry.id;
+    const day = dayInIndia();
+    const practitionerId = 'mer-central-DR-6';
+    const paths = {
+      availability:
+        'portal/family/availability?' +
+        new URLSearchParams({ day, practitionerId, relationshipId }),
+      booking: 'portal/family/appointments',
+      pass: 'portal/family/passes',
+    };
+    const checkIn = (pass: string) => post('queue/check-in', { pass }, reception, facility);
+    const appointmentIds: string[] = [];
+    try {
+      await grant(owner, entry, true, false);
+      const [first, second, third, fourth] = (await get(
+        paths.availability,
+        caregiver,
+        facility,
+      )) as string[];
+      const book = async (time: string) => {
+        const { id } = (await post(
+          paths.booking,
+          { day, practitionerId, time, relationshipId },
+          caregiver,
+          facility,
+        )) as { id: string };
+        appointmentIds.push(id);
+        return id;
+      };
+      const issue = async (appointmentId: string) =>
+        (
+          (await post(paths.pass, { relationshipId, appointmentId }, caregiver, facility)) as {
+            pass: string;
+          }
+        ).pass;
+      const firstId = await book(first);
+      const secondId = await book(second);
+      const thirdId = await book(third);
+      const familyCode = await issue(firstId);
+      const cancelledGrantCode = await issue(secondId);
+      const rescheduledCode = await issue(thirdId);
+      await expect(
+        post('portal/passes', { appointmentId: firstId }, caregiver, facility),
+      ).rejects.toMatchObject({ status: 404 });
+      const { pass: ownCode } = (await post(
+        'portal/passes',
+        { appointmentId: secondId },
+        owner,
+        facility,
+      )) as { pass: string };
+      expect(cancelledGrantCode).not.toBe(ownCode);
+      const view = (await get(
+        'portal/family?relationshipId=' + relationshipId,
+        caregiver,
+        facility,
+      )) as FamilyCare;
+      expect(
+        view.appointments.filter((row) => appointmentIds.includes(row.appointment.id)),
+      ).toHaveLength(3);
+      expect(view.appointments[0].appointment).not.toHaveProperty('pass');
+      await checkIn(familyCode);
+      await expect(checkIn(familyCode)).rejects.toMatchObject({ status: 409 });
+      await patch(
+        'appointments/reschedule',
+        { appointmentId: thirdId, version: '0', day, practitionerId, time: fourth },
+        reception,
+        facility,
+      );
+      await expect(checkIn(rescheduledCode)).rejects.toMatchObject({ status: 404 });
+      const anotherCode = await issue(thirdId);
+      expect(anotherCode).not.toBe(rescheduledCode);
+      await db.familyRelationships.update(relationshipId, { expiresAt: Date.now() - 1 });
+      await expect(checkIn(anotherCode)).rejects.toMatchObject({ status: 404 });
+
+      await grant(owner, (await directory(owner))[0], true, false);
+      const revocable = await issue(secondId);
+      await revoke(owner, (await directory(owner))[0]);
+      await expect(checkIn(revocable)).rejects.toMatchObject({ status: 404 });
+      await expect(issue(secondId)).rejects.toMatchObject({ status: 403 });
+      await grant(owner, (await directory(owner))[0], true, false);
+      await expect(checkIn(cancelledGrantCode)).rejects.toMatchObject({ status: 404 });
+      await expect(checkIn(revocable)).rejects.toMatchObject({ status: 404 });
+      await checkIn(ownCode);
+      const record = (await db.facilities.get(facility))!;
+      try {
+        await db.facilities.update(facility, { active: false });
+        await expect(directory(caregiver)).rejects.toMatchObject({ status: 403 });
+        await expect(issue(thirdId)).rejects.toMatchObject({ status: 403 });
+      } finally {
+        await db.facilities.put(record);
+      }
+    } finally {
+      await db.tickets.where('appointmentId').anyOf(appointmentIds).delete();
+      await db.appointments.bulkDelete(appointmentIds);
+      await db.familyPasses
+        .where('[relationshipId+appointmentId]')
+        .anyOf(appointmentIds.map((id) => [relationshipId, id]))
+        .delete();
+      await db.familyRelationships.update(entry.id, {
+        version: entry.version,
+        revoked: false,
+        expiresAt: undefined,
+        permissions: entry.permissions,
+      });
+    }
+  });
+});
 
 describe('facility workforce and equipment', () => {
   const facility = 'mer-central';

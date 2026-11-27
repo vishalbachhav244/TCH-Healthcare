@@ -14,7 +14,7 @@
 | 10 Procurement | Request replenishment → approve → choose supplier → issue order → receive all or part into the lot ledger → verify stock and order balance | Supplier onboarding, multiple order lines, non-pharmacy stock and payables matching |
 | 11 SaaS onboarding | Create organization → assign preset plan → add and activate facility → set entitlements and named roles → refresh or revoke access | Staff account creation, department configuration and subscription renewals |
 | 12 Integration | Configure connector → redeem patient code → request record → grant one available version → verify provenance and consent → audit access | Real external transport, verified partner identities and wider record coverage |
-| 13 Patient application | Clinician selection → booking → pass → queue status → released reports, discharge summaries and dispensed medication history → consent or patient-owned follow-up booking | Public discovery, family access and reminders |
+| 13 Patient application | Book → use pass → follow queue → review released records. Grant family appointment or document access → caregiver opens the profile → revoke access or let it expire | Public discovery, family relationship onboarding and reminders |
 | 14 CRM and marketing | Open | Conversion, engagement and campaigns |
 | 15 AI documentation | Open | Draft, review and audit |
 

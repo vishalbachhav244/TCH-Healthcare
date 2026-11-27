@@ -1,4 +1,5 @@
 import type { StaffMembership, StaffRole } from '../domain/access';
+import type { FamilyRelationship } from '../domain/family-access';
 
 export const platformAccount = 'platform';
 export const subscriptionAccount = 'success';
@@ -7,6 +8,27 @@ export const integrationAccount = 'integration';
 export const patientAccount = 'patient';
 export const patientFacility = 'mer-central';
 export const examplePatientId = 'TC-MERIDIAN-01001';
+export const familyAccount = 'family';
+const patientAccounts: Readonly<Record<string, string>> = {
+  [patientAccount]: examplePatientId,
+  [familyAccount]: 'TC-MERIDIAN-01002',
+};
+
+export function patientIdentity(account: string) {
+  return Object.hasOwn(patientAccounts, account) ? patientAccounts[account] : undefined;
+}
+
+export const initialFamilyRelationship: FamilyRelationship = {
+  id: '82532801-1ea5-4e48-a4d3-eb865c0db83b',
+  facilityId: patientFacility,
+  tenantId: 'meridian',
+  patientId: patientAccounts[familyAccount],
+  caregiverPatientId: examplePatientId,
+  caregiverAccount: patientAccount,
+  permissions: { appointments: false, documents: false },
+  revoked: false,
+  version: 1,
+};
 export const recordRecipients = [
   { account: 'partnercare', name: 'CityCare Referral Centre' },
   { account: 'partnerlab', name: 'Horizon Specialist Diagnostics' },
@@ -91,6 +113,7 @@ export const accountNames: Readonly<Record<string, string>> = {
   [operationsAccount]: 'Aniket Shah',
   [integrationAccount]: 'Maya Menon',
   [patientAccount]: 'Ananya Sharma',
+  [familyAccount]: 'Rajesh Patel',
   ...Object.fromEntries(Object.entries(staff).map(([key, value]) => [key, value.name])),
   ...Object.fromEntries(recordRecipients.map(({ account, name }) => [account, name])),
 };

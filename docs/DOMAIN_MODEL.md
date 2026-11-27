@@ -2,7 +2,7 @@
 
 A facility belongs to a tenant organization with a subscription plan. A facility has versioned inpatient access. A patient has a tenant-local ID. A practitioner is assigned to a facility and specialty. An appointment links a patient and practitioner. A queue ticket points to the checked-in appointment. An encounter identifies a consultation, its practitioner and its signed observation.
 
-An outpatient invoice links a signed encounter, line items and posted payments. A laboratory order links an encounter with an accession, finding, review and publication state. Admissions track bed ownership separately and preserve the allocated bed reference after discharge. A patient session may find records only for its own patient identity and facility.
+An outpatient invoice links a signed encounter, line items and posted payments. A laboratory order links an encounter with an accession, finding, review and publication state. Admissions track bed ownership separately and preserve the allocated bed reference after discharge. The portal’s own-care endpoints resolve the signed-in patient and selected facility. Family endpoints resolve the patient named in the current delegated grant.
 
 A connector binds one facility to one recipient identity. A matching code references one patient and connector, expires after 15 minutes and allows one request. A `ConsentGrant` is stored separately from the request and contains a `RecordReference` for the exact released laboratory report version, its expiry and revocation state. Every authorized recipient retrieval attempt with an existing request records a release or denial outcome. The audit projection excludes patient identifiers and report content.
 
@@ -45,5 +45,7 @@ An `Enquiry` links a tenant patient to a facility, capture source, specialty and
 An `AnalyticsReport` contains dated totals and specialty aggregates. Wait sample counts and elapsed time support a weighted period mean. A facility `DocumentationPolicy` controls generation and the daily quota. A `DocumentationDraft` references the assigned encounter, author, format, version and review state. Review is separate from the encounter lifecycle. [Intelligence contracts](../src/app/domain/intelligence.ts)
 
 A `PatientDocument` belongs to one patient and facility. Uploads reference an immutable synthetic fixture. Facility releases reference a signed encounter and the recorded visit details. A consent grant identifies the record type, ID and version. [Document contracts](../src/app/domain/patient-documents.ts)
+
+A `FamilyRelationship` links two verified synthetic patients at one facility with independently selectable appointment and document permissions. The owner’s grant has an expiration time and a version. A `FamilyPass` binds its own opaque code to the grant and appointment versions. Reception verifies both before creating a ticket for the appointment patient. [Family portal contracts](../src/app/domain/family-access.ts)
 
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

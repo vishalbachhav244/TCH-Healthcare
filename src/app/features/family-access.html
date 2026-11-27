@@ -1,0 +1,350 @@
+@let directory = entries();
+<section class="panel portal-list" aria-labelledby="family-heading">
+  <h2 id="family-heading" #heading tabindex="-1">Family profiles</h2>
+  <p>Manage who can help with care at this facility.</p>
+  @if (notice()) {
+    <p class="inline-notice" role="status">{{ notice() }}</p>
+  }
+  @switch (directory.state) {
+    @case ('loading') {
+      <p class="state-panel" role="status">Loading family profiles…</p>
+    }
+    @case ('error') {
+      <p class="state-panel" role="alert">{{ directory.message }}</p>
+      <button class="button secondary" type="button" (click)="refresh()">Retry</button>
+    }
+    @case ('ready') {
+      @for (access of directory.data; track access.id) {
+        <article>
+          <span class="square-icon teal"><ng-icon name="users" /></span>
+          <div>
+            <strong>{{ access.name }}</strong>
+            <p>
+              {{
+                access.direction === 'granted' ? 'Access to your care' : 'Access shared with you'
+              }}
+            </p>
+            <p>
+              <span [class]="access.status | statusTone">{{ access.status }}</span>
+              @if (access.status === 'Active') {
+                · Until {{ access.expiresAt | date: 'd MMM y, h:mm a' : '+0530' }} IST
+              }
+            </p>
+          </div>
+          @if (access.direction === 'granted') {
+            <div class="view-controls">
+              <button
+                class="button secondary"
+                type="button"
+                (click)="open({ kind: 'grant', access })"
+              >
+                {{ access.status === 'Active' ? 'Edit access' : 'Grant access' }}
+              </button>
+              @if (access.status === 'Active') {
+                <button
+                  class="button secondary"
+                  type="button"
+                  (click)="open({ kind: 'revoke', access })"
+                >
+                  Revoke access
+                </button>
+              }
+            </div>
+          } @else if (access.status === 'Active') {
+            <button
+              class="button secondary"
+              type="button"
+              [attr.aria-expanded]="selected() === access.id"
+              [attr.aria-controls]="selected() === access.id ? 'family-care' : null"
+              (click)="pick(selected() === access.id ? undefined : access)"
+            >
+              {{ selected() === access.id ? 'Close family profile' : 'Open family profile' }}
+            </button>
+          } @else {
+            <p>
+              {{
+                access.status === 'Inactive'
+                  ? 'Waiting for permission.'
+                  : 'This profile is unavailable.'
+              }}
+            </p>
+          }
+        </article>
+      } @empty {
+        <p class="state-panel">No family profiles are linked at this facility.</p>
+      }
+    }
+  }
+</section>
+@if (profile(); as access) {
+  <section id="family-care" class="panel portal-list" aria-labelledby="family-care-heading">
+    <h2 id="family-care-heading">{{ access.name }}’s care</h2>
+    @let state = care();
+    @if (state.state === 'loading') {
+      <p class="state-panel" role="status">Loading shared care…</p>
+    } @else if (state.state === 'error') {
+      <p class="state-panel" role="alert">{{ state.message }}</p>
+      <button class="button secondary" type="button" (click)="refresh()">Retry</button>
+    } @else if (state.data.access.version === access.version) {
+      @if (access.permissions.appointments) {
+        <div class="panel-heading">
+          <h3>Appointments</h3>
+          <button class="button primary" type="button" (click)="open({ kind: 'book', access })">
+            <ng-icon name="calendar" /> Book family appointment
+          </button>
+        </div>
+        @for (row of state.data.appointments.slice(0, more()); track row.appointment.id) {
+          <article>
+            <div>
+              <strong>{{ row.practitioner.name }}</strong>
+              <p>
+                {{ row.appointment.day + 'T12:00:00Z' | date: 'EEE, d MMM y' : 'UTC' }}
+                · {{ row.appointment.time }} IST
+              </p>
+              <p>
+                <span [class]="row.appointment.status | statusTone">{{
+                  row.appointment.status
+                }}</span>
+              </p>
+            </div>
+            @if (row.appointment.day >= today && row.appointment.status === 'Booked') {
+              <button
+                class="button secondary"
+                type="button"
+                (click)="
+                  open({
+                    kind: 'pass',
+                    access,
+                    appointmentId: row.appointment.id,
+                    appointmentVersion: row.appointment.version,
+                  })
+                "
+              >
+                <ng-icon name="scan" /> Family appointment pass
+              </button>
+            }
+          </article>
+        } @empty {
+          <p>No appointments at this facility.</p>
+        }
+      } @else {
+        <p>Appointment access has not been shared.</p>
+      }
+      @if (access.permissions.documents) {
+        <div class="panel-heading"><h3>Documents</h3></div>
+        @for (record of state.data.documents.slice(0, more()); track record.id) {
+          <article>
+            <div>
+              <strong>{{ record.title }}</strong>
+              <p>{{ record.origin }} · {{ record.format }}</p>
+            </div>
+            <button
+              class="button secondary"
+              type="button"
+              (click)="open({ kind: 'document', access, record })"
+            >
+              View shared document
+            </button>
+          </article>
+        } @empty {
+          <p>No shared documents are available.</p>
+        }
+      } @else {
+        <p>Document access has not been shared.</p>
+      }
+      @if (state.data.appointments.length > more() || state.data.documents.length > more()) {
+        <div class="table-footer">
+          <button class="button secondary" type="button" (click)="more.set(more() + 6)">
+            Show more
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+<dialog #editor aria-labelledby="family-dialog-title" (cancel)="close()">
+  <div class="dialog-head">
+    <h2 id="family-dialog-title">
+      @if (action(); as task) {
+        @switch (task.kind) {
+          @case ('grant') {
+            Share access with {{ task.access.name }}
+          }
+          @case ('revoke') {
+            Revoke access for {{ task.access.name }}
+          }
+          @case ('book') {
+            Book for {{ task.access.name }}
+          }
+          @case ('pass') {
+            Appointment pass for {{ task.access.name }}
+          }
+          @case ('document') {
+            {{ task.record.title }}
+          }
+        }
+      }
+    </h2>
+    <button class="icon-button" type="button" aria-label="Close" (click)="close()">
+      <ng-icon name="close" />
+    </button>
+  </div>
+  @if (action(); as task) {
+    <div class="dialog-body fields">
+      @if (error()) {
+        <p class="inline-notice" role="alert">{{ error() }}</p>
+      }
+      @switch (task.kind) {
+        @case ('grant') {
+          <form
+            class="fields"
+            [formGroup]="permissions"
+            (ngSubmit)="changeAccess(task.access, 'grant')"
+          >
+            <p>The permissions apply at this facility and end after the duration you select.</p>
+            <fieldset class="fields family-permissions">
+              <legend>Permissions</legend>
+              <label>
+                <input type="checkbox" formControlName="appointments" /> View and book appointments
+                and use appointment passes
+              </label>
+              <label>
+                <input type="checkbox" formControlName="documents" /> View and download documents
+              </label>
+            </fieldset>
+            <div class="select-control">
+              <label for="family-duration">Duration</label>
+              <select id="family-duration" formControlName="hours">
+                @for (hours of durations; track hours) {
+                  <option [ngValue]="hours">{{ hours === 24 ? '24 hours' : '7 days' }}</option>
+                }
+              </select>
+            </div>
+            <button
+              class="button primary"
+              type="submit"
+              [disabled]="
+                busy() || !(permissions.value.appointments || permissions.value.documents)
+              "
+            >
+              Save access
+            </button>
+          </form>
+        }
+        @case ('revoke') {
+          <p>
+            Access ends immediately. Family appointment passes already issued to
+            {{ task.access.name }} will stop working.
+          </p>
+          <button
+            class="button primary"
+            type="button"
+            [disabled]="busy()"
+            (click)="changeAccess(task.access, 'revoke')"
+          >
+            Confirm revocation
+          </button>
+        }
+        @case ('book') {
+          @let state = care();
+          @if (profile()?.version === task.access.version && state.state === 'ready') {
+            <form class="fields" [formGroup]="booking" (ngSubmit)="book(task.access)">
+              <div class="select-control">
+                <label for="family-clinician">Clinician</label>
+                <select
+                  id="family-clinician"
+                  formControlName="practitionerId"
+                  (change)="booking.controls.time.reset()"
+                >
+                  <option value="">Choose a clinician</option>
+                  @for (clinician of state.data.clinicians; track clinician.id) {
+                    <option [value]="clinician.id">
+                      {{ clinician.name }} · {{ clinician.specialty }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <div class="select-control">
+                <label for="family-date">Date</label>
+                <input
+                  id="family-date"
+                  type="date"
+                  formControlName="day"
+                  [min]="today"
+                  [max]="latest"
+                  (change)="booking.controls.time.reset()"
+                />
+              </div>
+              @let times = slots();
+              @if (times.state === 'ready' && times.data.length) {
+                <div class="select-control">
+                  <label for="family-time">Time (IST)</label>
+                  <select id="family-time" formControlName="time">
+                    <option value="">Choose a time</option>
+                    @for (time of times.data; track time) {
+                      <option [value]="time">{{ time }}</option>
+                    }
+                  </select>
+                </div>
+              } @else if (times.state === 'ready') {
+                <p role="status">No times available. Choose another date or clinician.</p>
+              } @else if (times.state === 'error') {
+                <p role="alert">{{ times.message }}</p>
+                <button class="button secondary" type="button" (click)="refresh()">Retry</button>
+              } @else if (
+                booking.controls.practitionerId.value &&
+                booking.controls.day.value >= today &&
+                booking.controls.day.value <= latest
+              ) {
+                <p role="status">Checking available times…</p>
+              }
+              <button
+                class="button primary"
+                type="submit"
+                [disabled]="busy() || booking.invalid || times.state !== 'ready'"
+              >
+                Confirm family appointment
+              </button>
+            </form>
+          } @else {
+            <p role="status">Checking family access…</p>
+          }
+        }
+        @case ('pass') {
+          @if (currentPass() && pass()) {
+            <p>Present this pass at reception on the appointment date.</p>
+            @if (qr()) {
+              <img [src]="qr()" width="192" height="192" alt="Family appointment QR code" />
+            }
+            <p>
+              <strong>Pass code</strong> <code class="family-pass-code">{{ pass() }}</code>
+            </p>
+          } @else if (!error()) {
+            <p role="status">Preparing the appointment pass…</p>
+          }
+        }
+        @case ('document') {
+          @let detail = preview();
+          @if (profile()?.version === task.access.version && detail.state === 'ready') {
+            <p>{{ task.access.name }} · {{ detail.data.source }}</p>
+            @for (line of detail.data.body; track $index) {
+              <p>{{ line }}</p>
+            }
+            <button
+              class="button primary"
+              type="button"
+              [disabled]="busy()"
+              (click)="downloadSharedDocument()"
+            >
+              Download {{ detail.data.file.format }}
+            </button>
+          } @else if (detail.state === 'error') {
+            <p role="alert">{{ detail.message }}</p>
+          } @else {
+            <p role="status">Loading shared document…</p>
+          }
+        }
+      }
+    </div>
+  }
+</dialog>

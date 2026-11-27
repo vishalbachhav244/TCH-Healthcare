@@ -37,6 +37,12 @@ import { crmCommand } from './crm';
 import { campaignCommand, updateContactPreferences } from './marketing';
 import { automationCommand } from './automation';
 import { documentCommand } from './patient-documents';
+import {
+  appointmentByFamilyPass,
+  bookFamilyVisit,
+  changeFamilyAccess,
+  issueFamilyPass,
+} from './family-access';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -118,6 +124,8 @@ export async function command(
       db.automationPolicies,
       db.documentationDrafts,
       db.patientDocuments,
+      db.familyRelationships,
+      db.familyPasses,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -276,7 +284,9 @@ export async function command(
           const code = field(payload, 'pass').toLowerCase();
           if (!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/.test(code))
             throw new ApiError(422, 'Enter a valid appointment pass.');
-          const appointment = await db.appointments.where('pass').equals(code).first();
+          const appointment =
+            (await db.appointments.where('pass').equals(code).first()) ??
+            (await appointmentByFamilyPass(facility, code));
           if (appointment?.facilityId !== facility.id)
             throw new ApiError(404, 'Appointment pass not found for this facility.');
           if (appointment.day !== dayInIndia())
@@ -643,6 +653,35 @@ export async function command(
             payload,
           );
           break;
+        case 'portal/family-access':
+        case 'portal/family/appointments':
+        case 'portal/family/passes': {
+          const facility = scope(session, facilityRecord, 'D12', 'portal');
+          const relationshipId = field(payload, 'relationshipId');
+          if (path === 'portal/family-access') {
+            changed = await changeFamilyAccess(facility, session, relationshipId, payload);
+          } else if (path === 'portal/family/appointments') {
+            const appointment = await bookFamilyVisit(facility, session, relationshipId, {
+              practitionerId: field(payload, 'practitionerId'),
+              day: field(payload, 'day'),
+              time: field(payload, 'time'),
+            });
+            changed = {
+              ...event(facility, 'AppointmentBooked', appointment.id),
+              actor: session.account,
+            };
+          } else {
+            const id = field(payload, 'appointmentId');
+            pass = await issueFamilyPass(facility, session, relationshipId, id);
+            await db.events.add({
+              ...event(facility, 'AppointmentPassIssued', id),
+              id: crypto.randomUUID(),
+              actor: session.account,
+            });
+            return { id, pass, event: undefined };
+          }
+          break;
+        }
         case 'clinical/documents':
         case 'clinical/documents/withdraw':
           changed = await documentCommand(

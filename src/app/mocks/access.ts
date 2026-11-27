@@ -3,10 +3,9 @@ import type { Facility, Session } from '../domain/operations';
 import { workspaceEnabled, type Resource } from '../domain/workspaces';
 import {
   accountNames,
-  examplePatientId,
   globalAccess,
-  patientAccount,
   patientFacility,
+  patientIdentity,
   platformAccount,
   subscriptionAccount,
 } from './accounts';
@@ -29,7 +28,7 @@ async function project(identity: Identity): Promise<Session> {
   if (!Object.hasOwn(accountNames, identity.account) || !name)
     throw new ApiError(401, 'Sign in to continue.');
   let facilityAccess: Session['facilityAccess'] = {};
-  if (identity.account === patientAccount) {
+  if (patientIdentity(identity.account)) {
     const facility = await db.facilities.get(patientFacility);
     if (facility && facility.active !== false) facilityAccess[patientFacility] = patientAccess;
   } else if (!Object.hasOwn(globalAccess, identity.account)) {
@@ -73,8 +72,9 @@ async function project(identity: Identity): Promise<Session> {
 }
 
 export function patientSubject(session: Session) {
-  if (session.account !== patientAccount) throw new ApiError(403, 'Patient access is unavailable.');
-  return examplePatientId;
+  const patientId = patientIdentity(session.account);
+  if (!patientId) throw new ApiError(403, 'Patient access is unavailable.');
+  return patientId;
 }
 
 export async function startSession(body: unknown): Promise<Session> {

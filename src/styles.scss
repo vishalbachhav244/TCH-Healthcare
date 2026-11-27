@@ -447,9 +447,22 @@ ng-icon {
   font-size: 12px;
   color: var(--muted);
 }
+
+.family-pass-code {
+  display: block;
+  margin-top: 0.4rem;
+  overflow-wrap: anywhere;
+}
 .mobile-only,
 .nav-scrim {
   display: none;
+}
+
+.family-permissions {
+  min-inline-size: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
 }
 
 .page {
@@ -1178,12 +1191,14 @@ dialog::backdrop {
 .document-facts dd {
   margin: 0.125rem 0 0;
 }
-.fields .document-check {
+.fields .document-check,
+.fields .family-permissions label {
   display: flex;
   align-items: flex-start;
   gap: 0.625rem;
 }
-.fields .document-check input {
+.fields .document-check input,
+.fields .family-permissions input {
   width: 1.125rem;
   height: 1.125rem;
   min-height: 0;
