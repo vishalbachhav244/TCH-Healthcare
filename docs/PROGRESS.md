@@ -1,5 +1,10 @@
 # Progress ledger
 
+## Demo sign-in password, 27 November 2026
+
+- Rotated the shared password for all 43 built-in accounts. The mock sign-in and hosted sign-in page use the same value. Invitation-based patient enrollment continues to use a password chosen by the patient. [Credentials](../src/app/mocks/credentials.ts) · [Hosted sign-in screenshot](screenshots/cloudflare-demo-sign-in.jpg)
+- Lint, formatting, 57 unit and contract tests, all three builds and release verification passed. The contract rejects the previous password and accepts the new password for every built-in account. Chromium passed the invited enrollment, public booking and clinic access journeys. [Contract cases](../src/app/mocks/rest.spec.ts) · [Release verification](../scripts/verify-release.mjs)
+
 ## Public Cloudflare evaluation, 27 November 2026
 
 - Preserved the existing commit history at [TCH-Healthcare on GitHub](https://github.com/vishalbachhav244/TCH-Healthcare). Added a separate Angular build for the public synthetic demo and kept the local evaluation and inactive release configurations. [Build configuration](../angular.json) · [Deployment guide](DEPLOYMENT_GUIDE.md)

@@ -11,7 +11,9 @@ const hostedOrigin = 'https://tch-healthcare-demo.pages.dev';
 const scripts = (await readdir(inactive)).filter((name) => name.endsWith('.js'));
 const code = await Promise.all(scripts.map((name) => readFile(join(inactive, name), 'utf8')));
 assert(
-  !code.some((source) => /TrueCare-Local-2026|truecare-evaluation-v1|H4K9-M7Q2-V6N3/.test(source)),
+  !code.some((source) =>
+    /Pass@2027|TrueCare-Local-2026|truecare-evaluation-v1|H4K9-M7Q2-V6N3/.test(source),
+  ),
   'The inactive build includes evaluation authentication or persistence',
 );
 assert(!(await readdir(inactive)).includes('ngsw-worker.js'));
@@ -95,12 +97,12 @@ try {
   await page.goto(`${hostedOrigin}/find-care`);
   await page.getByRole('heading', { name: 'Find care', exact: true }).waitFor();
   await page.goto(`${hostedOrigin}/sign-in`);
-  await page.getByText(/Public demo\. Use only fictional information/).waitFor();
+  await page.getByText('Pass@2027', { exact: true }).waitFor();
   await page.getByLabel('Account ID').fill('patient');
-  await page.getByLabel('Password', { exact: true }).fill('incorrect-password');
+  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('alert').waitFor();
-  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
+  await page.getByLabel('Password', { exact: true }).fill('Pass@2027');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL(`${hostedOrigin}/work/portal`);
   await page.reload();

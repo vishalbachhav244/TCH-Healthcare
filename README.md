@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation accounts with the shared password `TrueCare-Local-2026`. Enter only fictional data. Account credentials are distributed in this developer guide.
+Open [TrueCare on loopback](http://127.0.0.1:4280). All built-in demo accounts below use the shared password `Pass@2027`. Newly registered patient accounts use the password chosen during registration. Enter only fictional data.
 
 Open [Find care](http://127.0.0.1:4280/find-care) to browse published sample facilities and times. Select an appointment and sign in with `patient` or `family` to book at Meridian Medical Centre. On the appointment day, open the [self-service kiosk](http://127.0.0.1:4280/kiosk/mer-central) and enter the appointment code or scan a QR pass image.
 

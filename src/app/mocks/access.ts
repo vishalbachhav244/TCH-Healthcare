@@ -11,7 +11,7 @@ import {
   subscriptionAccount,
 } from './accounts';
 import { db } from './database';
-import { passwordVerifier } from './credentials';
+import { demoAccountPassword, passwordVerifier } from './credentials';
 
 export class ApiError extends Error {
   constructor(
@@ -103,7 +103,7 @@ export async function startSession(body: unknown): Promise<Session> {
   )
     throw invalid();
   if (Object.hasOwn(accountNames, account)) {
-    if (password !== 'TrueCare-Local-2026') throw invalid();
+    if (password !== demoAccountPassword) throw invalid();
   } else {
     const enrolled = await db.patientAccounts.get(account);
     if (!enrolled || (await passwordVerifier(password, enrolled.salt)) !== enrolled.verifier)

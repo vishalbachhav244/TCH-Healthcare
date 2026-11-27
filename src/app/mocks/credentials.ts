@@ -1,3 +1,5 @@
+export const demoAccountPassword = 'Pass@2027';
+
 export async function passwordVerifier(password: string, salt: readonly number[]) {
   const key = await crypto.subtle.importKey(
     'raw',

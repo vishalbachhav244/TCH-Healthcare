@@ -6,7 +6,7 @@ import { dayInIndia, shiftDay } from '../src/app/domain/operations';
 async function signIn(page: Page, account: string) {
   await page.goto('/');
   await page.getByLabel('Account ID').fill(account);
-  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
+  await page.getByLabel('Password', { exact: true }).fill('Pass@2027');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/work\//, { timeout: 20_000 });
 }
@@ -339,7 +339,7 @@ test('finds published care and preserves the selected visit through patient sign
   await appointment.getByRole('link', { name: 'Sign in to book' }).click();
   await expect(page).toHaveURL(/\/sign-in\?/);
   await page.getByLabel('Account ID').fill('patient');
-  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
+  await page.getByLabel('Password', { exact: true }).fill('Pass@2027');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/find-care\?/);
   await expect(time).toHaveValue(chosenTime);

@@ -38,6 +38,7 @@ import type { FinanceData } from '../domain/finance';
 import type { InsuranceRow } from '../domain/insurance';
 import type { InventoryData, ProcurementData } from '../domain/procurement';
 import { criticalCareWard, type AcuteView } from '../domain/acute-care';
+import { accountNames } from './accounts';
 import { db, initialize } from './database';
 import { handle } from './rest';
 import { seed } from './seed';
@@ -82,7 +83,20 @@ function headers(session?: Session, facility?: string) {
 }
 
 const login = (account: string) =>
-  post('session', { account, password: 'TrueCare-Local-2026' }) as Promise<Session>;
+  post('session', { account, password: 'Pass@2027' }) as Promise<Session>;
+
+it('accepts the new shared password and rejects the previous one for every built-in account', async () => {
+  for (const account of Object.keys(accountNames)) {
+    await expect(
+      post('session', { account, password: 'TrueCare-Local-2026' }),
+    ).rejects.toMatchObject({
+      status: 401,
+    });
+    const session = await login(account);
+    expect(session.account).toBe(account);
+    await db.sessions.delete(session.token);
+  }
+});
 
 describe('patient self-registration', () => {
   const password = 'Synthetic-Dawn-28';
@@ -146,7 +160,7 @@ describe('patient self-registration', () => {
         'occurredAt',
         'type',
       ]);
-      await expect(signIn(account, 'TrueCare-Local-2026')).rejects.toMatchObject({ status: 401 });
+      await expect(signIn(account, 'Pass@2027')).rejects.toMatchObject({ status: 401 });
       await expect(signIn(account)).resolves.toMatchObject({ patientId: session.patientId });
       await expect(get('portal', session, 'mer-central')).rejects.toMatchObject({ status: 403 });
       await expect(get('patients', session, 'sunrise')).rejects.toMatchObject({ status: 403 });
