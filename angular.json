@@ -53,6 +53,16 @@
                 }
               ]
             },
+            "hosted-evaluation": {
+              "outputPath": "dist/hosted-evaluation",
+              "serviceWorker": "ngsw-config.json",
+              "fileReplacements": [
+                {
+                  "replace": "src/app/core/evaluation.ts",
+                  "with": "src/app/core/evaluation.hosted.ts"
+                }
+              ]
+            },
             "evaluation": {
               "outputPath": "dist/evaluation",
               "serviceWorker": "ngsw-config.json",

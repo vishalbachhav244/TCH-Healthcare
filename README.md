@@ -2,6 +2,8 @@
 
 TrueCare is an Angular frontend for healthcare operations. This independent repository was built from the November 26 enterprise frontend brief.
 
+Try the [public TrueCare demo](https://tch-healthcare-demo.pages.dev). Use the sample accounts below and enter only fictional information. Each browser keeps its own demo records.
+
 ## Run the evaluation workspace
 
 Use Node.js 24.22.3. Start from this directory.
@@ -114,6 +116,7 @@ npm run format:check
 npm test
 npm run build
 npm run build:evaluation
+npm run build:hosted-evaluation
 npx playwright install chromium
 npm run e2e
 npm run verify:release

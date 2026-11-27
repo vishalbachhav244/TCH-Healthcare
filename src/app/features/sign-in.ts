@@ -3,7 +3,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { SessionStore } from '../core/session';
-import { evaluationAvailable } from '../core/evaluation';
+import { evaluationAvailable, hostedDemoPassword } from '../core/evaluation';
 import { errorMessage } from '../core/api';
 import { Brand } from '../design-system/brand';
 import { readPublicAppointment } from '../domain/public-care';
@@ -17,6 +17,7 @@ import { accountPattern } from '../domain/registration';
 export class SignIn {
   private readonly router = inject(Router);
   private readonly session = inject(SessionStore);
+  protected readonly hostedDemoPassword = hostedDemoPassword;
   protected readonly selectedVisit = readPublicAppointment(
     inject(ActivatedRoute).snapshot.queryParamMap,
   );

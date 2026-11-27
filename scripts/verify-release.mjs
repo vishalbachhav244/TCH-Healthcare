@@ -6,6 +6,8 @@ import { chromium } from '@playwright/test';
 
 const inactive = 'dist/truecare/browser';
 const evaluation = 'dist/evaluation/browser';
+const hosted = 'dist/hosted-evaluation/browser';
+const hostedOrigin = 'https://tch-healthcare-demo.pages.dev';
 const scripts = (await readdir(inactive)).filter((name) => name.endsWith('.js'));
 const code = await Promise.all(scripts.map((name) => readFile(join(inactive, name), 'utf8')));
 assert(
@@ -13,9 +15,11 @@ assert(
   'The inactive build includes evaluation authentication or persistence',
 );
 assert(!(await readdir(inactive)).includes('ngsw-worker.js'));
-const worker = JSON.parse(await readFile(join(evaluation, 'ngsw.json'), 'utf8'));
-assert.equal(worker.dataGroups.length, 0);
-assert(worker.assetGroups.length > 0);
+for (const directory of [evaluation, hosted]) {
+  const worker = JSON.parse(await readFile(join(directory, 'ngsw.json'), 'utf8'));
+  assert.equal(worker.dataGroups.length, 0);
+  assert(worker.assetGroups.length > 0);
+}
 
 const mime = {
   '.js': 'text/javascript',
@@ -34,6 +38,17 @@ function browserAsset(url) {
   };
 }
 
+function serveBuild(page, origin, directory) {
+  return page.route(`${origin}/**`, async (route) => {
+    const { asset, contentType } = browserAsset(route.request().url());
+    try {
+      await route.fulfill({ status: 200, path: join(directory, asset), contentType });
+    } catch {
+      await route.fulfill({ status: 404 });
+    }
+  });
+}
+
 const server = createServer(async (request, response) => {
   const { asset, contentType } = browserAsset(request.url);
   try {
@@ -49,7 +64,7 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 let browser;
 try {
   browser = await chromium.launch();
-  const page = await browser.newPage();
+  const page = await browser.newPage({ serviceWorkers: 'block' });
   for (const route of [
     '/',
     '/sign-in',
@@ -63,21 +78,36 @@ try {
     await page.getByRole('heading', { name: /(?:Workspace|Queue display) unavailable/ }).waitFor();
   }
   // Fulfil requests from local build files so the non-loopback check stays offline.
-  await page.route('http://truecare.invalid/**', async (route) => {
-    const { asset, contentType } = browserAsset(route.request().url());
-    try {
-      await route.fulfill({ status: 200, path: join(evaluation, asset), contentType });
-    } catch {
-      await route.fulfill({ status: 404 });
-    }
-  });
+  await serveBuild(page, 'http://truecare.invalid', evaluation);
   await page.goto('http://truecare.invalid/');
   await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
   for (const route of ['/find-care', '/kiosk/mer-central', '/register']) {
     await page.goto('http://truecare.invalid' + route);
     await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
   }
-  console.log('Verified inactive release routes and evaluation host restrictions.');
+
+  const otherOrigin = 'https://preview.tch-healthcare-demo.pages.dev';
+  await serveBuild(page, otherOrigin, hosted);
+  await page.goto(`${otherOrigin}/sign-in`);
+  await page.getByRole('heading', { name: 'Workspace unavailable' }).waitFor();
+
+  await serveBuild(page, hostedOrigin, hosted);
+  await page.goto(`${hostedOrigin}/find-care`);
+  await page.getByRole('heading', { name: 'Find care', exact: true }).waitFor();
+  await page.goto(`${hostedOrigin}/sign-in`);
+  await page.getByText(/Public demo\. Use only fictional information/).waitFor();
+  await page.getByLabel('Account ID').fill('patient');
+  await page.getByLabel('Password', { exact: true }).fill('incorrect-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('alert').waitFor();
+  await page.getByLabel('Password', { exact: true }).fill('TrueCare-Local-2026');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.waitForURL(`${hostedOrigin}/work/portal`);
+  await page.reload();
+  await page.getByRole('heading', { name: 'My care', exact: true }).waitFor();
+  await page.goto(`${hostedOrigin}/work/platform`);
+  await page.waitForURL(`${hostedOrigin}/denied`);
+  console.log('Verified inactive release, evaluation origin restrictions and hosted sign-in.');
 } finally {
   await browser?.close();
   server.close();

@@ -1,5 +1,11 @@
 # Progress ledger
 
+## Public Cloudflare evaluation, 27 November 2026
+
+- Preserved the existing commit history at [TCH-Healthcare on GitHub](https://github.com/vishalbachhav244/TCH-Healthcare). Added a separate Angular build for the public synthetic demo and kept the local evaluation and inactive release configurations. [Build configuration](../angular.json) · [Deployment guide](DEPLOYMENT_GUIDE.md)
+- The hosted build reuses the evaluation interceptor and only activates at its assigned HTTPS origin. Its sign-in displays synthetic sample credentials. [Hosted evaluation](../src/app/core/evaluation.hosted.ts) · [Sign-in](../src/app/features/sign-in.html)
+- Release verification checks the inactive bundle, loopback and hosted origin restrictions, rejected credentials, patient sign-in, reload and restricted workspace access. [Verification script](../scripts/verify-release.mjs)
+
 ## Imaging and discharge record exchange, 27 November 2026
 
 - Added published imaging reports and released discharge summaries to the patient consent picker. New approvals carry the selected source version. The exchange rejects drafts, stale versions and mismatched patient, facility or clinical relationships. [Patient consent](../src/app/features/patient-sharing.ts) · [Exchange adapter](../src/app/mocks/interoperability.ts)

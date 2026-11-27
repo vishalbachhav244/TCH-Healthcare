@@ -9,6 +9,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "vitest run",
     "build:evaluation": "ng build -c evaluation",
+    "build:hosted-evaluation": "ng build -c production,hosted-evaluation",
     "lint": "eslint src e2e",
     "format": "prettier --write src e2e",
     "format:check": "prettier --check src e2e",
