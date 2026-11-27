@@ -7,6 +7,8 @@ import { requestAdmission } from './admission-records';
 import { releaseDischargeSummary } from './discharge';
 import { endBedStay, finalizeInpatientAccount, startBedStay } from './inpatient-billing';
 import { openBloodRequest } from '../domain/blood-bank';
+import { queueBedPreparation, releaseCleanedBed } from './support';
+import { assertTransportHandedOff } from './transport';
 
 function pendingStepDown(facility: Facility, admissionId: string) {
   return db.icuStepDowns
@@ -72,6 +74,7 @@ export async function inpatientCommand(
   path: string,
   facility: Facility,
   payload: Record<string, unknown>,
+  actor: string,
 ): Promise<DomainEvent> {
   const time = Date.now();
   const event = (type: DomainEvent['type'], entityId: string) => ({
@@ -86,7 +89,7 @@ export async function inpatientCommand(
     if (!bed || bed.facilityId !== facility.id) throw new ApiError(404, 'Bed not found.');
     if (bed.status !== 'Cleaning')
       throw new ApiError(409, 'Only a bed awaiting cleaning can be released.');
-    await db.beds.update(bed.id, { status: 'Available' });
+    await releaseCleanedBed(bed, time, actor);
     return event('BedReleased', bed.id);
   }
   if (path === 'admissions') {
@@ -101,6 +104,7 @@ export async function inpatientCommand(
   if (admission?.facilityId !== facility.id) throw new ApiError(404, 'Admission not found.');
   if (String(admission.version) !== payload['version'])
     throw new ApiError(409, 'This admission was updated. Reload and try again.');
+  await assertTransportHandedOff(admission);
   const next: Partial<Admission> = { version: admission.version + 1 };
   if (path === 'admissions/discharge') {
     if (admission.status !== 'Admitted' || !admission.bedId)
@@ -146,7 +150,7 @@ export async function inpatientCommand(
     await releaseDischargeSummary(facility, admission, bed, time);
     await endBedStay(admission, bed, time);
     await finalizeInpatientAccount(admission, time);
-    await db.beds.update(admission.bedId, { status: 'Cleaning' });
+    await queueBedPreparation(bed, time, actor);
     await pendingStepDown(facility, admission.id).modify({ status: 'Closed', resolvedAt: time });
     await db.admissions.update(admission.id, { ...next, status: 'Discharged', dischargedAt: time });
     return event('PatientDischarged', admission.id);
@@ -162,7 +166,7 @@ export async function inpatientCommand(
     if (previous?.facilityId !== facility.id || previous.status !== 'Occupied')
       throw new ApiError(409, 'The assigned bed could not be verified.');
     await endBedStay(admission, previous, time);
-    await db.beds.update(previous.id, { status: 'Cleaning' });
+    await queueBedPreparation(previous, time, actor);
     if (previous.ward === criticalCareWard && bed.ward !== criticalCareWard) {
       await pendingStepDown(facility, admission.id).modify({
         status: 'Transferred',

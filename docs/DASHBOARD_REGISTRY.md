@@ -34,8 +34,8 @@ The 36 dashboard IDs come from the latest enterprise brief. “Partial” indica
 | D28 | Procurement | `/work/procurement` | Partial | Supplier onboarding, multi-line orders, outstanding balance closure and payables matching |
 | D29 | HR & Workforce | `/work/workforce` | Partial | Staff onboarding and credentialing, multi-day shift patterns and payroll |
 | D30 | Asset & Biomedical Engineering | `/work/biomedical` | Partial | Preventive service calendar, device safety records, and linked room setup for newly provisioned sites |
-| D31 | Hospital Support Services | — | Open | Housekeeping, CSSD, dietary and service requests |
-| D32 | Ambulance & Patient Transport | — | Open | Transport queue, dispatch and operational history |
+| D31 | Hospital Support Services | `/work/hospital-support` | Partial | Staff assignments, sterile processing and inventory, patient meal planning and additional service categories |
+| D32 | Ambulance & Patient Transport | `/work/patient-transport` | Partial | Emergency pickups, scheduling, fleet and crew administration, and receiving-facility records |
 | D33 | Healthcare CRM & Contact Center | — | Open | Enquiries, follow-up, referral and conversion |
 | D34 | Marketing & Engagement | — | Open | Consented campaigns, feedback and analytics |
 | D35 | Enterprise Analytics & BI | — | Open | Configurable reporting, lineage and exports |

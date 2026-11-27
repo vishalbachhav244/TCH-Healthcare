@@ -34,5 +34,7 @@
 | Procurement officer | Facility requisitions, supplier costs and purchase orders. A separate account approves or rejects a requisition. Purchase orders with receipts cannot be cancelled. |
 | Workforce coordinator | Active staff assignments and dated shift records for the selected facility. Scheduling and check-in validate the current assignment. A cross-facility overlap returns a conflict without exposing the other roster. |
 | Biomedical engineer | Facility equipment and maintenance work orders. Return to service requires a recorded functional check. Registration limits locations according to the facility’s inpatient entitlement. |
+| Hospital support coordinator | Inpatient-enabled facilities. Sees bed labels and ward locations, starts and completes housekeeping, and manages structured sterile supply and dietary requests. |
+| Transport dispatcher | Inpatient-enabled facilities. Sees eligible admission identity and pickup location. Requests, dispatches and completes trips using units scoped to that facility. |
 | Patient | Own visits and follow-up requests, available appointment times, passes, queue state, released reports and discharge summaries, dispensed medications and bill balances. |
 | Sunrise | Clinic overview, reception, waitlist and clinician schedule blocks. Inpatient access is disabled. |

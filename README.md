@@ -45,6 +45,8 @@ Open [TrueCare on loopback](http://127.0.0.1:4280). Use the following evaluation
 | `procurement` | Requisition decisions, supplier directory and purchase order tracking |
 | `workforce` | Facility staff directory, daily shift roster and attendance |
 | `biomedical` | Facility equipment register, maintenance work orders and return to service |
+| `support` | Housekeeping, sterile supply and dietary work requests |
+| `transport` | Admission-linked transport requests, dispatch, pickup and handoff |
 | `patient` | Own appointments and follow-up booking, QR passes, released reports, discharge summaries, medication history and bill balances |
 | `sunrise` | Clinic overview and reception without inpatient access |
 
@@ -77,6 +79,8 @@ In **Finance & Revenue**, `finance` can resolve a medication return review and r
 In **Inventory & Stores**, `stores` can request a catalogue item. In **Procurement**, `procurement` approves the request and issues a purchase order to an eligible supplier. Back in **Receiving**, `stores` records one or more deliveries against the remaining quantity. Pharmacy shows each receipt in its stock activity. Record a physical count from **Stock levels** to post an adjustment to the same ledger.
 
 In **HR & Workforce**, `workforce` can open the staff directory, schedule a shift and record attendance. In **Biomedical Engineering**, `biomedical` can open a work order for a tagged asset, record a local functional check and return the asset to service. While a linked imaging room is unavailable, `imaging` can see affected orders and still cancel them.
+
+Discharge or transfer an admitted patient to send the vacated bed to **Hospital Support Services**. Use `support` to start housekeeping and mark the bed ready, or to manage ward requests for sterile supplies and meal trolleys. Use `transport` in **Ambulance & Patient Transport** to request a trip from an admitted patient’s current bed, dispatch a synthetic unit, record pickup and confirm handoff.
 
 ## Verify
 

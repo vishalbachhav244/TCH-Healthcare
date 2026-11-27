@@ -4,6 +4,7 @@ import { ApiError, requirePlatform } from './access';
 import { db } from './database';
 import { staff, membershipId } from './accounts';
 import { staffRoles, type StaffRole } from '../domain/access';
+import { initialTransportUnits } from './support-seed';
 
 const administrativeEvents = [
   'OrganisationCreated',
@@ -53,7 +54,14 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
   const value = body as Record<string, unknown>;
   return db.transaction(
     'rw',
-    [db.organisations, db.facilities, db.memberships, db.practitioners, db.events],
+    [
+      db.organisations,
+      db.facilities,
+      db.memberships,
+      db.practitioners,
+      db.events,
+      db.transportUnits,
+    ],
     async () => {
       const emit = async (type: DomainEvent['type'], entityId: string, facilityId = 'platform') => {
         const event: DomainEvent = {
@@ -189,6 +197,8 @@ export async function updatePlatform(path: string, body: unknown, session: Sessi
       const organisation = await db.organisations.get(facility.tenantId);
       if (organisation?.plan === 'Clinic' && inpatient)
         throw new ApiError(409, 'The Clinic plan does not include inpatient operations.');
+      if (inpatient)
+        await db.transportUnits.bulkPut(initialTransportUnits([{ ...facility, inpatient }]));
       await db.facilities.update(facility.id, {
         inpatient,
         configurationVersion: (facility.configurationVersion ?? 0) + 1,

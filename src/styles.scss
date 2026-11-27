@@ -1017,6 +1017,7 @@ tbody tr:nth-child(3n) .table-initials {
 }
 .view-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }

@@ -1,5 +1,6 @@
 import {
   lucideActivity,
+  lucideAmbulance,
   lucideArrowDown,
   lucideArrowDownToLine,
   lucideArrowLeft,
@@ -23,6 +24,7 @@ import {
   lucideFlaskConical,
   lucideHeartPulse,
   lucideHospital,
+  lucideLayers,
   lucideLayoutDashboard,
   lucideListOrdered,
   lucideLogOut,
@@ -41,6 +43,7 @@ import {
 
 export const icons = {
   activity: lucideActivity,
+  ambulance: lucideAmbulance,
   down: lucideArrowDown,
   download: lucideArrowDownToLine,
   back: lucideArrowLeft,
@@ -64,6 +67,7 @@ export const icons = {
   flask: lucideFlaskConical,
   heart: lucideHeartPulse,
   hospital: lucideHospital,
+  layers: lucideLayers,
   layout: lucideLayoutDashboard,
   list: lucideListOrdered,
   logout: lucideLogOut,

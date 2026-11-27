@@ -53,6 +53,16 @@ export const staff = {
   },
   workforce: { name: 'Kiran Suri', role: 'workforce', facilities: ['mer-central', 'mer-north'] },
   biomedical: { name: 'Dhruv Batra', role: 'biomedical', facilities: ['mer-central', 'mer-north'] },
+  support: {
+    name: 'Nisha Fernandes',
+    role: 'supportCoordinator',
+    facilities: ['mer-central', 'mer-north'],
+  },
+  transport: {
+    name: 'Imran Shaikh',
+    role: 'transportDispatcher',
+    facilities: ['mer-central', 'mer-north'],
+  },
   admissions: { name: 'Charu Menon', role: 'admissions', facilities: ['mer-central'] },
   lab: { name: 'Farah Joseph', role: 'laboratory', facilities: ['mer-central'] },
   labreview: { name: 'Dr. Ajay Iyer', role: 'labReviewer', facilities: ['mer-central'] },

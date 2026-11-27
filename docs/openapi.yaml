@@ -761,7 +761,7 @@ paths:
   '/admissions/allocate':
     post:
       operationId: 'allocateBed'
-      summary: 'Place or transfer to an available bed. Transfers out of ICU resolve the active step-down request.'
+      summary: 'Place or transfer to an available bed. Transfers queue housekeeping and wait for any transport in transit. ICU step-down transfers resolve the active request.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -793,7 +793,7 @@ paths:
   '/admissions/discharge':
     post:
       operationId: 'dischargePatient'
-      summary: 'Close the stay after nursing, theatre and component request checks and required physician sign-off. Release the signed summary and finalize bed charges in the same transaction.'
+      summary: 'Close the stay after nursing, theatre, component and transport checks and required sign-off. Release the signed summary, finalize bed charges and queue housekeeping in the same transaction.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -823,7 +823,7 @@ paths:
   '/beds/release':
     post:
       operationId: 'releaseBed'
-      summary: 'Mark a cleaned bed available.'
+      summary: 'Mark a cleaned bed available and complete its active housekeeping task.'
       parameters:
         - { '$ref': '#/components/parameters/Facility' }
       requestBody:
@@ -5513,6 +5513,253 @@ paths:
           $ref: "#/components/responses/Error422"
         "503":
           $ref: "#/components/responses/Error503"
+  /hospital-support:
+    get:
+      operationId: getHospitalSupport
+      summary: Read facility support tasks and eligible ward locations.
+      parameters:
+        - &a1
+          $ref: "#/components/parameters/Facility"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HospitalSupportData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /hospital-support/tasks:
+    post:
+      operationId: requestHospitalSupport
+      summary: Queue a structured sterile supply or dietary request for a facility ward.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - service
+                - location
+                - request
+              properties:
+                service:
+                  type: string
+                  enum:
+                    - CSSD
+                    - Dietary
+                location:
+                  type: string
+                request:
+                  type: string
+                  enum:
+                    - Sterile set delivery
+                    - Used set collection
+                    - Meal trolley delivery
+                    - Meal trolley collection
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /hospital-support/tasks/status:
+    patch:
+      operationId: updateHospitalSupportTask
+      summary: Start, complete or cancel an eligible task. Completing housekeeping releases the bed.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - taskId
+                - version
+                - action
+              properties:
+                taskId:
+                  type: string
+                version: &a2
+                  type: string
+                  pattern: ^[1-9][0-9]*$
+                action:
+                  type: string
+                  enum:
+                    - start
+                    - complete
+                    - cancel
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /patient-transport:
+    get:
+      operationId: getPatientTransport
+      summary: Read eligible admissions, transport requests and unit availability within the selected facility.
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientTransportData"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /patient-transport/trips:
+    post:
+      operationId: requestPatientTransport
+      summary: Queue transport from a current admission and occupied bed to a compatible destination.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - admissionId
+                - admissionVersion
+                - kind
+                - destination
+              properties:
+                admissionId:
+                  type: string
+                admissionVersion: *a2
+                kind:
+                  type: string
+                  enum:
+                    - Internal transfer
+                    - Ambulance transfer
+                destination:
+                  type: string
+                  enum:
+                    - Diagnostics
+                    - Procedure suite
+                    - External facility
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /patient-transport/trips/status:
+    patch:
+      operationId: updatePatientTransportTrip
+      summary: Dispatch, pick up, complete or cancel a trip. Dispatch requires an available compatible unit.
+      parameters:
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tripId
+                - version
+                - action
+              properties:
+                tripId:
+                  type: string
+                version: *a2
+                action:
+                  type: string
+                  enum:
+                    - dispatch
+                    - pickup
+                    - complete
+                    - cancel
+                unitId:
+                  type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "422":
+          $ref: "#/components/responses/Error422"
+        "503":
+          $ref: "#/components/responses/Error503"
 components:
   securitySchemes:
     sessionToken:
@@ -8830,6 +9077,206 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MaintenanceRow"
+    SupportTaskRow:
+      type: object
+      required:
+        - id
+        - facilityId
+        - service
+        - location
+        - request
+        - status
+        - version
+        - requestedAt
+        - changedAt
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        service:
+          type: string
+          enum:
+            - Housekeeping
+            - CSSD
+            - Dietary
+        location:
+          type: string
+        request:
+          type: string
+          enum:
+            - Prepare bed
+            - Sterile set delivery
+            - Used set collection
+            - Meal trolley delivery
+            - Meal trolley collection
+        bedId:
+          type: string
+        activeBedId:
+          type: string
+        bed:
+          type: object
+          required:
+            - label
+            - ward
+          properties:
+            label:
+              type: string
+            ward:
+              type: string
+        status:
+          type: string
+          enum:
+            - Queued
+            - In progress
+            - Completed
+            - Cancelled
+        version:
+          type: integer
+          minimum: 1
+        requestedAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+    HospitalSupportData:
+      type: object
+      required:
+        - locations
+        - tasks
+      properties:
+        locations:
+          type: array
+          items:
+            type: string
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportTaskRow"
+    TransportAdmissionOption:
+      type: object
+      required:
+        - admissionId
+        - version
+        - patient
+        - pickup
+      properties:
+        admissionId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        patient: &a1
+          $ref: "#/components/schemas/DiagnosticsPatient"
+        pickup:
+          type: string
+    TransportTripRow:
+      type: object
+      required:
+        - id
+        - facilityId
+        - admissionId
+        - patientId
+        - pickupBedId
+        - kind
+        - destination
+        - status
+        - version
+        - requestedAt
+        - changedAt
+        - changedBy
+        - patient
+        - pickup
+        - pickupCurrent
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        admissionId:
+          type: string
+        patientId:
+          type: string
+        pickupBedId:
+          type: string
+        kind: &a2
+          type: string
+          enum:
+            - Internal transfer
+            - Ambulance transfer
+        destination:
+          type: string
+          enum:
+            - Diagnostics
+            - Procedure suite
+            - External facility
+        status:
+          type: string
+          enum:
+            - Requested
+            - Dispatched
+            - In transit
+            - Completed
+            - Cancelled
+        unitId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        requestedAt:
+          type: integer
+          minimum: 0
+        changedAt:
+          type: integer
+          minimum: 0
+        changedBy:
+          type: string
+        patient: *a1
+        pickup:
+          type: string
+        pickupCurrent: &a3
+          type: boolean
+        unitLabel:
+          type: string
+    TransportUnitAvailability:
+      type: object
+      required:
+        - id
+        - facilityId
+        - label
+        - kind
+        - available
+      properties:
+        id:
+          type: string
+        facilityId:
+          type: string
+        label:
+          type: string
+        kind: *a2
+        available: *a3
+    PatientTransportData:
+      type: object
+      required:
+        - admissions
+        - trips
+        - units
+      properties:
+        admissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransportAdmissionOption"
+        trips:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransportTripRow"
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransportUnitAvailability"
   responses:
     Error401:
       description: 'Missing or expired session.'

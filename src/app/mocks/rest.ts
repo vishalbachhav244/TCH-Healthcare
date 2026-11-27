@@ -15,6 +15,8 @@ import { inventoryData } from './inventory';
 import { procurementData } from './procurement';
 import { workforceData } from './workforce';
 import { biomedicalData } from './biomedical';
+import { supportData } from './support';
+import { transportData } from './transport';
 import { listLaboratory } from './laboratory';
 import { consultationImaging, imagingWorklist } from './radiology';
 import { bloodBankView } from './blood-bank';
@@ -100,6 +102,8 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
     'procurement/orders/cancel',
     'workforce/shifts/status',
     'biomedical/maintenance/status',
+    'hospital-support/tasks/status',
+    'patient-transport/trips/status',
   ].includes(path);
   const incidentWrite =
     path === 'platform-operations/incidents' && ['POST', 'PATCH'].includes(request.method);
@@ -447,6 +451,18 @@ export async function handle(request: HttpRequest<unknown>): Promise<unknown> {
       const facility = scope(session, facilityRecord, 'D30');
       return db.transaction('r', [db.biomedicalAssets, db.maintenanceOrders], async () =>
         biomedicalData(facility),
+      );
+    }
+    case 'hospital-support': {
+      const facility = scope(session, facilityRecord, 'D31');
+      return db.transaction('r', [db.beds, db.supportTasks], () => supportData(facility));
+    }
+    case 'patient-transport': {
+      const facility = scope(session, facilityRecord, 'D32');
+      return db.transaction(
+        'r',
+        [db.admissions, db.beds, db.patients, db.transportRequests, db.transportUnits],
+        () => transportData(facility),
       );
     }
     case 'billing/inpatient':

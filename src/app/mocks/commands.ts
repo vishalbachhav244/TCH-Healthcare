@@ -31,6 +31,8 @@ import { postGoodsReceipt, recordStockCount } from './inventory';
 import { purchaseOrderCommand, requisitionCommand } from './procurement';
 import { workforceCommand } from './workforce';
 import { biomedicalCommand } from './biomedical';
+import { supportCommand } from './support';
+import { transportCommand } from './transport';
 import { checkedDay } from './queries';
 import { governanceCommand } from './governance';
 import { assignWardTeam, wardCareCommand } from './ward-care';
@@ -103,6 +105,9 @@ export async function command(
       db.staffShifts,
       db.biomedicalAssets,
       db.maintenanceOrders,
+      db.supportTasks,
+      db.transportRequests,
+      db.transportUnits,
       db.clinicalReviews,
       db.qualityCases,
       db.waitlist,
@@ -559,6 +564,24 @@ export async function command(
             path.endsWith('/equipment') ? 'register' : path.endsWith('/status') ? 'update' : 'open',
           );
           break;
+        case 'hospital-support/tasks':
+        case 'hospital-support/tasks/status':
+          changed = await supportCommand(
+            scope(session, facilityRecord, 'D31', 'hospital-support'),
+            session,
+            payload,
+            path === 'hospital-support/tasks',
+          );
+          break;
+        case 'patient-transport/trips':
+        case 'patient-transport/trips/status':
+          changed = await transportCommand(
+            scope(session, facilityRecord, 'D32', 'patient-transport'),
+            session,
+            payload,
+            path === 'patient-transport/trips',
+          );
+          break;
         case 'alerts/acknowledge': {
           const facility = scope(session, facilityRecord, 'D06', 'overview');
           const alert = await db.alerts.get(field(payload, 'alertId'));
@@ -577,6 +600,7 @@ export async function command(
             path,
             scope(session, facilityRecord, 'D19', 'beds'),
             payload,
+            session.account,
           );
           break;
         case 'admissions/care-team': {

@@ -26,6 +26,8 @@ export type Resource =
   | 'procurement'
   | 'workforce'
   | 'biomedical'
+  | 'hospital-support'
+  | 'patient-transport'
   | 'laboratory'
   | 'radiology'
   | 'blood-bank'
@@ -235,8 +237,22 @@ export const workspaces: readonly Workspace[] = [
     icon: 'settings',
     resource: 'biomedical',
   },
-  { id: 'D31', title: 'Hospital Support Services', group: 'Operations', icon: 'layers' },
-  { id: 'D32', title: 'Ambulance & Patient Transport', group: 'Operations', icon: 'activity' },
+  {
+    id: 'D31',
+    title: 'Hospital Support Services',
+    group: 'Operations',
+    icon: 'layers',
+    resource: 'hospital-support',
+    inpatient: true,
+  },
+  {
+    id: 'D32',
+    title: 'Ambulance & Patient Transport',
+    group: 'Operations',
+    icon: 'ambulance',
+    resource: 'patient-transport',
+    inpatient: true,
+  },
   { id: 'D33', title: 'Healthcare CRM & Contact Center', group: 'Engagement', icon: 'users' },
   { id: 'D34', title: 'Marketing & Engagement', group: 'Engagement', icon: 'heart' },
   { id: 'D35', title: 'Enterprise Analytics & BI', group: 'Intelligence', icon: 'chart' },
@@ -294,6 +310,18 @@ export const navigation = [
   { title: 'Procurement', resource: 'procurement', icon: 'clipboard', workspace: 'D28' },
   { title: 'HR & workforce', resource: 'workforce', icon: 'users', workspace: 'D29' },
   { title: 'Biomedical engineering', resource: 'biomedical', icon: 'settings', workspace: 'D30' },
+  {
+    title: 'Hospital support services',
+    resource: 'hospital-support',
+    icon: 'layers',
+    workspace: 'D31',
+  },
+  {
+    title: 'Ambulance & patient transport',
+    resource: 'patient-transport',
+    icon: 'ambulance',
+    workspace: 'D32',
+  },
   { title: 'My care', resource: 'portal', icon: 'heart', workspace: 'D12' },
 ] as const;
 

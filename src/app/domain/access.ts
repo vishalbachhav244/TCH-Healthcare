@@ -42,6 +42,16 @@ export const staffRoles = {
   procurement: { label: 'Procurement officer', workspaces: ['D28'], writes: ['procurement'] },
   workforce: { label: 'Workforce coordinator', workspaces: ['D29'], writes: ['workforce'] },
   biomedical: { label: 'Biomedical engineer', workspaces: ['D30'], writes: ['biomedical'] },
+  supportCoordinator: {
+    label: 'Hospital support coordinator',
+    workspaces: ['D31'],
+    writes: ['hospital-support'],
+  },
+  transportDispatcher: {
+    label: 'Transport dispatcher',
+    workspaces: ['D32'],
+    writes: ['patient-transport'],
+  },
   admissions: { label: 'Admissions', workspaces: ['D19'], writes: ['beds'] },
   laboratory: { label: 'Laboratory technician', workspaces: ['D20'], writes: ['laboratory'] },
   labReviewer: { label: 'Laboratory reviewer', workspaces: ['D20'], writes: ['laboratory/review'] },

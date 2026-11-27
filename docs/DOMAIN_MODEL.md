@@ -36,4 +36,8 @@ A `StaffShift` records a facility membership version, staff account, local date,
 
 A `BiomedicalAsset` has a facility-unique tag and may link to one imaging room. A `MaintenanceOrder` references the asset and records its status, last actor and functional check. An active order locks availability. Cancellation or release updates both records in one transaction. [Biomedical contracts](../src/app/domain/biomedical.ts)
 
+A `SupportTask` records a request, ward, status and version. For Housekeeping it also links a bed, with a unique active index that clears when work completes. Task completion and bed release share a transaction. [Hospital support contracts](../src/app/domain/support.ts)
+
+A `TransportRequest` links an admission, patient, pickup bed and, after dispatch, a facility `TransportUnit`. Pickup and handoff are separate states. Unit availability is computed from the active assignments. [Patient transport contracts](../src/app/domain/transport.ts)
+
 The TypeScript contracts live in [operations.ts](../src/app/domain/operations.ts), [diagnostics.ts](../src/app/domain/diagnostics.ts), [portal.ts](../src/app/domain/portal.ts), [interoperability.ts](../src/app/domain/interoperability.ts) and [governance.ts](../src/app/domain/governance.ts). Imported record references and broader external identity verification remain open.

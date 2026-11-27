@@ -54,6 +54,9 @@ import type { GoodsReceipt, PurchaseOrder, Requisition, Supplier } from '../doma
 import { initialSuppliers } from './procurement-seed';
 import type { StaffShift } from '../domain/workforce';
 import type { BiomedicalAsset, MaintenanceOrder } from '../domain/biomedical';
+import type { SupportTask } from '../domain/support';
+import type { TransportRequest, TransportUnit } from '../domain/transport';
+import { initialBedPreparations, initialTransportUnits } from './support-seed';
 import { initialEquipment } from './biomedical-seed';
 import { diagnosticMemberships, initialBloodUnits, initialImagingOrders } from './diagnostics-seed';
 
@@ -82,6 +85,9 @@ export const db = new Dexie('truecare-evaluation-v1') as Dexie & {
   staffShifts: EntityTable<StaffShift, 'id'>;
   biomedicalAssets: EntityTable<BiomedicalAsset, 'id'>;
   maintenanceOrders: EntityTable<MaintenanceOrder, 'id'>;
+  supportTasks: EntityTable<SupportTask, 'id'>;
+  transportUnits: EntityTable<TransportUnit, 'id'>;
+  transportRequests: EntityTable<TransportRequest, 'id'>;
   platformIncidents: EntityTable<PlatformIncident, 'id'>;
   connectors: EntityTable<Connector, 'id'>;
   matchingCodes: EntityTable<MatchingCode, 'code'>;
@@ -495,6 +501,27 @@ db.version(22)
     }
   });
 
+db.version(23)
+  .stores({
+    supportTasks: 'id, facilityId, &activeBedId',
+    transportUnits: 'id, facilityId',
+    transportRequests: 'id, facilityId, admissionId, unitId',
+  })
+  .upgrade(async (transaction) => {
+    const sites = await transaction.table<Facility, string>('facilities').toArray();
+    const beds = await transaction.table<Bed, string>('beds').toArray();
+    await transaction.table('supportTasks').bulkAdd(initialBedPreparations(beds, Date.now()));
+    await transaction.table('transportUnits').bulkAdd(initialTransportUnits(sites));
+    const existing = new Set(sites.map((facility) => facility.id));
+    const members = transaction.table<StaffMembership, string>('memberships');
+    for (const membership of initialStaff.filter(
+      (row) => row.role === 'supportCoordinator' || row.role === 'transportDispatcher',
+    )) {
+      if (existing.has(membership.facilityId) && !(await members.get(membership.id)))
+        await members.add(membership);
+    }
+  });
+
 export function initialize() {
   return (initialization ??= db
     .transaction(
@@ -520,6 +547,8 @@ export function initialize() {
         db.stockMovements,
         db.suppliers,
         db.biomedicalAssets,
+        db.supportTasks,
+        db.transportUnits,
         db.platformIncidents,
         db.connectors,
         db.qualityCases,
@@ -559,6 +588,10 @@ export function initialize() {
           ),
           db.suppliers.bulkAdd(initialSuppliers(initialFacilities)),
           db.biomedicalAssets.bulkAdd(initialEquipment(initialFacilities)),
+          db.supportTasks.bulkAdd(
+            initialBedPreparations(data.beds, Date.parse(referenceDay + 'T00:00:00+05:30')),
+          ),
+          db.transportUnits.bulkAdd(initialTransportUnits(initialFacilities)),
           db.platformIncidents.bulkAdd(initialIncidents(referenceDay)),
           db.connectors.bulkAdd(initialConnectors),
           db.qualityCases.bulkAdd(initialQualityCases(referenceDay)),

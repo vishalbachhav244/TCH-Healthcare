@@ -1353,6 +1353,10 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(theatre.getByRole('heading', { name: 'Operation Theatre' })).toBeVisible();
   const biomedical = await page.context().newPage();
   await signIn(biomedical, 'biomedical');
+  const support = await page.context().newPage();
+  const transport = await page.context().newPage();
+  await signIn(support, 'support');
+  await signIn(transport, 'transport');
   await page
     .getByRole('row', { name: /Meridian Medical Centre/ })
     .getByRole('button', { name: 'Edit entitlement' })
@@ -1367,6 +1371,8 @@ test('platform provisions organizations and revokes active inpatient workspaces'
   await expect(theatre.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(inpatientCharges).toHaveCount(0);
   await expect(blood.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(support.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
+  await expect(transport.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
   await expect(cashier.getByRole('heading', { name: 'Invoices' })).toBeVisible();
   await biomedical.getByRole('button', { name: 'Register equipment' }).click();
   const register = biomedical.getByRole('dialog', { name: 'Register equipment' });
@@ -1382,6 +1388,8 @@ test('platform provisions organizations and revokes active inpatient workspaces'
     biomedical.getByRole('row', { name: /LIGHT-04.*Outpatient.*Available/ }),
   ).toBeVisible();
   await biomedical.close();
+  await support.close();
+  await transport.close();
   await ward.close();
   await nursing.close();
   await theatre.close();
@@ -1940,9 +1948,10 @@ test('tracks pharmacy receipts, supplier returns and a credited patient return',
   for (const tab of [desk, clinician, cashier, patient, finance]) await tab.close();
 });
 
-test('moves a patient from admission request through cleaning and bed release', async ({
+test('dispatches transport and hands the discharged bed to housekeeping', async ({
   page,
-}) => {
+}, testInfo) => {
+  test.setTimeout(120_000);
   await signIn(page, 'admissions');
   await page.getByRole('button', { name: 'Request admission' }).click();
   const request = page.getByRole('dialog', { name: 'Request admission' });
@@ -1962,13 +1971,140 @@ test('moves a patient from admission request through cleaning and bed release', 
   await assign.getByRole('button', { name: 'Confirm bed allocation' }).click();
   await expect(row).toContainText('Admitted');
   await expect(row).toContainText(bed);
+  const dispatcher = await page.context().newPage();
+  await signIn(dispatcher, 'transport');
+  await expect(
+    dispatcher.getByRole('heading', { name: 'Ambulance & Patient Transport' }),
+  ).toBeVisible();
+  const trigger = dispatcher.getByRole('button', { name: 'Request transport' });
+  const tripEditor = dispatcher.getByRole('dialog', { name: 'Request transport' });
+  await trigger.focus();
+  await dispatcher.keyboard.press('Enter');
+  await expect(tripEditor).toBeVisible();
+  await dispatcher.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await tripEditor.getByLabel('Find admitted patient').fill(id);
+  await tripEditor.getByLabel('Admission', { exact: true }).selectOption({ index: 1 });
+  await tripEditor.getByLabel('Transport type').selectOption('Ambulance transfer');
+  await tripEditor.getByLabel('Destination', { exact: true }).selectOption('External facility');
+  await tripEditor.getByRole('button', { name: 'Add transport request' }).click();
+  const trip = dispatcher.getByRole('row', { name: new RegExp(id) });
+  await trip.getByRole('button', { name: 'Dispatch', exact: true }).click();
+  await dispatcher.getByLabel('Available unit').selectOption({ label: 'Ambulance 1' });
+  await dispatcher.getByRole('button', { name: 'Confirm dispatch' }).click();
+  await expect(trip).toContainText('Dispatched');
+  const units = dispatcher.getByRole('button', { name: 'Transport units' });
+  const ambulance = dispatcher.getByRole('row', { name: /Ambulance 1/ });
+  await units.click();
+  await expect(ambulance).toContainText('Assigned');
+  await dispatcher.getByRole('button', { name: 'Dispatch queue' }).click();
+  await trip.getByRole('button', { name: 'Record pickup' }).click();
+  await dispatcher.getByRole('button', { name: 'Confirm pickup' }).click();
+  await expect(trip).toContainText('In transit');
+  await dispatcher.reload();
+  await expect(trip).toContainText('In transit');
+  await checkReflow(dispatcher);
+  expect(
+    (
+      await new AxeBuilder({ page: dispatcher })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await dispatcher.screenshot({
+    path: testInfo.outputPath('transport-1440.png'),
+    animations: 'disabled',
+  });
   await row.getByRole('button', { name: 'Discharge' }).click();
+  await page.getByRole('button', { name: 'Confirm discharge' }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
+    'Finish the active transport handoff before moving or discharging this admission.',
+  );
+  await dispatcher.getByRole('button', { name: 'Complete handoff' }).click();
+  await dispatcher.getByRole('button', { name: 'Confirm handoff' }).click();
+  await dispatcher.getByRole('button', { name: 'Trip history' }).click();
+  await expect(trip).toContainText('Completed');
+  await units.click();
+  await expect(ambulance).toContainText('Available');
+  const support = await page.context().newPage();
+  await signIn(support, 'support');
+  await support.getByRole('searchbox', { name: 'Find support task' }).fill(bed);
+  const cleaning = support.getByRole('row', { name: new RegExp('Bed ' + bed) });
+  await expect(cleaning).toHaveCount(0);
   await page.getByRole('button', { name: 'Confirm discharge' }).click();
   await expect(row).toContainText('Discharged');
   await page.getByRole('button', { name: 'Bed board' }).click();
   await page.getByLabel('Filter by bed status').selectOption('Cleaning');
-  await page.getByRole('button', { name: 'Release bed ' + bed }).click();
-  await expect(page.getByText('Bed available for allocation.')).toBeVisible();
+  const release = page.getByRole('button', { name: 'Release bed ' + bed });
+  await expect(release).toBeVisible();
+  await cleaning.getByRole('button', { name: 'Start task' }).click();
+  await support.getByRole('button', { name: 'Confirm start' }).click();
+  await expect(cleaning).toContainText('In progress');
+  await cleaning.getByRole('button', { name: 'Mark bed ready' }).click();
+  await support.getByRole('button', { name: 'Confirm completion' }).click();
+  await expect(support.getByText('Bed available for allocation.')).toBeVisible();
+  await expect(release).toHaveCount(0);
+  await page.getByLabel('Filter by bed status').selectOption('Available');
+  await expect(
+    page
+      .locator('.bed-card')
+      .filter({ has: page.getByRole('heading', { name: bed, exact: true }) }),
+  ).toContainText('Available');
+  await support.getByRole('button', { name: 'Task history' }).click();
+  await expect(cleaning).toContainText('Completed');
+  await dispatcher.close();
+  await support.close();
+});
+
+test('queues CSSD and dietary requests and persists the work states', async ({
+  page,
+}, testInfo) => {
+  await signIn(page, 'support');
+  const request = page.getByRole('button', { name: 'Request support' });
+  const editor = page.getByRole('dialog', { name: 'Request support' });
+  await request.focus();
+  await page.keyboard.press('Enter');
+  await expect(editor).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(request).toBeFocused();
+  async function submit(service: string, work: string) {
+    await request.click();
+    await editor.getByLabel('Support service').selectOption(service);
+    await editor.getByLabel('Ward', { exact: true }).selectOption({ index: 1 });
+    await editor.getByLabel('Request type').selectOption(work);
+    await editor.getByRole('button', { name: 'Add to work queue' }).click();
+  }
+  await submit('CSSD', 'Sterile set delivery');
+  const sterile = page.getByRole('row', { name: /Sterile set delivery/ });
+  await expect(sterile).toContainText('Queued');
+  await submit('Dietary', 'Meal trolley delivery');
+  const dietary = page.getByRole('row', { name: /Meal trolley delivery/ });
+  await dietary.getByRole('button', { name: 'Cancel request' }).click();
+  await page.getByRole('button', { name: 'Confirm cancellation' }).click();
+  await expect(dietary).toHaveCount(0);
+  await sterile.getByRole('button', { name: 'Start task' }).click();
+  await page.getByRole('button', { name: 'Confirm start' }).click();
+  await page.reload();
+  await page.getByRole('combobox', { name: 'Service', exact: true }).selectOption('CSSD');
+  await expect(sterile).toContainText('In progress');
+  await checkReflow(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('hospital-support-390.png'),
+    animations: 'disabled',
+  });
+  await sterile.getByRole('button', { name: 'Complete task' }).click();
+  await page.getByRole('button', { name: 'Confirm completion' }).click();
+  await page.getByRole('button', { name: 'Task history' }).click();
+  await expect(sterile).toContainText('Completed');
+  await expect(dietary).toContainText('Cancelled');
+  await page.goto('/work/patient-transport');
+  await expect(page.getByRole('heading', { name: 'Access restricted' })).toBeVisible();
 });
 
 test('laboratory stages render and the mobile patient sees only their own pass and care tabs', async ({

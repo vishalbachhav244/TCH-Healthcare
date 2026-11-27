@@ -30,6 +30,13 @@ import type {
   MaintenanceReason,
 } from '../domain/biomedical';
 import type { ShiftAction, ShiftFields, StaffShift, WorkforceData } from '../domain/workforce';
+import type { SupportAction, SupportData, SupportFields, SupportTask } from '../domain/support';
+import type {
+  TransportAction,
+  TransportData,
+  TransportFields,
+  TransportRequest,
+} from '../domain/transport';
 import type {
   CountFields,
   InventoryData,
@@ -1052,6 +1059,55 @@ export class Api {
       token,
       facility,
       { orderId: order.id, version: String(order.version), action, verified: String(verified) },
+      'PATCH',
+    );
+  }
+
+  hospitalSupport(token: string, facility: string) {
+    return this.get('hospital-support', token, facility).pipe(
+      map((value) => objectShape<SupportData>(value, ['locations', 'tasks'])),
+    );
+  }
+
+  requestSupport(token: string, facility: string, fields: SupportFields) {
+    return this.execute('hospital-support/tasks', token, facility, { ...fields });
+  }
+
+  updateSupport(token: string, facility: string, task: SupportTask, action: SupportAction) {
+    return this.execute(
+      'hospital-support/tasks/status',
+      token,
+      facility,
+      { taskId: task.id, version: String(task.version), action },
+      'PATCH',
+    );
+  }
+
+  patientTransport(token: string, facility: string) {
+    return this.get('patient-transport', token, facility).pipe(
+      map((value) => objectShape<TransportData>(value, ['admissions', 'trips', 'units'])),
+    );
+  }
+
+  requestTransport(token: string, facility: string, fields: TransportFields) {
+    return this.execute('patient-transport/trips', token, facility, {
+      ...fields,
+      admissionVersion: String(fields.admissionVersion),
+    });
+  }
+
+  updateTransport(
+    token: string,
+    facility: string,
+    trip: TransportRequest,
+    action: TransportAction,
+    unitId: string,
+  ) {
+    return this.execute(
+      'patient-transport/trips/status',
+      token,
+      facility,
+      { tripId: trip.id, version: String(trip.version), action, ...(unitId ? { unitId } : {}) },
       'PATCH',
     );
   }

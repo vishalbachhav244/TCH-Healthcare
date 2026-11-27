@@ -50,3 +50,5 @@ Local identifiers below apply only to this implementation. The 137 canonical scr
 | TC-LOCAL-44 | D28 | `/work/procurement` | Requisition decisions, facility suppliers, order issue and purchase order register |
 | TC-LOCAL-45 | D29 | `/work/workforce` | Staff directory, dated shift roster, scheduling and attendance |
 | TC-LOCAL-46 | D30 | `/work/biomedical` | Equipment register, maintenance work orders, functional check and return to service |
+| TC-LOCAL-47 | D31 | `/work/hospital-support` | Bed preparation, structured sterile supply and dietary requests, task history |
+| TC-LOCAL-48 | D32 | `/work/patient-transport` | Admission-linked dispatch queue, compatible units, pickup, handoff and trip history |

@@ -20,6 +20,8 @@ import type { WardAssignmentOptions, WardDetail, WardWorklistRow } from '../doma
 import type { ImagingOrder, ImagingRow } from '../domain/radiology';
 import type { BiomedicalData } from '../domain/biomedical';
 import type { WorkforceData } from '../domain/workforce';
+import type { SupportData } from '../domain/support';
+import type { TransportData } from '../domain/transport';
 import type { BloodBankView } from '../domain/blood-bank';
 import type { PharmacyData } from '../domain/pharmacy';
 import type { FinanceData } from '../domain/finance';
@@ -1762,7 +1764,11 @@ describe('fixture contract', () => {
       ),
     ).toBe(true);
     expect(
-      dataset.invoices.every((row) => encounters.get(row.encounterId)?.patientId === row.patientId),
+      dataset.invoices.every(
+        (row) =>
+          row.encounterId !== undefined &&
+          encounters.get(row.encounterId)?.patientId === row.patientId,
+      ),
     ).toBe(true);
     expect(dataset.payments.every((row) => invoices.has(row.invoiceId))).toBe(true);
   });
@@ -2763,6 +2769,213 @@ describe('inventory and procurement', () => {
       await expect(get('procurement', buyer, facility)).rejects.toMatchObject({ status: 403 });
     } finally {
       await db.facilities.update(facility, { active: true });
+    }
+  }, 90_000);
+});
+
+describe('hospital support and transport', () => {
+  const facility = 'mer-central';
+  const branch = 'mer-north';
+
+  it('keeps housekeeping and bed availability consistent and completes scoped support requests', async () => {
+    const [support, admissions, dispatcher] = await Promise.all(
+      ['support', 'admissions', 'transport'].map(login),
+    );
+    const worklist = async (at = facility) =>
+      (await get('hospital-support', support, at)) as SupportData;
+    await expect(get('hospital-support', dispatcher, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    const overview = await worklist();
+    const first = overview.tasks.find(
+      (row) => row.service === 'Housekeeping' && row.status === 'Queued',
+    )!;
+    const bedId = first.service === 'Housekeeping' ? first.bedId : '';
+    const change = (taskId: string, version: string, action: string, at = facility) =>
+      patch('hospital-support/tasks/status', { taskId, version, action }, support, at);
+    await expect(change(first.id, '1', 'start', branch)).rejects.toMatchObject({ status: 404 });
+    expect((await worklist(branch)).tasks.some((row) => row.id === first.id)).toBe(false);
+    await expect(change(first.id, String(first.version), 'complete')).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(change(first.id, String(first.version), 'cancel')).rejects.toMatchObject({
+      status: 409,
+    });
+    const started = await Promise.allSettled(
+      ['start', 'start'].map((action) => change(first.id, String(first.version), action)),
+    );
+    expect(started.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(await db.beds.get(bedId)).toMatchObject({ status: 'Cleaning' });
+    await change(first.id, String(first.version + 1), 'complete');
+    expect(await db.beds.get(bedId)).toMatchObject({ status: 'Available' });
+    expect(await db.supportTasks.get(first.id)).toMatchObject({
+      status: 'Completed',
+      changedBy: 'support',
+    });
+    await expect(post('beds/release', { bedId }, admissions, facility)).rejects.toMatchObject({
+      status: 409,
+    });
+
+    const legacy = (await worklist()).tasks.find(
+      (row) => row.service === 'Housekeeping' && row.status === 'Queued',
+    )!;
+    if (legacy.service !== 'Housekeeping') throw new Error('Expected a housekeeping fixture.');
+    await post('beds/release', { bedId: legacy.bedId }, admissions, facility);
+    expect(await db.supportTasks.get(legacy.id)).toMatchObject({
+      status: 'Completed',
+      changedBy: 'admissions',
+    });
+    const fields = {
+      service: 'CSSD',
+      request: 'Sterile set delivery',
+      location: overview.locations[0],
+    };
+    const create = (changes = {}) =>
+      post('hospital-support/tasks', { ...fields, ...changes }, support, facility);
+    await expect(create({ location: 'Foreign ward' })).rejects.toMatchObject({ status: 422 });
+    await expect(create({ service: 'Dietary' })).rejects.toMatchObject({ status: 422 });
+    const { id: taskId } = (await create()) as { id: string };
+    await change(taskId, '1', 'start');
+    await expect(change(taskId, '1', 'complete')).rejects.toMatchObject({ status: 409 });
+    await expect(change(taskId, '2', 'cancel')).rejects.toMatchObject({ status: 409 });
+    await change(taskId, '2', 'complete');
+    expect((await worklist()).tasks).toContainEqual(
+      expect.objectContaining({ id: taskId, status: 'Completed' }),
+    );
+  }, 90_000);
+
+  it('validates pickup and unit allocation, records handoff and enforces facility capability', async () => {
+    const [dispatch, admissions, support] = await Promise.all(
+      ['transport', 'admissions', 'support'].map(login),
+    );
+    const worklist = async (at = facility) =>
+      (await get('patient-transport', dispatch, at)) as TransportData;
+    await expect(get('patient-transport', support, facility)).rejects.toMatchObject({
+      status: 403,
+    });
+    const usedPatients = new Set(
+      (await db.admissions.where('facilityId').equals(facility).toArray()).map(
+        (row) => row.patientId,
+      ),
+    );
+    const patients = await db.patients
+      .where('tenantId')
+      .equals('meridian')
+      .filter((row) => !usedPatients.has(row.id))
+      .limit(2)
+      .toArray();
+    const beds = await db.beds
+      .where('facilityId')
+      .equals(facility)
+      .filter((row) => row.status === 'Available')
+      .limit(3)
+      .toArray();
+    async function admit(patientId: string, bedId: string) {
+      const { id } = (await post('admissions', { patientId }, admissions, facility)) as {
+        id: string;
+      };
+      await post(
+        'admissions/allocate',
+        { admissionId: id, bedId, version: '1' },
+        admissions,
+        facility,
+      );
+      return id;
+    }
+    const first = await admit(patients[0].id, beds[0].id);
+    const second = await admit(patients[1].id, beds[1].id);
+    const options = await worklist();
+    expect(options.admissions).toContainEqual(
+      expect.objectContaining({ admissionId: first, version: 2 }),
+    );
+    const request = (admissionId: string, changes = {}, at = facility) =>
+      post(
+        'patient-transport/trips',
+        {
+          admissionId,
+          admissionVersion: '2',
+          kind: 'Ambulance transfer',
+          destination: 'External facility',
+          ...changes,
+        },
+        dispatch,
+        at,
+      );
+    await expect(request(first, {}, branch)).rejects.toMatchObject({ status: 404 });
+    await expect(request(first, { admissionVersion: '1' })).rejects.toMatchObject({ status: 409 });
+    await expect(request(first, { destination: 'Diagnostics' })).rejects.toMatchObject({
+      status: 422,
+    });
+    const requests = await Promise.allSettled([request(first), request(first)]);
+    expect(requests.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const { id: tripId } = requests.find((result) => result.status === 'fulfilled')!.value as {
+      id: string;
+    };
+    const { id: secondTrip } = (await request(second)) as { id: string };
+    const update = (id: string, version: string, action: string, unitId = '', at = facility) =>
+      patch(
+        'patient-transport/trips/status',
+        { tripId: id, version, action, unitId },
+        dispatch,
+        at,
+      );
+    const vehicle = 'mer-central-ambulance-1';
+    await expect(update(tripId, '1', 'pickup')).rejects.toMatchObject({ status: 409 });
+    await expect(update(tripId, '1', 'dispatch', 'mer-north-ambulance-1')).rejects.toMatchObject({
+      status: 422,
+    });
+    await expect(update(tripId, '1', 'dispatch', 'mer-central-porter-1')).rejects.toMatchObject({
+      status: 422,
+    });
+    await update(tripId, '1', 'dispatch', vehicle);
+    await expect(update(secondTrip, '1', 'dispatch', vehicle)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect((await worklist()).units.find((unit) => unit.id === vehicle)?.available).toBe(false);
+    expect((await worklist(branch)).trips.some((row) => row.id === tripId)).toBe(false);
+    await expect(update(tripId, '2', 'pickup', '', branch)).rejects.toMatchObject({ status: 404 });
+    await update(tripId, '2', 'pickup');
+    await expect(update(tripId, '3', 'cancel')).rejects.toMatchObject({ status: 409 });
+    const discharge = () =>
+      post('admissions/discharge', { admissionId: first, version: '2' }, admissions, facility);
+    await expect(discharge()).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('active transport'),
+    });
+    await update(tripId, '3', 'complete');
+    await discharge();
+    expect((await worklist()).units.find((unit) => unit.id === vehicle)?.available).toBe(true);
+
+    await update(secondTrip, '1', 'dispatch', vehicle);
+    await post(
+      'admissions/allocate',
+      { admissionId: second, bedId: beds[2].id, version: '2' },
+      admissions,
+      facility,
+    );
+    const queued = (await get('hospital-support', support, facility)) as SupportData;
+    expect(queued.tasks).toContainEqual(
+      expect.objectContaining({ bedId: beds[1].id, status: 'Queued' }),
+    );
+    expect((await worklist()).trips).toContainEqual(
+      expect.objectContaining({ id: secondTrip, pickupCurrent: false }),
+    );
+    await expect(update(secondTrip, '2', 'pickup')).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('pickup changed'),
+    });
+    await update(secondTrip, '2', 'cancel');
+    expect((await worklist()).units.find((unit) => unit.id === vehicle)?.available).toBe(true);
+
+    await db.facilities.update(facility, { inpatient: false });
+    try {
+      await expect(worklist()).rejects.toMatchObject({ status: 403 });
+      await expect(get('hospital-support', support, facility)).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(request(second)).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await db.facilities.update(facility, { inpatient: true });
     }
   }, 90_000);
 });

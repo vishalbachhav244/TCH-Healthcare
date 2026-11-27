@@ -1,5 +1,13 @@
 # Progress ledger
 
+## Hospital Support and Patient Transport, 27 November 2026
+
+- Added D31 `/work/hospital-support` for housekeeping and structured sterile supply and dietary requests. A vacated bed enters the work queue on transfer or discharge. Marking it ready updates the Admissions bed board. [Workspace](../src/app/features/hospital-support.ts) · [Bed adapter](../src/app/mocks/inpatient.ts)
+- Added D32 `/work/patient-transport` for admission-linked dispatch, pickup and handoff. Each unit serves one active trip. The original pickup must still be current when the unit reaches the patient. An active transit holds bed transfer and discharge until handoff. [Workspace](../src/app/features/patient-transport.ts) · [Transport adapter](../src/app/mocks/transport.ts)
+- Added 6 OpenAPI operations and schema version 23. A Chromium upgrade preserved the existing biomedical work and let Support release a previously saved bed from Cleaning. Both new roles could sign in. [OpenAPI](openapi.yaml) · [Migration](../src/app/mocks/database.ts)
+- Passed 42 domain and contract tests, 21 Chromium journeys and both builds. [Test evidence](TEST_REPORT.md) · [Mobile hospital support](screenshots/hospital-support-390.png) · [Transport dispatch](screenshots/transport-1440.png)
+- Coverage is 32 dashboard IDs with partial routes and 4 open. Patient meal planning, sterile supply processing records, emergency transport and fleet management remain open. [Implementation status](FRONTEND_IMPLEMENTATION_STATUS.md)
+
 ## Workforce and Biomedical Engineering, 27 November 2026
 
 - Added D29 `/work/workforce` for a searchable staff directory, dated shift roster and attendance. A current assignment is required to schedule or check in, and an overlap is rejected across branches without revealing the other roster. [Workspace](../src/app/features/workforce.ts) · [Contract tests](../src/app/mocks/rest.spec.ts)

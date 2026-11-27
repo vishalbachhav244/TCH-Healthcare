@@ -18,5 +18,6 @@ The supplied brief provides the 28-module baseline count, the 36-dashboard list 
 | Patient finance | D24–D26 | Consultation, medication and inpatient invoices, return credits and refunds, coverage and payer claims, and daily collection reconciliation |
 | Supplies and purchasing | D27–D28 | Pharmacy stock counts, replenishment requests, approval, supplier selection, purchase orders and partial goods receipts |
 | Workforce and biomedical engineering | D29–D30 | Staff roster and attendance, equipment register and work orders, and linked imaging room availability |
+| Hospital support and patient transport | D31–D32 | Housekeeping handoff and bed release, sterile supply and dietary work queues, and admission-linked transport dispatch and handoff |
 
 See [dashboard registry](DASHBOARD_REGISTRY.md) for open responsibilities and [workflow specifications](WORKFLOW_SPECIFICATIONS.md) for connected workflow coverage.

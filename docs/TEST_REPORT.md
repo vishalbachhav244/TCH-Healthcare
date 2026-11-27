@@ -6,14 +6,15 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
-| `npm test` | 40 contract and domain tests passed across 3 files |
-| `npm run e2e` | All 20 Chromium journeys passed, including staff attendance, linked imaging maintenance and equipment registration with inpatient services disabled. |
-| `npm run build` | Passed. Initial assets approximately 375 kB raw and 97 kB estimated transfer. |
-| `npm run build:evaluation` | Passed. Initial assets approximately 378 kB raw and 98 kB estimated transfer. |
+| Spec TypeScript check | `tsc --noEmit -p tsconfig.spec.json` passed. |
+| `npm test` | 42 contract and domain tests passed across 3 files |
+| `npm run e2e -- --fully-parallel --workers=2` | All 21 Chromium journeys passed, including transport handoff, housekeeping bed release and inpatient access withdrawal. |
+| `npm run build` | Passed. Initial assets approximately 377 kB raw and 97 kB estimated transfer. |
+| `npm run build:evaluation` | Passed. Initial assets approximately 380 kB raw and 98 kB estimated transfer. |
 | `npm run verify:release` | Passed. The default build blocks signed-in entry points and excludes local authentication and persistence. The evaluation build rejects non-loopback access. |
 | `npm audit` | Zero reported advisories in the baseline run. This continuation introduced no dependency changes. |
-| Browser-local migration | Verified 21 to 22 in Chromium. The saved supplier and lot balance survived. Both new roles could sign in and the linked imaging equipment appeared. |
-| OpenAPI | 147 operations, unique IDs and checked internal references. |
+| Browser-local migration | Verified 22 to 23 in Chromium. The saved biomedical work survived. A migrated housekeeping task released its bed and the new transport unit catalogue appeared. |
+| OpenAPI | 153 operations, unique IDs and checked internal references. |
 | Scheduling at 390 px | Loopback Chromium with a synthetic waitlist request passed reflow and selected WCAG axe checks. |
 
 ## Browser journeys
@@ -28,7 +29,7 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 - Add a patient to a clinician’s waitlist. From an executive tab, block the day and verify both reception and the patient portal lose the available times. Release the block, book an open time from the waitlist, and confirm the appointment persists after reload. Reject an overlapping block and patient access to the staff route.
 - Match a recipient with a patient-issued code, grant one report version, preview it, pause and resume the connector, then revoke access. Check that access disappears on the recipient’s open screen and the patient’s decision survives reload.
 - Refer a flagged laboratory result using the keyboard, claim the redacted case, require a resolution and close it. Verify that status updates in the original worklist, the case history survives reload, and the Medical Director cannot open the quality register. Create and filter a facility case.
-- Create an organization and a facility, stage a staff role, activate the facility, revoke the scoped role in an open staff tab, then withdraw the inpatient capability from the open bed, physician, nursing, theatre, cashier and Blood Bank views. Verify an open Biomedical workspace offers only Outpatient for new equipment and successfully saves a register entry there.
+- Create an organization and a facility, stage a staff role, activate the facility and revoke the scoped role in an open staff tab. Withdraw the inpatient capability from the open bed, physician, nursing, theatre, cashier, Blood Bank, Hospital Support and Patient Transport views. Verify Biomedical can then register an asset in Outpatient.
 - Compare hospital facilities, time ranges and metrics. Export the patient-flow CSV and persist an alert acknowledgement. Check responsive layout, keyboard navigation and axe rules.
 - Confirm that a clinic omits bed occupancy and rejects direct access to a disabled bed route.
 - Review a subscription, reject an incompatible downgrade and drill into authorized network departments.
@@ -36,7 +37,8 @@ Verification ran locally on 27 November 2026 with Node 24.22.3 and Chromium. The
 - Register a patient, reschedule the visit and decode the replacement pass. Check in, reject replay, call the token on a separate display tab, recall, skip, requeue and transfer it. Finish the consultation and issue an invoice. Record coverage and claim stages, reject authorisation above the requested amount, post the approved share and record the patient remainder.
 - Dispense a signed prescription from an unexpired lot, check the stock reduction and confirm the resulting cashier charge.
 - Receive a batch, return units to the supplier and dispense from the received stock. Reject excess patient return quantity, credit an unpaid return, and settle the adjusted charge. Process a later return through Finance, verify refund status in the cashier and patient portal, reject a mismatched count and reload the reconciled day.
-- Request admission, allocate a bed, discharge and release the bed after it has entered cleaning.
+- Request admission and allocate a bed. Dispatch an available ambulance, record pickup and reload the in-transit trip. Verify discharge is blocked until handoff, complete handoff and verify unit availability. Discharge the admission, then start and complete housekeeping and verify the bed returns to the available list.
+- Queue a sterile set request and a dietary request. Cancel the dietary request, begin work on the sterile set request and reload. Filter by service, complete the request, verify both history records and deny direct transport access to the Support coordinator.
 - Collect a specimen as a technician and open a patient-owned appointment pass and records tabs on mobile. Check mobile axe rules and reflow.
 
 ## Known verification limits
@@ -70,3 +72,5 @@ See [accessibility report](ACCESSIBILITY_REPORT.md) and [implementation status](
 [Purchase order register](screenshots/procurement-1440.png) · [Mobile receiving history](screenshots/receiving-390.png)
 
 [Mobile shift roster](screenshots/workforce-390.png) · [Biomedical work orders](screenshots/biomedical-1440.png)
+
+[Mobile hospital support](screenshots/hospital-support-390.png) · [Transport dispatch](screenshots/transport-1440.png)
